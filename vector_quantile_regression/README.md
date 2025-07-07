@@ -8,9 +8,9 @@ You can manage the Python dependencies for this project using uv or pip.
 <summary><b>Optional: Installing uv</b></summary>
 
 uv is an extremely fast Python package installer and resolver. If you'd like to use it, you can install it with the following command:
-
+```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
+```
 </details>
 
 ### Project Dependencies
