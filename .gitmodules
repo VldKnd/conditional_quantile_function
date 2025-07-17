@@ -1,0 +1,6 @@
+[submodule "third_party/cp-flow"]
+	path = third_party/cp-flow
+	url = git@github.com:CW-Huang/CP-Flow.git
+[submodule "vector_quantile_regression/third_party/cp-flow"]
+	path = vector_quantile_regression/third_party/cp-flow
+	url = git@github.com:CW-Huang/CP-Flow.git
