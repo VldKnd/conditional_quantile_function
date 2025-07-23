@@ -22,3 +22,7 @@ dependencies = [
 
 [tool.uv]
 package = true
+
+
+[tool.uv.dependencies]
+old_source_code = { path = "./old_source_code", develop = true }
