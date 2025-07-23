@@ -41,19 +41,13 @@ class CPFlow:
         ]
         self.flow = SequentialFlow(layers)
 
-    def fit(self, scores_cal: np.ndarray, train_params: dict):
+    def fit(self, train_loader: torch.utils.data.DataLoader, train_params: dict):
         num_epochs = train_params.get("num_epochs", 100)
         batch_size = train_params.get("batch_size", 128)
         lr = train_params.get("lr", 1e-3)
         print_every = train_params.get("print_every", 10)
 
         self.flow = self.flow.to(self.device)
-
-        train_loader = torch.utils.data.DataLoader(
-            torch.tensor(scores_cal, dtype=torch.float32, device=self.device),
-            batch_size=batch_size,
-            shuffle=True,
-        )
 
         optim = torch.optim.Adam(self.flow.parameters(), lr=lr)
         sch = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -93,7 +87,7 @@ class CPFlow:
         self.is_fitted_ = True
         return self
 
-    def reverse_transform(self, y: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+    def reverse_transform(self, u: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
@@ -103,26 +97,26 @@ class CPFlow:
             self.flow.eval()
             for f in self.flow.flows[1::2]:
                 f.no_bruteforce = False
-            u = self.flow.reverse(y, context=cond)
+            y = self.flow.reverse(u, context=cond)
 
-        return u
-
-    def forward_transform(self, u: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
-        if not self.is_fitted_:
-            raise ValueError(
-                "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
-            )
-
-        with torch.no_grad():
-            self.flow.eval()
-            for f in self.flow.flows[1::2]:
-                f.no_bruteforce = False
-            y = self.flow.forward_transform(u, context=cond)
         return y
+
+    def forward_transform(self, y: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        if not self.is_fitted_:
+            raise ValueError(
+                "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
+            )
+
+        with torch.no_grad():
+            self.flow.eval()
+            for f in self.flow.flows[1::2]:
+                f.no_bruteforce = False
+            u, _ = self.flow.forward_transform(y, context=cond)
+        return u
 
     def sample_y(self, n_samples: int, cond: torch.Tensor) -> torch.Tensor:
         u = torch.randn(n_samples, self.dim_y, device=self.device, dtype=torch.float32)
-        y = self.forward_transform(u, cond)
+        y = self.reverse_transform(u, cond)
         return y
 
     def logp_cond(self, y: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
