@@ -9,7 +9,7 @@ from lib.flows import SequentialFlow, DeepConvexFlow, ActNorm
 from lib.icnn import PICNN
 
 
-class CPFlowOrdering:
+class CPFlow:
     def __init__(
         self,
         dim_y: int,
