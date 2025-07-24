@@ -5,8 +5,9 @@ from tqdm.auto import tqdm
 import gc
 
 sys.path.insert(0, "./third_party/cp-flow")
-from lib.flows import SequentialFlow, DeepConvexFlow, ActNorm
-from lib.icnn import PICNN
+from src.cpflow.flows import SequentialFlow, ActNorm
+from src.cpflow.cpflows import DeepConvexFlow
+from src.cpflow.icnn import PICNN
 
 
 class CPFlow:
