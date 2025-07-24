@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch
 from src.cpflow.distributions import log_standard_normal
-from src.cpflow.flows import cpflows
+from src.cpflow.cpflows import DeepConvexFlow
 
 
 _scaling_min = 0.001
@@ -140,7 +140,7 @@ class SequentialFlow(torch.nn.Module):
 
     def forward_transform(self, x, logdet=0, context=None, extra=None):
         for flow in self.flows:
-            if isinstance(flow, cpflows.DeepConvexFlow):
+            if isinstance(flow, DeepConvexFlow):
                 x, logdet = flow.forward_transform(
                     x, logdet, context=context, extra=extra
                 )
