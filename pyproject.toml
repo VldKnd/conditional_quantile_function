@@ -21,10 +21,5 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
-
 [tool.uv]
 package = true
-
-
-[tool.uv.dependencies]
-old_source_code = { path = "./old_source_code", develop = true }
