@@ -8,9 +8,10 @@ sys.path.insert(0, "./third_party/cp-flow")
 from src.cpflow.flows import SequentialFlow, ActNorm
 from src.cpflow.cpflows import DeepConvexFlow
 from src.cpflow.icnn import PICNN
+from src.protocols.pushforward_operator import PushForwardOperator
 
 
-class CPFlow:
+class CPFlow(PushForwardOperator):
     def __init__(
         self,
         dim_y: int,
@@ -88,7 +89,7 @@ class CPFlow:
         self.is_fitted_ = True
         return self
 
-    def reverse_transform(self, u: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
@@ -98,11 +99,11 @@ class CPFlow:
             self.flow.eval()
             for f in self.flow.flows[1::2]:
                 f.no_bruteforce = False
-            y = self.flow.reverse(u, context=cond)
+            y = self.flow.reverse(U, context=X)
 
         return y
 
-    def forward_transform(self, y: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+    def push_backward_y_given_x(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
@@ -112,17 +113,17 @@ class CPFlow:
             self.flow.eval()
             for f in self.flow.flows[1::2]:
                 f.no_bruteforce = False
-            u, _ = self.flow.forward_transform(y, context=cond)
+            u, _ = self.flow.forward_transform(Y, context=X)
         return u
 
-    def sample_y(self, n_samples: int, cond: torch.Tensor) -> torch.Tensor:
+    def sample_y_given_x(self, n_samples: int, X: torch.Tensor) -> torch.Tensor:
         u = torch.randn(n_samples, self.dim_y, device=self.device, dtype=torch.float32)
-        y = self.reverse_transform(u, cond)
+        y = self.push_forward_u_given_x(u, X)
         return y
 
-    def logp_cond(self, y: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+    def logp_cond(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
             )
-        return self.flow.logp(y, context=cond)
+        return self.flow.logp(Y, context=X)
