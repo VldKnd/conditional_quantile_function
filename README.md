@@ -1,36 +1,34 @@
 ### Conditional Quantile Estimation
-This project contains experiments for conditional quantile estimation using two different models. The core logic and helper functions are located in the src folder, while the Jupyter notebooks detailing the experiments can be found in the notebooks folder.
+Codebase containing implimentation, benchmarking and experiments related to vector quantile regression.
 
 ### Installation
 You can manage the Python dependencies for this project using uv or pip.
 
-<details>
-<summary><b>Optional: Installing uv</b></summary>
-
-uv is an extremely fast Python package installer and resolver. If you'd like to use it, you can install it with the following command:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-</details>
-
 ### Project Dependencies
-
-
-**Using uv:**
+uv is an extremely fast Python package installer and resolver. If you'd like to use it, we recommned using it. It is an almost drop-in replacement of pip. Configuration file should be compatible with pip, so if you want you can use pip instead.
 ```bash
+## Using uv:
+
+# Optional: Installing uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Installing dependencies
 uv sync
 ```
-
-**Using pip:**
-
-Create a virtual environment:
+Or
 ```bash
+## Using pip:
+
+# Create a virtual environment:
 python -m venv .venv
 source .venv/bin/activate
-```
-Install the dependencies using uv or pip:
-```bash
+
+# Install the dependencies using pip:
 pip install -r requirements.txt
 ```
-### Usage
-The notebooks folder contains the primary experiments.
+
+### Project structure
+* notebooks/ - Contain different implementations of approaches to quantile regression.
+* src/ - Folder with main code snippets used in notebooks and experiments.
+* experiments/ - Notebooks with different experiments with Optimal Transport approach to quantile regression.
+
