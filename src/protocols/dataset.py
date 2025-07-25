@@ -15,7 +15,7 @@ class Dataset:
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """
             Returns:
-            (x, y) - Union[torch.Tensor[n, k], torch.Tensor[n, p]]
+            torch.Tensor[n, k]
         """
         pass
 
