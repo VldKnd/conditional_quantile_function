@@ -1,7 +1,7 @@
 import torch
 import ot
 
-def wassertein2(ground_truth: torch.Tensor, approximation: torch.Tensor, **kwargs):
+def wassertein2(ground_truth: torch.Tensor, approximation: torch.Tensor):
     """
     Computes the Wasserstein distance between two sets of points.
 
