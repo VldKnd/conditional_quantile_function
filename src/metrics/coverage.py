@@ -8,6 +8,20 @@ def compare_coverage_in_latent_space(
         alpha: float,
         distribution_type: Literal["gaussian", "sphere"] = "gaussian"
     ):
+    """
+    Computes the coverage of a discrete quantile in the latent space.
+
+    Args:
+        discrete_quantile (torch.Tensor): The discrete quantile.
+        alpha (float): The alpha level.
+        distribution_type (Literal["gaussian", "sphere"], optional): The distribution type. Defaults to "gaussian".
+
+    Raises:
+        RuntimeError: If the distribution type is not supported.
+
+    Returns:
+        float: The coverage of the discrete quantile in the latent space.
+    """
     if distribution_type not in {"gaussian", "sphere"}:
         raise RuntimeError(f"Distribution type {distribution_type} is not supported")
 

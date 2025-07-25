@@ -9,6 +9,9 @@ def get_quantile_level_numerically(samples: torch.Tensor, alpha: float) -> float
     Args:
         samples (torch.Tensor): Samples from the distribution.
         alpha (float): Level of the quantile.
+
+    Returns:
+        float: The radius of the quantile level.
     """
     distances = torch.norm(samples, dim=-1).reshape(-1)
     distances, _ = distances.sort()
