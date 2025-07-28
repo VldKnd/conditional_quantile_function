@@ -8,7 +8,7 @@ sys.path.insert(0, "./third_party/cp-flow")
 from src.cpflow.flows import SequentialFlow, ActNorm
 from src.cpflow.cpflows import DeepConvexFlow
 from src.cpflow.icnn import PICNN
-from src.protocols.pushforward_operator import PushForwardOperator
+from src.protocols.pushforward_operator import PushForwardOperator, TrainParams
 
 
 class CPFlow(PushForwardOperator):
@@ -43,9 +43,8 @@ class CPFlow(PushForwardOperator):
         ]
         self.flow = SequentialFlow(layers)
 
-    def fit(self, train_loader: torch.utils.data.DataLoader, train_params: dict):
+    def fit(self, train_loader: torch.utils.data.DataLoader, train_params: TrainParams, *args, **kwargs):
         num_epochs = train_params.get("num_epochs", 100)
-        batch_size = train_params.get("batch_size", 128)
         lr = train_params.get("lr", 1e-3)
         print_every = train_params.get("print_every", 10)
 

@@ -25,3 +25,19 @@ class PushForwardOperator(ABC):
             torch.Tensor: Y|X.
         """
         ...
+
+    def save(self, path: str):
+        """Saves the pushforward operator to a file.
+
+        Args:
+            path (str): Path to save the pushforward operator.
+        """
+        ...
+
+    def load(self, path: str) -> "PushForwardOperator":
+        """Loads the pushforward operator from a file.
+
+        Args:
+            path (str): Path to load the pushforward operator from.
+        """
+        ...

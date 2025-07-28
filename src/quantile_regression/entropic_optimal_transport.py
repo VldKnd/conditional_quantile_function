@@ -1,0 +1,125 @@
+import torch.nn as nn
+import torch
+from tqdm import trange
+from protocols.pushforward_operator import PushForwardOperator
+from utils import TrainParams
+
+class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
+    def __init__(self, input_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7):
+        super().__init__()
+        self.phi_potential_network = nn.Sequential(
+            nn.Linear(input_dimension, hidden_dimension),
+            nn.Softplus(),
+            *[nn.Linear(hidden_dimension, hidden_dimension), nn.Softplus()] * number_of_hidden_layers,
+            nn.Linear(hidden_dimension, 1)
+        )
+        self.epsilon = epsilon
+
+    def fit(self, dataloader: torch.utils.data.DataLoader, train_params: TrainParams = TrainParams(verbose=False), *args, **kwargs):
+        """Fits the pushforward operator to the data.
+
+        Args:
+            dataloader (torch.utils.data.DataLoader): Data loader.
+            train_params (TrainParams): Training parameters.
+        """
+        num_epochs = train_params.get("num_epochs", 100)
+        lr = train_params.get("lr", 1e-3)
+        _, Y_tensor = next(iter(dataloader))
+        device_and_dtype_specifications = {
+            "device": Y_tensor.device,
+            "dtype": Y_tensor.dtype
+        }
+        self.phi_potential_network.to(**device_and_dtype_specifications)
+        phi_potential_network_optimizer = torch.optim.Adam(self.phi_potential_network.parameters(), lr=lr)
+
+        training_information = []
+        progress_bar = trange(1, num_epochs+1, desc="Training", disable=not train_params["verbose"])
+
+        for epoch_idx in progress_bar:
+                for X_batch, Y_batch in dataloader:
+                    self.phi_potential_network.zero_grad()
+                    U_batch = torch.randn_like(Y_batch)
+
+                    phi = self.phi_potential_network(torch.cat([X_batch, U_batch], dim=1))
+                    psi = self.estimate_entropy_dual_psi(
+                            X_tensor=X_batch,
+                            U_tensor=torch.randn(
+                                    2048, Y_batch.shape[1],
+                                    **device_and_dtype_specifications
+                            ),
+                            Y_tensor=Y_batch
+                    )
+
+                    objective = torch.mean(phi) + torch.mean(psi)
+
+                    objective.backward()
+                    phi_potential_network_optimizer.step()
+
+                    training_information.append({
+                            "objective": objective.item(),
+                            "epoch_index": epoch_idx
+                    })
+
+                    running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
+                    progress_bar.set_description(f"Epoch: {epoch_idx}, objective: {running_mean_objective:.3f}")
+
+    def estimate_entropy_dual_psi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
+        """Estimates the entropy dual psi.
+
+        Args:
+            X_tensor (torch.Tensor): Input tensor.
+            U_tensor (torch.Tensor): Random variable to be pushed forward.
+            Y_tensor (torch.Tensor): Output tensor.
+        """
+        n, _ = X_tensor.shape
+        m, _ = U_tensor.shape
+
+        U_expanded = U_tensor.unsqueeze(0).expand(n, -1, -1)
+        X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, m, -1)
+        XU = torch.cat((X_expanded_for_U, U_expanded), dim=-1)
+
+        phi_vals = self.phi_potential_network(XU).squeeze(-1)
+        cost_matrix = Y_tensor @ U_tensor.T
+
+        slackness = cost_matrix - phi_vals
+
+        log_mean_exp = torch.logsumexp(slackness / self.epsilon, dim=1, keepdim=True) \
+                - torch.log(torch.tensor(m, device=slackness.device, dtype=slackness.dtype))
+
+        psi_estimate = self.epsilon * log_mean_exp
+
+        return psi_estimate
+
+    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+        """Generates Y|X by applying a push forward operator to U.
+        """
+        requires_grad_backup = U.requires_grad
+        U.requires_grad = True
+        device_type_and_specification = {
+            "device": X.device,
+            "dtype": X.dtype
+        }
+        self.phi_potential_network.to(**device_type_and_specification)
+        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(torch.cat([X, U], dim=1)).sum(), U, create_graph=False)[0]
+        U.requires_grad = requires_grad_backup
+        return pushforward_of_u
+
+    def save(self, path: str):
+        """Saves the pushforward operator to a file.
+
+        Args:
+            path (str): Path to save the pushforward operator.
+        """
+        torch.save({"phi_potential_network.state_dict": self.phi_potential_network.state_dict(), "epsilon": self.epsilon}, path)
+
+    def load(self, path: str):
+        """Loads the pushforward operator from a file.
+
+        Args:
+            path (str): Path to load the pushforward operator from.
+        """
+        data = torch.load(path)
+        self.phi_potential_network.load_state_dict(data["phi_potential_network.state_dict"])
+        self.phi_potential_network.eval()
+        self.epsilon = data["epsilon"]
+        return self
