@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 from src.protocols.dataset import Dataset
 
@@ -14,21 +14,23 @@ class BananaDataset(Dataset):
     def __init__(self, seed=31337, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.seed = seed
+        self.rng = torch.Generator()
+        self.rng.set_state(self.seed)
 
     def sample_covariates(self, n_points):
-        rng = np.random.default_rng(seed=self.seed)
-        x = rng.uniform(0.5, 2.5, size=(n_points, 1))
+        self.rng.set_state(self.seed)
+        x = torch.rand(size=(n_points, 1), generator=self.rng) * 2 + 0.5
         return x
 
     def sample_conditional(self, n_points, x):
-        rng = np.random.default_rng(seed=self.seed)
-        u = rng.normal(0, 1, size=(n_points, 2))
-        y = np.concatenate(
+        self.rng.set_state(self.seed)
+        u = torch.randn(size=(n_points, 2), generator=self.rng)
+        y = torch.concatenate(
             [
                 u[:, 0:1] * x,
                 u[:, 1:2] / x + (u[:, 0:1] ** 2 + x**3),
             ],
-            axis=1,
+            dim=1,
         )
         return y
 
