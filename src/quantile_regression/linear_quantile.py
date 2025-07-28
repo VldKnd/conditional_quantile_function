@@ -40,7 +40,6 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         mu = np.ones((m, 1)) / m
 
         result = self.solve_linear_vector_quantile_regression_primal(X, Y, U, nu, mu, verbose)
-        print(result['eqlin']['marginals'].shape)
         self.b_u = result['eqlin']['marginals'][n:].reshape((U.shape[0], X.shape[1]), order='F')
         self.u = U
         return self
