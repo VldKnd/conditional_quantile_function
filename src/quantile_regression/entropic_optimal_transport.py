@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch
 from tqdm import trange
-from protocols.pushforward_operator import TrainParams, PushForwardOperator
-
+from protocols.pushforward_operator import PushForwardOperator
+from utils import TrainParams
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self, input_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7):

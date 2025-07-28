@@ -1,4 +1,5 @@
-from protocols.pushforward_operator import PushForwardOperator, TrainParams
+from protocols.pushforward_operator import PushForwardOperator
+from utils import TrainParams
 from tqdm import tqdm
 import torch
 import torch.nn as nn
