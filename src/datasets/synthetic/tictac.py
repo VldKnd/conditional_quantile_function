@@ -15,11 +15,10 @@ class TicTacDataset(Dataset):
     https://github.com/vita-epfl/TIC-TAC/blob/main/Multivariate/sampler.py
     """
 
-    def __init__(self, in_dim=5, out_dim=5, seed=31337, *args, **kwargs):
+    def __init__(self, in_dim=5, out_dim=5, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.seed = seed
 
         self.rng = torch.Generator()
         self.rng.manual_seed(self.seed + 1)

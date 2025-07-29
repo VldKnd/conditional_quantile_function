@@ -11,9 +11,8 @@ class BananaDataset(Dataset):
     Y: 2D, derived from x and random noise.
     """
 
-    def __init__(self, seed=31337, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.seed = seed
         self.rng = torch.Generator()
         self.rng.manual_seed(self.seed)
 

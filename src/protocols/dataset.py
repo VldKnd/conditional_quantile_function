@@ -2,8 +2,8 @@ import torch
 from typing import Union
 
 class Dataset:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, seed=31337, *args, **kwargs):
+        self.seed = seed
 
     def sample_joint(self, n_points: int) -> Union[torch.Tensor, torch.Tensor]:
         """
