@@ -15,15 +15,15 @@ class BananaDataset(Dataset):
         super().__init__(*args, **kwargs)
         self.seed = seed
         self.rng = torch.Generator()
-        self.rng.set_state(self.seed)
+        self.rng.manual_seed(self.seed)
 
     def sample_covariates(self, n_points):
-        self.rng.set_state(self.seed)
+        self.rng.manual_seed(self.seed)
         x = torch.rand(size=(n_points, 1), generator=self.rng) * 2 + 0.5
         return x
 
     def sample_conditional(self, n_points, x):
-        self.rng.set_state(self.seed)
+        self.rng.manual_seed(self.seed)
         u = torch.randn(size=(n_points, 2), generator=self.rng)
         y = torch.concatenate(
             [
