@@ -1,13 +1,11 @@
 # code is copied from https://github.com/CW-Huang/CP-Flow/blob/main/lib/flows/flows.py
 
-import numpy as np
-
 # noinspection PyPep8Naming
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-from src.cpflow.distributions import log_standard_normal
-from src.cpflow.cpflows import DeepConvexFlow
+from cpflow.distributions import log_standard_normal
+from cpflow.cpflows import DeepConvexFlow
 
 
 _scaling_min = 0.001

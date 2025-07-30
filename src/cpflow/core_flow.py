@@ -1,12 +1,12 @@
 import torch
-import numpy as np
 from tqdm.auto import tqdm
 import gc
 
-from src.cpflow.flows import SequentialFlow, ActNorm
-from src.cpflow.cpflows import DeepConvexFlow
-from src.cpflow.icnn import PICNN
-from src.protocols.pushforward_operator import PushForwardOperator, TrainParams
+from cpflow.flows import SequentialFlow, ActNorm
+from cpflow.cpflows import DeepConvexFlow
+from cpflow.icnn import PICNN
+from protocols.pushforward_operator import PushForwardOperator
+from utils import TrainParams
 
 
 class CPFlow(PushForwardOperator):
@@ -41,10 +41,19 @@ class CPFlow(PushForwardOperator):
         ]
         self.flow = SequentialFlow(layers)
 
-    def fit(self, train_loader: torch.utils.data.DataLoader, train_params: TrainParams, *args, **kwargs):
+    def fit(
+        self,
+        train_loader: torch.utils.data.DataLoader,
+        train_params: TrainParams,
+        *args,
+        **kwargs,
+    ):
         num_epochs = train_params.get("num_epochs", 100)
-        lr = train_params.get("lr", 1e-3)
-        print_every = train_params.get("print_every", 10)
+        lr = train_params.get("learning_rate", 1e-3)
+        verbose = train_params.get("verbose", True)
+        print_every = None
+        if verbose:
+            print_every = 10
 
         self.flow = self.flow.to(self.device)
 
@@ -81,7 +90,7 @@ class CPFlow(PushForwardOperator):
                 t += 1
                 if t == 1:
                     print("init loss:", loss_acc)
-                if t % print_every == 0:
+                if print_every is not None and t % print_every == 0:
                     print(t, loss_acc / print_every)
         self.is_fitted_ = True
         return self
@@ -124,7 +133,7 @@ class CPFlow(PushForwardOperator):
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
             )
         return self.flow.logp(Y, context=X)
-    
+
     def save(self, path: str):
         """Saves the pushforward operator to a file.
 
