@@ -5,14 +5,14 @@ from protocols.pushforward_operator import PushForwardOperator
 from utils import TrainParams
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
-    def __init__(self, feature_dimension: int, response_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7):
+    def __init__(self, feature_dimension: int, response_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7, activation_function: nn.Module = nn.Softplus):
         super().__init__()
-
+        self.activation_function_name = activation_function.__name__
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
         self.phi_potential_network = nn.Sequential(
             nn.Linear(feature_dimension + response_dimension, hidden_dimension),
-            nn.Softplus(),
-            *[nn.Linear(hidden_dimension, hidden_dimension), nn.Softplus()] * number_of_hidden_layers,
+            activation_function(),
+            *[nn.Linear(hidden_dimension, hidden_dimension), activation_function()] * number_of_hidden_layers,
             nn.Linear(hidden_dimension, 1)
         )
         self.epsilon = epsilon
@@ -105,7 +105,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon}, path)
+        torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon, "activation_function_name": self.activation_function_name}, path)
 
     def load(self, path: str):
         """Loads the pushforward operator from a file.
@@ -116,4 +116,5 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         data = torch.load(path)
         self.load_state_dict(data["state_dict"])
         self.epsilon = data["epsilon"]
+        self.activation_function_name = data["activation_function_name"]
         return self
