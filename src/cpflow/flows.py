@@ -152,7 +152,7 @@ class SequentialFlow(torch.nn.Module):
     def reverse(self, x, **kwargs):
         # noinspection PyTypeChecker
         for flow in self.flows[::-1]:
-            x = flow.reverse(x, **kwargs)
+            x = flow.reverse(x.contiguous(), **kwargs)
         return x
 
     def logp(self, x, context=None, extra=None):
