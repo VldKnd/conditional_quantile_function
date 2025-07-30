@@ -1,10 +1,8 @@
-import sys
 import torch
 import numpy as np
 from tqdm.auto import tqdm
 import gc
 
-sys.path.insert(0, "./third_party/cp-flow")
 from src.cpflow.flows import SequentialFlow, ActNorm
 from src.cpflow.cpflows import DeepConvexFlow
 from src.cpflow.icnn import PICNN
@@ -126,3 +124,19 @@ class CPFlow(PushForwardOperator):
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
             )
         return self.flow.logp(Y, context=X)
+    
+    def save(self, path: str):
+        """Saves the pushforward operator to a file.
+
+        Args:
+            path (str): Path to save the pushforward operator.
+        """
+        ...
+
+    def load(self, path: str) -> "PushForwardOperator":
+        """Loads the pushforward operator from a file.
+
+        Args:
+            path (str): Path to load the pushforward operator from.
+        """
+        ...
