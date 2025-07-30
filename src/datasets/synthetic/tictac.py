@@ -10,6 +10,7 @@ norm_ = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
 
 class TicTacDataset(Dataset):
     """
+    Work in progress, not yet debugged.
     Adapted from paper "TIC-TAC: A Framework for Improved Covariance Estimation in Deep Heteroscedastic Regression"
     https://arxiv.org/abs/2310.18953v2
     https://github.com/vita-epfl/TIC-TAC/blob/main/Multivariate/sampler.py
