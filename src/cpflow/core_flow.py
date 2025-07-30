@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from tqdm.auto import tqdm
 import gc
 
@@ -9,24 +10,30 @@ from protocols.pushforward_operator import PushForwardOperator
 from utils import TrainParams
 
 
-class CPFlow(PushForwardOperator):
+class CPFlow(PushForwardOperator, nn.Module):
     def __init__(
         self,
-        dim_y: int,
-        dim_cond: int,
-        hidden_dim: int,
-        num_hidden_layers: int,
-        n_blocks: int,
-        device: str = "cuda:0",
+        response_dimension: int,
+        feature_dimension: int,
+        hidden_dimension: int,
+        number_of_hidden_layers: int,
+        n_blocks: int = 4,
     ):
-        self.device = device
-        self.dim_y = dim_y
+        super().__init__()
+        self.config = dict(
+            response_dimension=response_dimension,
+            feature_dimension=feature_dimension,
+            hidden_dimension=hidden_dimension,
+            number_of_hidden_layers=number_of_hidden_layers,
+            n_blocks=n_blocks,
+        )
+
         icnns = [
             PICNN(
-                dim=dim_y,
-                dimh=hidden_dim,
-                dimc=dim_cond,
-                num_hidden_layers=num_hidden_layers,
+                dim=response_dimension,
+                dimh=hidden_dimension,
+                dimc=feature_dimension,
+                num_hidden_layers=number_of_hidden_layers,
                 symm_act_first=True,
                 softplus_type="gaussian_softplus",
                 zero_softplus=True,
@@ -34,9 +41,9 @@ class CPFlow(PushForwardOperator):
             for _ in range(n_blocks)
         ]
         layers = [None] * (2 * n_blocks + 1)
-        layers[0::2] = [ActNorm(dim_y) for _ in range(n_blocks + 1)]
+        layers[0::2] = [ActNorm(response_dimension) for _ in range(n_blocks + 1)]
         layers[1::2] = [
-            DeepConvexFlow(icnn, dim_y, unbiased=False)
+            DeepConvexFlow(icnn, response_dimension, unbiased=False)
             for _, icnn in zip(range(n_blocks), icnns)
         ]
         self.flow = SequentialFlow(layers)
@@ -55,8 +62,6 @@ class CPFlow(PushForwardOperator):
         if verbose:
             print_every = 10
 
-        self.flow = self.flow.to(self.device)
-
         optim = torch.optim.Adam(self.flow.parameters(), lr=lr)
         sch = torch.optim.lr_scheduler.CosineAnnealingLR(
             optim, num_epochs * len(train_loader), eta_min=0
@@ -68,9 +73,6 @@ class CPFlow(PushForwardOperator):
         self.flow.train()
         for _ in tqdm(range(num_epochs)):
             for cond, y in train_loader:
-                y = y.to(self.device)
-                cond = cond.to(self.device)
-
                 loss = -self.flow.logp(y, context=cond).mean()
                 optim.zero_grad()
                 loss.backward()
@@ -123,7 +125,12 @@ class CPFlow(PushForwardOperator):
         return u
 
     def sample_y_given_x(self, n_samples: int, X: torch.Tensor) -> torch.Tensor:
-        u = torch.randn(n_samples, self.dim_y, device=self.device, dtype=torch.float32)
+        u = torch.randn(
+            n_samples,
+            self.config["response_dimension"],
+            device=X.device,
+            dtype=torch.float32,
+        )
         y = self.push_forward_u_given_x(u, X)
         return y
 
@@ -140,12 +147,21 @@ class CPFlow(PushForwardOperator):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        ...
+        torch.save(
+            {
+                "state_dict": self.state_dict(),
+                **self.config,
+            },
+            path,
+        )
 
-    def load(self, path: str) -> "PushForwardOperator":
+    def load(self, path: str):
         """Loads the pushforward operator from a file.
 
         Args:
             path (str): Path to load the pushforward operator from.
         """
-        ...
+        data = torch.load(path)
+        self.load_state_dict(data["state_dict"])
+        self.config.update(data)
+        return self
