@@ -5,7 +5,7 @@ import torch.nn as nn
 from tqdm import trange
 from picnn import SCPICNN
 
-class UnconstrainedOTQuantileRegression(PushForwardOperator):
+class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
         alpha: float,
         x_dimension: int,
@@ -14,6 +14,19 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator):
         z_dimension: int,
         number_of_hidden_layers: int
     ):
+        super().__init__()
+        self.init_dict = {
+            "class_name": "UnconstrainedOTQuantileRegression",
+            "alpha": alpha,
+            "x_dimension": x_dimension,
+            "y_dimension": y_dimension,
+            "u_dimension": u_dimension,
+            "z_dimension": z_dimension,
+            "number_of_hidden_layers": number_of_hidden_layers
+        }
+
+        self.Y_scaler = nn.BatchNorm1d(y_dimension, affine=False)
+
         self.phi_potential_network = SCPICNN(
             alpha=alpha,
             x_dimension=x_dimension,
@@ -32,13 +45,8 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator):
             train_params (TrainParams): Training parameters.
         """
         num_epochs = train_params.get("num_epochs", 100)
-        lr = train_params.get("lr", 1e-3)
-        _, Y_tensor = next(iter(dataloader))
-        device_and_dtype_specifications = {
-            "device": Y_tensor.device,
-            "dtype": Y_tensor.dtype
-        }
-        self.phi_potential_network.to(**device_and_dtype_specifications)
+        lr = train_params.get("learning_rate", 1e-3)
+
         phi_potential_network_optimizer = torch.optim.Adam(self.phi_potential_network.parameters(), lr=lr)
 
         training_information = []
@@ -47,16 +55,18 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator):
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
                     U_batch = torch.randn_like(Y_batch)
+                    Y_batch_scaled = self.Y_scaler(Y_batch)
+
                     U_batch_for_psi = self.estimate_U_from_phi(
                             X_tensor=X_batch,
-                            Y_tensor=Y_batch,
+                            Y_tensor=Y_batch_scaled,
                             verbose=False,
                     )
 
                     self.phi_potential_network.zero_grad()
 
                     phi = self.phi_potential_network(X_batch, U_batch)
-                    psi = torch.sum(U_batch_for_psi * Y_batch, dim=-1, keepdims=True) \
+                    psi = torch.sum(U_batch_for_psi * Y_batch_scaled, dim=-1, keepdims=True) \
                             - self.phi_potential_network(X_batch, U_batch_for_psi)
                     objective = torch.mean(phi) + torch.mean(psi)
                     objective.backward()
@@ -121,12 +131,8 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator):
         """
         requires_grad_backup = U.requires_grad
         U.requires_grad = True
-        device_type_and_specification = {
-            "device": X.device,
-            "dtype": X.dtype
-        }
-        self.phi_potential_network.to(**device_type_and_specification)
         pushforward_of_u = torch.autograd.grad(self.phi_potential_network(X, U).sum(), U, create_graph=False)[0]
+        pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
         U.requires_grad = requires_grad_backup
         return pushforward_of_u
 
@@ -136,7 +142,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        torch.save({"phi_potential_network.state_dict": self.phi_potential_network.state_dict()}, path)
+        torch.save({"init_dict": self.init_dict, "state_dict": self.state_dict()}, path)
 
     def load(self, path: str):
         """Loads the pushforward operator from a file.
@@ -145,6 +151,6 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator):
             path (str): Path to load the pushforward operator from.
         """
         data = torch.load(path)
-        self.phi_potential_network.load_state_dict(data["phi_potential_network.state_dict"])
-        self.phi_potential_network.eval()
+        self.load_state_dict(data["state_dict"])
+        self.init_dict = data["init_dict"]
         return self

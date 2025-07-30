@@ -5,12 +5,14 @@ from protocols.pushforward_operator import PushForwardOperator
 from utils import TrainParams
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
-    def __init__(self, input_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7):
+    def __init__(self, feature_dimension: int, response_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7, activation_function: nn.Module = nn.Softplus):
         super().__init__()
+        self.activation_function_name = activation_function.__name__
+        self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
         self.phi_potential_network = nn.Sequential(
-            nn.Linear(input_dimension, hidden_dimension),
-            nn.Softplus(),
-            *[nn.Linear(hidden_dimension, hidden_dimension), nn.Softplus()] * number_of_hidden_layers,
+            nn.Linear(feature_dimension + response_dimension, hidden_dimension),
+            activation_function(),
+            *[nn.Linear(hidden_dimension, hidden_dimension), activation_function()] * number_of_hidden_layers,
             nn.Linear(hidden_dimension, 1)
         )
         self.epsilon = epsilon
@@ -23,13 +25,8 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             train_params (TrainParams): Training parameters.
         """
         num_epochs = train_params.get("num_epochs", 100)
-        lr = train_params.get("lr", 1e-3)
-        _, Y_tensor = next(iter(dataloader))
-        device_and_dtype_specifications = {
-            "device": Y_tensor.device,
-            "dtype": Y_tensor.dtype
-        }
-        self.phi_potential_network.to(**device_and_dtype_specifications)
+        lr = train_params.get("learning_rate", 1e-3)
+
         phi_potential_network_optimizer = torch.optim.Adam(self.phi_potential_network.parameters(), lr=lr)
 
         training_information = []
@@ -38,30 +35,32 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
                     self.phi_potential_network.zero_grad()
-                    U_batch = torch.randn_like(Y_batch)
+
+                    Y_scaled_batch = self.Y_scaler(Y_batch)
+                    U_batch = torch.randn_like(Y_scaled_batch)
 
                     phi = self.phi_potential_network(torch.cat([X_batch, U_batch], dim=1))
                     psi = self.estimate_entropy_dual_psi(
                             X_tensor=X_batch,
                             U_tensor=torch.randn(
                                     2048, Y_batch.shape[1],
-                                    **device_and_dtype_specifications
+                                    **{"device": Y_batch.device, "dtype": Y_batch.dtype}
                             ),
-                            Y_tensor=Y_batch
+                            Y_tensor=Y_scaled_batch
                     )
-
                     objective = torch.mean(phi) + torch.mean(psi)
 
                     objective.backward()
                     phi_potential_network_optimizer.step()
 
-                    training_information.append({
-                            "objective": objective.item(),
-                            "epoch_index": epoch_idx
-                    })
+                    if train_params["verbose"]:
+                        training_information.append({
+                                "objective": objective.item(),
+                                "epoch_index": epoch_idx
+                        })
 
-                    running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
-                    progress_bar.set_description(f"Epoch: {epoch_idx}, objective: {running_mean_objective:.3f}")
+                        running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
+                        progress_bar.set_description(f"Epoch: {epoch_idx}, objective: {running_mean_objective:.3f}")
 
     def estimate_entropy_dual_psi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
         """Estimates the entropy dual psi.
@@ -95,12 +94,8 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         """
         requires_grad_backup = U.requires_grad
         U.requires_grad = True
-        device_type_and_specification = {
-            "device": X.device,
-            "dtype": X.dtype
-        }
-        self.phi_potential_network.to(**device_type_and_specification)
         pushforward_of_u = torch.autograd.grad(self.phi_potential_network(torch.cat([X, U], dim=1)).sum(), U, create_graph=False)[0]
+        pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
         U.requires_grad = requires_grad_backup
         return pushforward_of_u
 
@@ -110,7 +105,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        torch.save({"phi_potential_network.state_dict": self.phi_potential_network.state_dict(), "epsilon": self.epsilon}, path)
+        torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon, "activation_function_name": self.activation_function_name}, path)
 
     def load(self, path: str):
         """Loads the pushforward operator from a file.
@@ -119,7 +114,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             path (str): Path to load the pushforward operator from.
         """
         data = torch.load(path)
-        self.phi_potential_network.load_state_dict(data["phi_potential_network.state_dict"])
-        self.phi_potential_network.eval()
+        self.load_state_dict(data["state_dict"])
         self.epsilon = data["epsilon"]
+        self.activation_function_name = data["activation_function_name"]
         return self
