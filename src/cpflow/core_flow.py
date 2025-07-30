@@ -149,7 +149,7 @@ class CPFlow(PushForwardOperator, nn.Module):
         """
         torch.save(
             {
-                "state_dict": self.state_dict(),
+                "state_dict": self.flow.state_dict(),
                 **self.config,
             },
             path,
@@ -162,6 +162,11 @@ class CPFlow(PushForwardOperator, nn.Module):
             path (str): Path to load the pushforward operator from.
         """
         data = torch.load(path)
-        self.load_state_dict(data["state_dict"])
+        with torch.no_grad():
+            y = torch.rand(8, self.config["response_dimension"])
+            x = torch.rand(8, self.config["feature_dimension"])
+        self.flow.forward_transform(y, context=x)
+        self.flow.load_state_dict(data["state_dict"])
         self.config.update(data)
+        self.is_fitted_ = True
         return self
