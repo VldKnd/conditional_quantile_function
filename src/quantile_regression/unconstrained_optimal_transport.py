@@ -26,7 +26,6 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         }
 
         self.Y_scaler = nn.BatchNorm1d(y_dimension, affine=False)
-        self.X_scaler = nn.BatchNorm1d(x_dimension, affine=False)
 
         self.phi_potential_network = SCPICNN(
             alpha=alpha,
@@ -46,7 +45,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             train_params (TrainParams): Training parameters.
         """
         num_epochs = train_params.get("num_epochs", 100)
-        lr = train_params.get("lr", 1e-3)
+        lr = train_params.get("learning_rate", 1e-3)
 
         phi_potential_network_optimizer = torch.optim.Adam(self.phi_potential_network.parameters(), lr=lr)
 
@@ -56,20 +55,19 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
                     U_batch = torch.randn_like(Y_batch)
-                    X_batch_scaled = self.X_scaler(X_batch)
                     Y_batch_scaled = self.Y_scaler(Y_batch)
 
                     U_batch_for_psi = self.estimate_U_from_phi(
-                            X_tensor=X_batch_scaled,
+                            X_tensor=X_batch,
                             Y_tensor=Y_batch_scaled,
                             verbose=False,
                     )
 
                     self.phi_potential_network.zero_grad()
 
-                    phi = self.phi_potential_network(X_batch_scaled, U_batch)
+                    phi = self.phi_potential_network(X_batch, U_batch)
                     psi = torch.sum(U_batch_for_psi * Y_batch_scaled, dim=-1, keepdims=True) \
-                            - self.phi_potential_network(X_batch_scaled, U_batch_for_psi)
+                            - self.phi_potential_network(X_batch, U_batch_for_psi)
                     objective = torch.mean(phi) + torch.mean(psi)
                     objective.backward()
 
@@ -133,8 +131,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         """
         requires_grad_backup = U.requires_grad
         U.requires_grad = True
-        X_scaled = self.X_scaler(X)
-        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(X_scaled, U).sum(), U, create_graph=False)[0]
+        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(X, U).sum(), U, create_graph=False)[0]
         pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
         U.requires_grad = requires_grad_backup
         return pushforward_of_u

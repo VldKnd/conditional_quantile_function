@@ -20,7 +20,7 @@ class PICNN(nn.Module):
 
         # Activations:
         self.z_activation = nn.Softplus()
-        self.u_activation = nn.Softplus()
+        self.u_activation = nn.ELU()
         self.positive_activation = nn.Softplus()
 
         # First layer
