@@ -1,14 +1,36 @@
 import torch
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, Literal
 import matplotlib.pyplot as plt
 from old_source_code.data import create_conditional_x
 import matplotlib
+import scipy.stats as stats
 from protocols.pushforward_operator import PushForwardOperator
 
 class TrainParams(TypedDict):
     num_epochs: int | None = None
     learning_rate: float | None = None
     verbose: bool = False
+
+def get_quantile_level_analytically(alpha: torch.Tensor, distribution: Literal["gaussian", "ball"], dimension: int) -> torch.Tensor:
+    """Function finds the radius, that is corresponding to alpha-quantile of the samples.
+
+    The function is based on the fact, that the distribution of the distances is symmetric around the origin.
+    So, we can find the radius, that is corresponding to alpha-quantile of the samples.
+
+    Args:
+        samples (torch.Tensor): Samples from the distribution.
+        alpha (float): Level of the quantile.
+
+    Returns:
+        float: The radius of the quantile level.
+    """
+    if distribution == "gaussian":
+        scipy_quantile = stats.chi2.ppf(alpha.cpu().detach().numpy(), df=dimension)
+        return torch.from_numpy(scipy_quantile**(1/2))
+    elif distribution == "ball":
+        return alpha**(1/dimension)
+    else:
+        raise ValueError(f"Distribution {distribution} is not supported.")
 
 def get_quantile_level_numerically(samples: torch.Tensor, alpha: float) -> float:
     """Function finds the radius, that is corresponding to alpha-quantile of the samples.
@@ -55,10 +77,13 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, device_and_d
     loop_start_value = 50
     for x_ in range(loop_start_value, 250, 10):
         X_batch = torch.tensor([[x_ / 100]]).repeat(100, 1)
-        radii = torch.linspace(0.01, 2, 10)
+        quantile_levels = torch.arange(0.05, 1, 0.1)
+        radii = get_quantile_level_analytically(quantile_levels, distribution="gaussian", dimension=2)
+
         colors = [color_map(i / len(radii)) for i in range(len(radii))]
-        for contour_radius, color in zip(radii, colors):
-            pi = torch.linspace(-torch.pi, torch.pi, 100) # Use linspace for a perfectly smooth circle
+        for i, contour_radius in enumerate(radii):
+            color = colors[i]
+            pi = torch.linspace(-torch.pi, torch.pi, 100)
 
             u = torch.stack([
                 contour_radius * torch.cos(pi),
@@ -71,7 +96,7 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, device_and_d
             pushforward_of_u = model.push_forward_u_given_x(u, X=X_batch).detach().cpu()
             z_line = torch.full((pushforward_of_u.shape[0], ), x_)
 
-            label = f'Radius {contour_radius:.2f}' if x_ == loop_start_value else ""
+            label = f'Quantile level {quantile_levels[i]:.2f}' if x_ == loop_start_value else ""
             ax2.plot(pushforward_of_u[:, 0], pushforward_of_u[:, 1], z_line, color=color, linewidth=2.5, label=label)
             ax1.plot(pushforward_of_u[:, 0], pushforward_of_u[:, 1], z_line, color=color, linewidth=2.5, label=label)
 
