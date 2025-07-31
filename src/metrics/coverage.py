@@ -1,6 +1,5 @@
 from typing import Literal
-from utils import get_quantile_level_numerically
-from distributions import sample_ball
+import scipy.stats as stats
 import torch
 
 def compare_coverage_in_latent_space(
@@ -26,9 +25,10 @@ def compare_coverage_in_latent_space(
         raise RuntimeError(f"Distribution type {distribution_type} is not supported")
 
     if distribution_type == "gaussian":
-        samples = torch.randn(10**6, discrete_quantile.shape[1])
-    elif distribution_type == "sphere":
-        samples = sample_ball(10**6, discrete_quantile.shape[1])
+        scipy_quantile = stats.chi2.ppf([alpha], df=discrete_quantile.shape[-1])
+        quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2))
 
-    quantile_level_radius = get_quantile_level_numerically(samples=samples, alpha=alpha)
+    elif distribution_type == "sphere":
+        quantile_level_radius = alpha**(1/discrete_quantile.shape[-1])
+
     return torch.mean(discrete_quantile.norm(dim=-1) - quantile_level_radius)
