@@ -59,6 +59,6 @@ class BananaDataset(Dataset):
         """
         assert Y.shape[0] == X.shape[0], "The number of rows in Y and X must be the same."
         U0 = Y[:, 0:1] / X
-        U1 = ( Y[:, 1:2] - (U0 ** 2 + X**3) )* X
+        U1 = (Y[:, 1:2] - (U0 ** 2 + X**3))* X
         U = torch.concatenate([U0, U1], dim=-1)
         return U
