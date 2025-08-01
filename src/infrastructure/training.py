@@ -3,6 +3,29 @@ from infrastructure.dataclasses import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 import torch
 
+def train_from_json_file(path_to_experiment_file: str) -> PushForwardOperator:
+    """
+    Train a model on a synthetic dataset from an experiment set in a JSON file.
+
+    Args:
+        path_to_experiment_file (str): The path to the JSON file containing the experiment description.
+
+    Returns:
+        PushForwardOperator: The trained model.
+    """
+    try:
+        with open(path_to_experiment_file, "r") as f:
+            experiment_as_json = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File {path_to_experiment_file} not found. Make sure the file exists and path is correct.")
+
+    try:
+        experiment = Experiment.model_validate_json(experiment_as_json)
+    except Exception as e:
+        raise ValueError(f"Error loading experiment from {path_to_experiment_file}: {e}. Make sure the file is a valid JSON file and is consistent with the Experiment class.")
+
+    return train(experiment=experiment)
+
 def train(experiment: Experiment) -> PushForwardOperator:
     """
     Train a model on a synthetic dataset.
