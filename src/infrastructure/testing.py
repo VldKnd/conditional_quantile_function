@@ -7,6 +7,48 @@ from metrics.wasserstein2 import wassertein2
 from infrastructure.dataclasses import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 
+def test_from_json_file(path_to_experiment_file: str) -> float:
+    """
+    Test a model on a synthetic dataset from an experiment set in a JSON file.
+
+    Args:
+        path_to_experiment_file (str): The path to the JSON file containing the experiment description.
+
+    Returns:
+        PushForwardOperator: The trained model.
+    """
+    try:
+        with open(path_to_experiment_file, "r") as f:
+            experiment_as_json = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File {path_to_experiment_file} not found. Make sure the file exists and path is correct.")
+
+    try:
+        experiment = Experiment.model_validate_json(experiment_as_json)
+    except Exception as e:
+        raise ValueError(f"Error loading experiment from {path_to_experiment_file}: {e}. Make sure the file is a valid JSON file and is consistent with the Experiment class.")
+
+    return test(experiment)
+
+def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushForwardOperator:
+    """
+    Load a pushforward operator from an experiment.
+
+    Args:
+        experiment (Experiment): The experiment to load the pushforward operator from.
+
+    Returns:
+        PushForwardOperator: The loaded pushforward operator.
+    """
+    pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
+    pushforward_operator.to(**experiment.tensor_parameteres)
+
+    if experiment.path_to_result is not None:
+        pushforward_operator.load(experiment.path_to_result)
+
+    pushforward_operator.eval()
+    return pushforward_operator
+
 def test(experiment: Experiment) -> PushForwardOperator:
     """
     Test a model on a synthetic dataset.
@@ -18,16 +60,12 @@ def test(experiment: Experiment) -> PushForwardOperator:
         PushForwardOperator: The trained model.
     """
     dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
-    pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
     X_dataset, Y_dataset = dataset.sample_joint(n_points=experiment.dataset_number_of_points)
     X_dataset = X_dataset.to(**experiment.tensor_parameteres)
     Y_dataset = Y_dataset.to(**experiment.tensor_parameteres)
-    pushforward_operator.to(**experiment.tensor_parameteres)
+    pushforward_operator = load_pushforward_operator_from_experiment(experiment)
 
-    pushforward_operator.eval()
-    if experiment.path_to_result is not None:
-        pushforward_operator.load(experiment.path_to_result)
-    return pushforward_operator
+    return 0
 
 def benchmark_wasserstein2_on_synthetic_data(model: PushForwardOperator, dataset: Dataset, device_and_dtype_specifications: Dict, path_to_load_model: Optional[str] = None, covariates: Optional[torch.Tensor] = None) -> Tuple[List[float], torch.Tensor]:
     """
