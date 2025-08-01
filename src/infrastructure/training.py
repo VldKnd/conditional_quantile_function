@@ -1,4 +1,4 @@
-from protocols.pushforward_operator import PushForwardOperator
+from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.dataclasses import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 import torch

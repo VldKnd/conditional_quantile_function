@@ -29,8 +29,10 @@ class TicTacDataset(Dataset):
         self.scale = out_dim
         self.mean = 2 * self.scale * torch.rand(
             size=(in_dim + out_dim, ), generator=self.rng) - self.scale
-        self.sigma_corr = get_correlation(dim=in_dim + out_dim,
-                                          seed=self.seed + 2)
+        self.sigma_corr = get_correlation(
+            dim=in_dim + out_dim,
+            seed=self.seed + 2
+        )
         self.sigma_covar = self.sigma_corr * self.scale
 
         # PyTorch Objects

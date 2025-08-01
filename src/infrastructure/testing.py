@@ -1,4 +1,4 @@
-from protocols.pushforward_operator import PushForwardOperator
+from pushforward_operators.protocol import PushForwardOperator
 from datasets.protocol import Dataset
 import torch
 from typing import Dict, Optional, Tuple, List
