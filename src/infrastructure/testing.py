@@ -1,5 +1,5 @@
 from protocols.pushforward_operator import PushForwardOperator
-from protocols.dataset import Dataset
+from datasets.protocol import Dataset
 import torch
 from typing import Dict, Optional, Tuple, List
 from metrics.wasserstein2 import wassertein2

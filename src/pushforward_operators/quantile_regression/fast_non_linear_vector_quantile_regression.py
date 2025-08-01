@@ -1,4 +1,4 @@
-from protocols.pushforward_operator import PushForwardOperator
+from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.dataclasses import TrainParameters
 from tqdm import trange
 import torch

@@ -1,7 +1,7 @@
 import torch
 
 from typing import Tuple
-from protocols.dataset import Dataset
+from datasets.protocol import Dataset
 
 
 class BananaDataset(Dataset):

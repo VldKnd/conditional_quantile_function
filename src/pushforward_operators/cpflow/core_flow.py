@@ -3,10 +3,10 @@ import torch.nn as nn
 from tqdm import trange
 import gc
 
-from cpflow.flows import SequentialFlow, ActNorm
-from cpflow.cpflows import DeepConvexFlow
-from cpflow.icnn import PICNN
-from protocols.pushforward_operator import PushForwardOperator
+from pushforward_operators.cpflow.flows import SequentialFlow, ActNorm
+from pushforward_operators.cpflow.cpflows import DeepConvexFlow
+from pushforward_operators.cpflow.icnn import PICNN
+from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.dataclasses import TrainParameters
 
 

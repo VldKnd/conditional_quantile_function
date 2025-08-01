@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from scipy.optimize import linprog
 from typing import Dict, Optional
-from protocols.pushforward_operator import PushForwardOperator
+from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.dataclasses import TrainParameters
 
 class LinearVectorQuantileRegression(PushForwardOperator):

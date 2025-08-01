@@ -3,7 +3,7 @@ import math
 import torch
 #from scipy.stats import norm
 
-from protocols.dataset import Dataset
+from datasets.protocol import Dataset
 
 norm_ = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
 

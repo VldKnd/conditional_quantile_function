@@ -1,9 +1,9 @@
-from protocols.pushforward_operator import PushForwardOperator
+from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.dataclasses import TrainParameters
 import torch
 import torch.nn as nn
 from tqdm import trange
-from picnn import SCPICNN
+from pushforward_operators.picnn import SCPICNN
 
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
