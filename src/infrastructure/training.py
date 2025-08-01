@@ -1,38 +1,32 @@
 from protocols.pushforward_operator import PushForwardOperator
-from utils import TrainParams
-from protocols.dataset import Dataset
+from infrastructure.dataclasses import Experiment
+from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 import torch
-from typing import Dict, Optional
 
-def train_model_on_synthetic_data(model: PushForwardOperator, dataset: Dataset, train_params: TrainParams, device_and_dtype_specifications: Dict, path_to_save_model: Optional[str] = None) -> PushForwardOperator:
+def train(experiment: Experiment) -> PushForwardOperator:
     """
-    Train a model on a synthetic dataset. If path_to_save_model is provided, the trained model is saved to the path.
+    Train a model on a synthetic dataset.
 
     Args:
-        model (PushForwardOperator): The model to train.
-        dataset (Dataset): The dataset to train on.
-        train_params (TrainParams): The training parameters.
-        device_and_dtype_specifications (Dict): The device and dtype specifications to use for the training.
-        path_to_save_model (Optional[str], optional): The path to save the model. Defaults to None.
+        experiment (Experiment): The experiment to train.
+        path_to_save_model (str | None): The path to save the model.
 
     Returns:
         PushForwardOperator: The trained model.
     """
-    X_dataset, Y_dataset = dataset.sample_joint(n_points=1000)
-
-    X_dataset = X_dataset.to(**device_and_dtype_specifications)
-    Y_dataset = Y_dataset.to(**device_and_dtype_specifications)
-
+    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
+    pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
+    X_dataset, Y_dataset = dataset.sample_joint(n_points=experiment.dataset_number_of_points)
+    X_dataset = X_dataset.to(**experiment.tensor_parameteres)
+    Y_dataset = Y_dataset.to(**experiment.tensor_parameteres)
     dataloader = torch.utils.data.DataLoader(
         dataset=torch.utils.data.TensorDataset(X_dataset, Y_dataset),
-        batch_size=256,
-        shuffle=True
+        **experiment.dataloader_parameters
     )
+    pushforward_operator.to(**experiment.tensor_parameteres)
 
-    model.to(**device_and_dtype_specifications)
-    _ = model.fit(dataloader, train_params=train_params)
-
-    if path_to_save_model is not None:
-        model.save(path_to_save_model)
-
-    return model
+    pushforward_operator.train()
+    _ = pushforward_operator.fit(dataloader, train_parameters=experiment.train_parameters)
+    if experiment.path_to_result is not None:
+        pushforward_operator.save(experiment.path_to_result)
+    return pushforward_operator

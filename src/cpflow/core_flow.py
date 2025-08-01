@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
-from tqdm.auto import tqdm
+from tqdm import trange
 import gc
 
 from cpflow.flows import SequentialFlow, ActNorm
 from cpflow.cpflows import DeepConvexFlow
 from cpflow.icnn import PICNN
 from protocols.pushforward_operator import PushForwardOperator
-from utils import TrainParams
+from infrastructure.dataclasses import TrainParameters
 
 
 class CPFlow(PushForwardOperator, nn.Module):
@@ -48,52 +48,54 @@ class CPFlow(PushForwardOperator, nn.Module):
         ]
         self.flow = SequentialFlow(layers)
 
-    def fit(
-        self,
-        train_loader: torch.utils.data.DataLoader,
-        train_params: TrainParams,
-        *args,
-        **kwargs,
-    ):
-        num_epochs = train_params.get("num_epochs", 100)
-        lr = train_params.get("learning_rate", 1e-3)
-        verbose = train_params.get("verbose", True)
-        print_every = None
-        if verbose:
-            print_every = 10
+    def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
+        number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
+        total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
+        verbose = train_parameters.verbose
 
-        optim = torch.optim.Adam(self.flow.parameters(), lr=lr)
-        sch = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optim, num_epochs * len(train_loader), eta_min=0
-        )
+        convex_potential_flow_optimizer = torch.optim.Adam(self.flow.parameters(), **train_parameters.optimizer_parameters)
+        if train_parameters.scheduler_parameters:
+            convex_potential_flow_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(convex_potential_flow_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+        else:
+            convex_potential_flow_scheduler = None
 
-        loss_acc = 0
-        t = 0
 
-        self.flow.train()
-        for _ in tqdm(range(num_epochs)):
-            for cond, y in train_loader:
+        accumulated_loss_function = 0
+        progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
+
+        for _ in progress_bar:
+            for cond, y in dataloader:
                 loss = -self.flow.logp(y, context=cond).mean()
-                optim.zero_grad()
+                convex_potential_flow_optimizer.zero_grad()
                 loss.backward()
 
                 torch.nn.utils.clip_grad.clip_grad_norm_(
                     self.flow.parameters(), max_norm=10
                 ).item()
 
-                optim.step()
-                sch.step()
+                convex_potential_flow_optimizer.step()
+                if convex_potential_flow_scheduler is not None:
+                    convex_potential_flow_scheduler.step()
 
-                loss_acc += loss.item()
+                accumulated_loss_function += loss.item()
+
                 del loss
                 gc.collect()
                 torch.clear_autocast_cache()
 
-                t += 1
-                if t == 1:
-                    print("init loss:", loss_acc)
-                if print_every is not None and t % print_every == 0:
-                    print(t, loss_acc / print_every)
+                if verbose:
+                    progress_bar.set_description(
+                        (
+                            f"Epoch: {progress_bar.n + 1}, Loss: {accumulated_loss_function / (progress_bar.n + 1):.3f}"
+                        ) + \
+                        (
+                            f", LR: {convex_potential_flow_scheduler.get_last_lr()[0]:.6f}"
+                            if convex_potential_flow_scheduler is not None
+                            else ""
+                        )
+                    )
+
+        progress_bar.close()
         self.is_fitted_ = True
         return self
 

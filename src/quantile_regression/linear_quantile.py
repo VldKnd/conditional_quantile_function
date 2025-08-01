@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import linprog
 from typing import Dict, Optional
 from protocols.pushforward_operator import PushForwardOperator
-from utils import TrainParams
+from infrastructure.dataclasses import TrainParameters
 
 class LinearVectorQuantileRegression(PushForwardOperator):
     """
@@ -28,19 +28,19 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         self.b_u: Optional[torch.Tensor] = None
         self.num_latent_points_to_generate = num_latent_points_to_generate
 
-    def fit(self, dataloader: torch.utils.data.DataLoader, train_params: TrainParams = TrainParams(verbose=False), *args, **kwargs):
+    def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters = TrainParameters(verbose=False), *args, **kwargs):
         """
         Fits the pushforward operator to the data from a DataLoader.
 
         Args:
             dataloader (torch.utils.data.DataLoader): Data loader providing (X, Y) batches.
-            train_params (TrainParams): Training parameters, e.g., {'verbose': True}.
+            train_parameters (TrainParameters): Training parameters, e.g., {'verbose': True}.
         """
         X_Y_tuple = [(X_batch, Y_batch) for X_batch, Y_batch in dataloader]
         X_tensor = torch.cat([X_batch for X_batch, _ in X_Y_tuple], dim=0)
         Y_tensor = torch.cat([Y_batch for _, Y_batch in X_Y_tuple], dim=0)
 
-        self.fit_tensor(X_tensor, Y_tensor, verbose=train_params.get("verbose", False))
+        self.fit_tensor(X_tensor, Y_tensor, verbose=train_parameters.verbose)
         return self
 
     def fit_tensor(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, verbose: bool = False):

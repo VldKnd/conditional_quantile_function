@@ -7,8 +7,9 @@ import scipy.stats as stats
 from protocols.pushforward_operator import PushForwardOperator
 
 class TrainParams(TypedDict):
-    num_epochs: int | None = None
-    learning_rate: float | None = None
+    number_of_epochs_to_train: int | None = None
+    optimizer_parameters: dict | None = None
+    scheduler_parameters: dict | None = None
     verbose: bool = False
 
 def get_quantile_level_analytically(alpha: torch.Tensor, distribution: Literal["gaussian", "ball"], dimension: int) -> torch.Tensor:

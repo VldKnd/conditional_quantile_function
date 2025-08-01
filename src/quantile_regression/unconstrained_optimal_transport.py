@@ -1,5 +1,5 @@
 from protocols.pushforward_operator import PushForwardOperator
-from utils import TrainParams
+from infrastructure.dataclasses import TrainParameters
 import torch
 import torch.nn as nn
 from tqdm import trange
@@ -37,20 +37,24 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             number_of_hidden_layers=number_of_hidden_layers
         )
 
-    def fit(self, dataloader: torch.utils.data.DataLoader, train_params: TrainParams = TrainParams(verbose=False), *args, **kwargs):
+    def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
 
         Args:
             dataloader (torch.utils.data.DataLoader): Data loader.
-            train_params (TrainParams): Training parameters.
+            train_parameters (TrainParameters): Training parameters.
         """
-        num_epochs = train_params.get("num_epochs", 100)
-        lr = train_params.get("learning_rate", 1e-3)
-
-        phi_potential_network_optimizer = torch.optim.Adam(self.phi_potential_network.parameters(), lr=lr)
+        number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
+        verbose = train_parameters.verbose
+        total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
+        phi_potential_network_optimizer = torch.optim.AdamW(self.phi_potential_network.parameters(), **train_parameters.optimizer_parameters)
+        if train_parameters.scheduler_parameters:
+            phi_potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(phi_potential_network_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+        else:
+            phi_potential_network_scheduler = None
 
         training_information = []
-        progress_bar = trange(1, num_epochs+1, desc="Training", disable=not train_params["verbose"])
+        progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
 
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
@@ -72,17 +76,30 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
                     objective.backward()
 
                     phi_potential_network_optimizer.step()
+                    if phi_potential_network_scheduler is not None:
+                        phi_potential_network_scheduler.step()
 
-                    training_information.append({
-                            "objective": objective.item(),
-                            "epoch_index": epoch_idx
-                    })
+                    if verbose:
+                        training_information.append({
+                                "objective": objective.item(),
+                                "epoch_index": epoch_idx
+                        })
 
-                    running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
-                    progress_bar.set_description(f"Epoch: {epoch_idx}, objective: {running_mean_objective:.3f}")
+                        running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
+                        progress_bar.set_description(
+                            (
+                                f"Epoch: {epoch_idx}, "
+                                f"Objective: {running_mean_objective:.3f}"
+                            ) + \
+                            (
+                                f", LR: {phi_potential_network_scheduler.get_last_lr()[0]:.6f}"
+                                if phi_potential_network_scheduler is not None
+                                else ""
+                            )
+                        )
 
-        _ = self.phi_potential_network.eval()
-
+        progress_bar.close()
+        return self
 
     def estimate_U_from_phi(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, verbose: bool = False):
             """

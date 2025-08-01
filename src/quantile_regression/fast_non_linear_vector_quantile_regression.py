@@ -1,6 +1,6 @@
 from protocols.pushforward_operator import PushForwardOperator
-from utils import TrainParams
-from tqdm import tqdm
+from infrastructure.dataclasses import TrainParameters
+from tqdm import trange
 import torch
 import torch.nn as nn
 
@@ -18,21 +18,21 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.b_u = None
         self.phi = None
 
-    def fit(self, dataloader: torch.utils.data.DataLoader, train_params: TrainParams = TrainParams(verbose=False), *args, **kwargs):
+    def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
 
         Args:
             dataloader (torch.utils.data.DataLoader): Data loader.
-            train_params (TrainParams): Training parameters.
+            train_parameters (TrainParameters): Training parameters.
         """
 
         X_Y_tuple = [(X_batch, Y_batch) for X_batch, Y_batch in dataloader]
         X_tensor = torch.cat([X_batch for X_batch, _ in X_Y_tuple], dim=0)
         Y_tensor = torch.cat([Y_batch for _, Y_batch in X_Y_tuple], dim=0)
-        self.fit_tensor(X_tensor=X_tensor, Y_tensor=Y_tensor, verbose=train_params["verbose"], train_params=train_params, *args, **kwargs)
+        self.fit_tensor(X_tensor=X_tensor, Y_tensor=Y_tensor, train_parameters=train_parameters, *args, **kwargs)
         return self
 
-    def fit_tensor(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, verbose: bool = False, train_params: TrainParams = TrainParams(verbose=False), *args, **kwargs):
+    def fit_tensor(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
 
         Args:
@@ -41,7 +41,6 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
             verbose (bool): Whether to print verbose output.
         """
         epsilon = 0.001
-        num_epochs = train_params["num_epochs"]
         device_type_and_specification = {
             "device": Y_tensor.device,
             "dtype": Y_tensor.dtype
@@ -55,13 +54,22 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         b_tensor = torch.zeros(*(m, self.embedding_dimension), **device_type_and_specification)
         b_tensor.requires_grad = True
 
+        total_number_of_optimizer_steps = train_parameters.number_of_epochs_to_train
+
         self.feature_network.to(**device_type_and_specification)
         self.feature_network.train()
 
-        network_optimizer = torch.optim.Adam([dict(params=self.feature_network.parameters())], lr=train_params["learning_rate"])
-        b_psi_optimizer = torch.optim.Adam([dict(params=[b_tensor, psi_tensor])], lr=train_params["learning_rate"])
+        network_optimizer = torch.optim.AdamW([dict(params=self.feature_network.parameters())], **train_parameters.optimizer_parameters)
+        b_psi_optimizer = torch.optim.AdamW([dict(params=[b_tensor, psi_tensor])], **train_parameters.optimizer_parameters)
+        if train_parameters.scheduler_parameters:
+            network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(network_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+            b_psi_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(b_psi_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+        else:
+            network_scheduler = None
+            b_psi_scheduler = None
 
-        for _ in tqdm(range(num_epochs), disable=not train_params["verbose"]):
+        progress_bar = trange(1, train_parameters.number_of_epochs_to_train+1, desc="Training", disable=not train_parameters.verbose)
+        for _ in progress_bar:
                 b_psi_optimizer.zero_grad()
                 network_optimizer.zero_grad()
 
@@ -79,6 +87,10 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
                 objective.backward()
                 b_psi_optimizer.step()
                 network_optimizer.step()
+                if network_scheduler is not None:
+                    network_scheduler.step()
+                if b_psi_scheduler is not None:
+                    b_psi_scheduler.step()
 
         with torch.no_grad():
                 phi_tensor = epsilon * torch.logsumexp(
@@ -95,6 +107,7 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.u = U_tensor.detach()
         self.feature_network.zero_grad()
         self.feature_network.eval()
+        progress_bar.close()
         self.fitted = True
         return self
 
