@@ -45,6 +45,8 @@ def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushFor
 
     if experiment.path_to_result is not None:
         pushforward_operator.load(experiment.path_to_result)
+    else:
+        raise ValueError("Path to the model is not specified. Model can not be loaded.")
 
     pushforward_operator.eval()
     return pushforward_operator
