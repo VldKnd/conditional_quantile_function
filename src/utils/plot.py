@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 import torch
 import matplotlib
-from datasets.synthetic.banana import BananaDataset
-from pushforward_operators.protocol import PushForwardOperator
+from datasets import BananaDataset
+from pushforward_operators import PushForwardOperator
 from utils.quantile import get_quantile_level_analytically
 
-def plot_potentials_from_banana_dataset(model: PushForwardOperator, device_and_dtype_specifications: dict):
+def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_conditional_points:int, number_of_points_to_sample:int, tensor_parameteres: dict):
     dataset = BananaDataset()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': '3d'})
     fig.suptitle('Separated 3D Plots', fontsize=16)
@@ -15,13 +15,15 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, device_and_d
     ax1.set_ylabel('Axis 1')
     ax1.set_zlabel('x_ value')
 
-    for x_ in range(50, 250, 10):
-        x = torch.tensor([x_ / 100])
+    X = torch.linspace(1, 2.5, number_of_conditional_points).unsqueeze(1)
 
-        # This section is now active for the first plot
-        _, y_x_gt = dataset.sample_conditional(n_points=100, x=x)
-        z_scatter = torch.full((_.shape[0],),  x_)
-        ax1.scatter(y_x_gt[:, 0], y_x_gt[:, 1], z_scatter, color='blue', marker='o', s=30, alpha=0.2)
+    # This section is now active for the first plot
+    y_x_gt = dataset.sample_conditional(n_points=number_of_points_to_sample, X=X)
+    z_scatter = X.unsqueeze(1).repeat(1, number_of_points_to_sample, 1)
+    y_0 = y_x_gt[:, :, 0].flatten()
+    y_1 = y_x_gt[:, :, 1].flatten()
+    z_scatter = z_scatter.flatten()
+    ax1.scatter(y_0, y_1, z_scatter, color='blue', marker='o', s=30, alpha=0.2)
 
     ax1.view_init(elev=-55, azim=154, roll=-83)
 
@@ -30,14 +32,13 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, device_and_d
     ax2.set_ylabel('Axis 1')
     ax2.set_zlabel('x_ value')
     color_map = matplotlib.colormaps['viridis']
+    quantile_levels = torch.arange(0.05, 1, 0.1)
+    radii = get_quantile_level_analytically(quantile_levels, distribution="gaussian", dimension=2)
+    colors = [color_map(i / len(radii)) for i in range(len(radii))]
+    X = X.to(**tensor_parameteres)
 
-    loop_start_value = 50
-    for x_ in range(loop_start_value, 250, 10):
-        X_batch = torch.tensor([[x_ / 100]]).repeat(100, 1)
-        quantile_levels = torch.arange(0.05, 1, 0.1)
-        radii = get_quantile_level_analytically(quantile_levels, distribution="gaussian", dimension=2)
-
-        colors = [color_map(i / len(radii)) for i in range(len(radii))]
+    for j in range(number_of_conditional_points):
+        X_batch = X[j].unsqueeze(0).repeat(100, 1)
         for i, contour_radius in enumerate(radii):
             color = colors[i]
             pi = torch.linspace(-torch.pi, torch.pi, 100)
@@ -46,14 +47,12 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, device_and_d
                 contour_radius * torch.cos(pi),
                 contour_radius * torch.sin(pi),
             ]).T
-
-            X_batch = X_batch.to(**device_and_dtype_specifications)
-            u = u.to(**device_and_dtype_specifications)
+            u = u.to(**tensor_parameteres)
 
             pushforward_of_u = model.push_forward_u_given_x(u, X=X_batch).detach().cpu()
-            z_line = torch.full((pushforward_of_u.shape[0], ), x_)
+            z_line = torch.full((pushforward_of_u.shape[0], ), X[j].item())
 
-            label = f'Quantile level {quantile_levels[i]:.2f}' if x_ == loop_start_value else ""
+            label = f'Quantile level {quantile_levels[i]:.2f}' if j == 0 else ""
             ax2.plot(pushforward_of_u[:, 0], pushforward_of_u[:, 1], z_line, color=color, linewidth=2.5, label=label)
             ax1.plot(pushforward_of_u[:, 0], pushforward_of_u[:, 1], z_line, color=color, linewidth=2.5, label=label)
 

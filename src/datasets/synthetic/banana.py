@@ -26,6 +26,16 @@ class BananaDataset(Dataset):
         """
         Sample the conditional distribution of the response given the covariates.
         """
+    # u = np.random.normal(0, 1, size=(n_points, 2))
+    # x = np.random.uniform(0.5, 2.5, size=(n_points, 1))
+
+    # y = np.concatenate([
+    #     u[:, 0:1] * x,
+    #     u[:, 1:2] / x + (u[:, 0:1]**2 + x**3),
+    # ], axis=1)
+
+    # return x, y
+
         U = torch.randn(size=(X.shape[0], n_points, 2))
         X_unsqueezed = X.unsqueeze(1)
         y = torch.concatenate(

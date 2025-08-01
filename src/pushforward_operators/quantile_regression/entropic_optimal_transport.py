@@ -121,7 +121,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         """
         requires_grad_backup = U.requires_grad
         U.requires_grad = True
-        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(torch.cat([X, U], dim=1)).sum(), U, create_graph=False)[0]
+        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(torch.cat([X, U], dim=-1)).sum(), U, create_graph=False)[0]
         pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
         U.requires_grad = requires_grad_backup
         return pushforward_of_u

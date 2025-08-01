@@ -1,12 +1,16 @@
-from datasets.protocol import Dataset
-from datasets.synthetic.banana import BananaDataset
-from datasets.synthetic.tictac import TicTacDataset
-from pushforward_operators.protocol import PushForwardOperator
-from pushforward_operators.quantile_regression.entropic_optimal_transport import EntropicOTQuantileRegression
-from pushforward_operators.cpflow.core_flow import CPFlow
-from pushforward_operators.quantile_regression.unconstrained_optimal_transport import UnconstrainedOTQuantileRegression
-from pushforward_operators.quantile_regression.fast_non_linear_vector_quantile_regression import FastNonLinearVectorQuantileRegression
-from pushforward_operators.quantile_regression.linear_quantile import LinearVectorQuantileRegression
+from datasets import (
+    BananaDataset,
+    TicTacDataset,
+    Dataset
+)
+from pushforward_operators import (
+    PushForwardOperator,
+    EntropicOTQuantileRegression,
+    CPFlow,
+    UnconstrainedOTQuantileRegression,
+    FastNonLinearVectorQuantileRegression,
+    LinearVectorQuantileRegression,
+)
 
 name_to_dataset_map: dict[str, Dataset] = {
     "banana": BananaDataset,
