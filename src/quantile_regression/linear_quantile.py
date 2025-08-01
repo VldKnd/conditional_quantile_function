@@ -28,6 +28,28 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         self.b_u: Optional[torch.Tensor] = None
         self.num_latent_points_to_generate = num_latent_points_to_generate
 
+    def to(self, *args, **kwargs):
+        """
+        Moves the model to the specified device and dtype.
+        """
+        if self.u is not None:
+            self.u = self.u.to(*args, **kwargs)
+        if self.b_u is not None:
+            self.b_u = self.b_u.to(*args, **kwargs)
+        return self
+
+    def train(self):
+        """
+        Sets the model to training mode.
+        """
+        pass
+
+    def eval(self):
+        """
+        Sets the model to evaluation mode.
+        """
+        pass
+
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters = TrainParameters(verbose=False), *args, **kwargs):
         """
         Fits the pushforward operator to the data from a DataLoader.

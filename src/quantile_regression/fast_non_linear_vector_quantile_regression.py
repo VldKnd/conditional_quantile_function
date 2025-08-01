@@ -18,6 +18,32 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.b_u = None
         self.phi = None
 
+
+    def to(self, *args, **kwargs):
+        """
+        Moves the model to the specified device and dtype.
+        """
+        self.feature_network.to(*args, **kwargs)
+
+        if self.phi is not None:
+            self.phi = self.phi.to(*args, **kwargs)
+        if self.b_u is not None:
+            self.b_u = self.b_u.to(*args, **kwargs)
+
+        return self
+
+    def train(self):
+        """
+        Sets the model to training mode.
+        """
+        self.feature_network.train()
+
+    def eval(self):
+        """
+        Sets the model to evaluation mode.
+        """
+        self.feature_network.eval()
+
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
 
@@ -68,8 +94,11 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
             network_scheduler = None
             b_psi_scheduler = None
 
+        training_information = []
+
         progress_bar = trange(1, train_parameters.number_of_epochs_to_train+1, desc="Training", disable=not train_parameters.verbose)
-        for _ in progress_bar:
+
+        for epoch_idx in progress_bar:
                 b_psi_optimizer.zero_grad()
                 network_optimizer.zero_grad()
 
@@ -91,7 +120,26 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
                     network_scheduler.step()
                 if b_psi_scheduler is not None:
                     b_psi_scheduler.step()
+                    if train_parameters.verbose:
+                        training_information.append({
+                                "objective": objective.item(),
+                                "epoch_index": epoch_idx
+                        })
 
+                        running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
+                        progress_bar.set_description(
+                            (
+                                f"Epoch: {epoch_idx}, "
+                                f"Objective: {running_mean_objective:.3f}"
+                            ) + \
+                            (
+                                f", LR: {network_scheduler.get_last_lr()[0]:.6f}"
+                                if network_scheduler is not None
+                                else ""
+                            )
+                        )
+
+        progress_bar.close()
         with torch.no_grad():
                 phi_tensor = epsilon * torch.logsumexp(
                         (

@@ -23,10 +23,15 @@ def train(experiment: Experiment) -> PushForwardOperator:
         dataset=torch.utils.data.TensorDataset(X_dataset, Y_dataset),
         **experiment.dataloader_parameters
     )
-    pushforward_operator.to(**experiment.tensor_parameteres)
 
-    pushforward_operator.train()
+    try:
+        pushforward_operator.to(**experiment.tensor_parameteres)
+        pushforward_operator.train()
+    except AttributeError:
+        pass
+
     _ = pushforward_operator.fit(dataloader, train_parameters=experiment.train_parameters)
+
     if experiment.path_to_result is not None:
         pushforward_operator.save(experiment.path_to_result)
     return pushforward_operator
