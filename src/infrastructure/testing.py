@@ -1,12 +1,10 @@
-from pushforward_operators.protocol import PushForwardOperator
 import torch
-from metrics.wasserstein2 import wassertein2
 from tqdm import tqdm
-from datasets.protocol import Dataset
+from datasets import Dataset
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
-from metrics.compare_quantile import compare_quantile_in_latent_space
-from metrics.nll import compute_gaussian_negative_log_likelihood
+from metrics import wassertein2, compare_quantile_in_latent_space, compute_gaussian_negative_log_likelihood
+from pushforward_operators import PushForwardOperator
 
 def test_from_json_file(path_to_experiment_file: str, verbose: bool = False, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False) -> dict:
     """
