@@ -12,8 +12,10 @@ class BananaDataset(Dataset):
     Y: 2D, derived from x and random noise.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, tensor_parameters: dict, seed: int = 31337, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.tensor_parameters = tensor_parameters
+        self.seed = seed
 
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """

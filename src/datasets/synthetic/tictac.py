@@ -14,8 +14,10 @@ class TicTacDataset(Dataset):
     https://github.com/vita-epfl/TIC-TAC/blob/main/Multivariate/sampler.py
     """
 
-    def __init__(self, in_dim=5, out_dim=5, *args, **kwargs):
+    def __init__(self, tensor_parameters: dict, seed: int = 31337, in_dim=5, out_dim=5, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.tensor_parameters = tensor_parameters
+        self.seed = seed
         self.in_dim = in_dim
         self.out_dim = out_dim
 
