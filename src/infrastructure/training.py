@@ -1,7 +1,7 @@
-from pushforward_operators.protocol import PushForwardOperator
-from infrastructure.dataclasses import Experiment
-from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 import torch
+from pushforward_operators.protocol import PushForwardOperator
+from infrastructure.classes import Experiment
+from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 
 def train_from_json_file(path_to_experiment_file: str) -> PushForwardOperator:
     """
@@ -55,6 +55,16 @@ def train(experiment: Experiment) -> PushForwardOperator:
 
     _ = pushforward_operator.fit(dataloader, train_parameters=experiment.train_parameters)
 
-    if experiment.path_to_result is not None:
-        pushforward_operator.save(experiment.path_to_result)
+    if experiment.path_to_weights is not None:
+        pushforward_operator.save(experiment.path_to_weights)
+
     return pushforward_operator
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path_to_experiment_file", type=str, required=True)
+    args = parser.parse_args()
+    train_from_json_file(args.path_to_experiment_file)

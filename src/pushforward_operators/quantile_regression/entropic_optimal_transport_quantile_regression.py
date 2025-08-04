@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from tqdm import trange
-from infrastructure.dataclasses import TrainParameters
+from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):

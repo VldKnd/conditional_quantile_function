@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import linprog
 from typing import Dict, Optional
 from pushforward_operators.protocol import PushForwardOperator
-from infrastructure.dataclasses import TrainParameters
+from infrastructure.classes import TrainParameters
 
 class LinearVectorQuantileRegression(PushForwardOperator):
     """

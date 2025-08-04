@@ -1,5 +1,11 @@
+# Mac OS
+.DS_Store
+
 # Datasets
 data/
+
+# Experiments
+experiments/
 
 # Model weights
 *.pth

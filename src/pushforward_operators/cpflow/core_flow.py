@@ -7,7 +7,7 @@ from pushforward_operators.cpflow.flows import SequentialFlow, ActNorm
 from pushforward_operators.cpflow.cpflows import DeepConvexFlow
 from pushforward_operators.cpflow.icnn import PICNN
 from pushforward_operators.protocol import PushForwardOperator
-from infrastructure.dataclasses import TrainParameters
+from infrastructure.classes import TrainParameters
 
 
 class CPFlow(PushForwardOperator, nn.Module):
