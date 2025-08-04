@@ -27,7 +27,7 @@ class BananaDataset(Dataset):
         Sample the conditional distribution of the response given the covariates.
         """
 
-        U = torch.randn(size=(X.shape[0], n_points, 2))
+        U = torch.randn(size=(X.shape[0], n_points, 2), device=X.device, dtype=X.dtype)
         X_unsqueezed = X.unsqueeze(1)
         y = torch.concatenate(
             [
@@ -43,7 +43,7 @@ class BananaDataset(Dataset):
         Sample the joint distribution of the covariates and the response.
         """
         X = self.sample_covariates(n_points=n_points)
-        U = torch.randn(size=(X.shape[0], 2))
+        U = torch.randn(size=(X.shape[0], 2), device=X.device, dtype=X.dtype)
         Y = torch.concatenate(
             [
                 U[:, 0:1] * X,
