@@ -173,7 +173,7 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=100,
+                number_of_samples=10,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -196,7 +196,7 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
                 dataset=dataset,
             X_dataset=X_dataset,
             Y_dataset=Y_dataset,
-            number_of_samples=100,
+            number_of_samples=10,
             number_of_alphas=10,
             verbose=verbose
         )
