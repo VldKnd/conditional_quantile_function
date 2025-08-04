@@ -161,13 +161,13 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         """
         torch.save({"init_dict": self.init_dict, "state_dict": self.state_dict()}, path)
 
-    def load(self, path: str):
+    def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """Loads the pushforward operator from a file.
 
         Args:
             path (str): Path to load the pushforward operator from.
         """
-        data = torch.load(path)
+        data = torch.load(path, map_location=map_location)
         self.load_state_dict(data["state_dict"])
         self.init_dict = data["init_dict"]
         return self

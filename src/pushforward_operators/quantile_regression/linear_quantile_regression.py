@@ -243,14 +243,14 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         state = {'u': self.u, 'b_u': self.b_u}
         torch.save(state, path)
 
-    def load(self, path: str):
+    def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """
         Loads the model's state (u and b_u tensors) from a file.
 
         Args:
             path (str): Path to load the model file from.
         """
-        state = torch.load(path)
+        state = torch.load(path, map_location=map_location)
         self.u = state['u']
         self.b_u = state['b_u']
         self.num_latent_points_to_generate = self.u.shape[0]
