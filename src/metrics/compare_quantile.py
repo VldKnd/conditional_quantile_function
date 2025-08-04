@@ -26,7 +26,7 @@ def compare_quantile_in_latent_space(
 
     if distribution_type == "gaussian":
         scipy_quantile = stats.chi2.ppf([alpha], df=discrete_quantile.shape[-1])
-        quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(discrete_quantile.device)
+        quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(discrete_quantile)
 
     elif distribution_type == "sphere":
         quantile_level_radius = alpha**(1/discrete_quantile.shape[-1])
