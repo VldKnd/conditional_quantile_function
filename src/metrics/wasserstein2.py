@@ -1,5 +1,6 @@
 import torch
 import ot
+from tqdm import tqdm
 
 def wassertein2(ground_truth: torch.Tensor, approximation: torch.Tensor):
     """
@@ -15,7 +16,19 @@ def wassertein2(ground_truth: torch.Tensor, approximation: torch.Tensor):
     return ot.solve_sample(X_a=ground_truth, X_b=approximation).value
 
 if __name__ == "__main__":
-    for alpha in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1]:
-        ground_truth = torch.rand(1000, 5)
-        approximation = torch.rand(1000, 5) * alpha + 10 * (1 - alpha)
-        print(f"alpha: {alpha}, wassertein2: {wassertein2(ground_truth, approximation)}")
+        statistics = {
+            "10": [],
+            "100": [],
+            "1000": [],
+            "10000": []
+        }
+
+        distances = []
+        pbar = tqdm(range(10000))
+
+        for i in pbar:
+            ground_truth = torch.rand(10000, 5)
+            switch = (torch.rand(10000, 5) > 0.5).float()
+            approximation = (torch.rand(10000, 5) + 0.5) * switch + (torch.rand(10000, 5) - 0.5) * (1 - switch)
+            distances.append(wassertein2(ground_truth, approximation))
+            pbar.set_description(f"Mean: {torch.tensor(distances).mean()}, Std: {torch.tensor(distances).std()}")

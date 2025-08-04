@@ -1,6 +1,9 @@
 # Datasets
 data/
 
+# Experiments
+experiments/
+
 # Model weights
 *.pth
 

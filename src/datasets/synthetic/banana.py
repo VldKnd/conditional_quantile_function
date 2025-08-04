@@ -54,7 +54,7 @@ class BananaDataset(Dataset):
 
         return X, Y
 
-    def push_backward_Y_given_X(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def pushbackward_Y_given_X(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         """
         Push backwards the conditional distribution of the response given the covariates.
         """
@@ -88,3 +88,10 @@ class BananaDataset(Dataset):
             dim=1,
         )
         return Y_flat.reshape(Y_shape)
+
+    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
+        """
+        Create a meshgrid of covariates.
+        """
+        x = torch.linspace(0.5, 2.5, n_points_per_dimension)
+        return x.unsqueeze(1)

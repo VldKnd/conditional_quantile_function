@@ -27,7 +27,8 @@ class Experiment(pydantic.BaseModel):
     pushforward_operator_parameters: dict = pydantic.Field(default={})
     train_parameters: TrainParameters = pydantic.Field(default=TrainParameters())
     tensor_parameteres: TensorParameters = pydantic.Field(default=TensorParameters())
-    path_to_result: str | None = pydantic.Field(default=None)
+    path_to_weights: str | None = pydantic.Field(default=None)
+    path_to_metrics: str | None = pydantic.Field(default=None)
 
     def __getattribute__(self, name):
         if name == "tensor_parameteres":
