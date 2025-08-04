@@ -31,4 +31,4 @@ def compare_quantile_in_latent_space(
     elif distribution_type == "sphere":
         quantile_level_radius = alpha**(1/discrete_quantile.shape[-1])
 
-    return torch.mean(discrete_quantile.norm(dim=-1) - quantile_level_radius)
+    return torch.mean((discrete_quantile - quantile_level_radius).norm(dim=-1))

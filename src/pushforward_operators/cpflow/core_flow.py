@@ -157,13 +157,13 @@ class CPFlow(PushForwardOperator, nn.Module):
             path,
         )
 
-    def load(self, path: str):
+    def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """Loads the pushforward operator from a file.
 
         Args:
             path (str): Path to load the pushforward operator from.
         """
-        data = torch.load(path)
+        data = torch.load(path, map_location=map_location)
         with torch.no_grad():
             y = torch.rand(8, self.config["response_dimension"])
             x = torch.rand(8, self.config["feature_dimension"])

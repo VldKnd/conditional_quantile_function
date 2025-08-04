@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-from datasets import Dataset
+from datasets import Dataset, BananaDataset, TicTacDataset
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 from metrics import wassertein2, compare_quantile_in_latent_space, compute_gaussian_negative_log_likelihood
@@ -48,7 +48,7 @@ def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushFor
     pushforward_operator.to(**experiment.tensor_parameteres)
 
     if experiment.path_to_weights is not None:
-        pushforward_operator.load(experiment.path_to_weights)
+        pushforward_operator.load(experiment.path_to_weights, map_location=torch.device(experiment.tensor_parameteres["device"]))
     else:
         raise ValueError("Path to the model is not specified. Model can not be loaded.")
 
@@ -144,17 +144,12 @@ def sample_quantile_similarity_metrics(
         alpha_metrics.append(torch.stack(metrics_per_x))
     return torch.stack(alpha_metrics)
 
-def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
+def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
     """
     Test a model on a synthetic dataset.
-
-    Args:
-        experiment (Experiment): The experiment to train.
-
-    Returns:
-        dict: The metrics.
     """
     dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
+
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameteres)
@@ -204,6 +199,23 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
         print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
 
     return metrics
+
+def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
+    """
+    Test a model on a synthetic dataset.
+
+    Args:
+        experiment (Experiment): The experiment to train.
+
+    Returns:
+        dict: The metrics.
+    """
+    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
+
+    if type(dataset) in {BananaDataset, TicTacDataset}:
+        return test_on_synthetic_dataset(experiment, exclude_wasserstein2, exclude_gaussian_likelihood, exclude_quantile_similarity, verbose)
+    else:
+        raise NotImplementedError(f"Testing on the dataset {dataset.__class__.__name__} is not implemented.")
 
 if __name__ == "__main__":
     import argparse

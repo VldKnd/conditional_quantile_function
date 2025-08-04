@@ -260,13 +260,13 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         """
         torch.save({"u": self.u, "b_u": self.b_u, "phi": self.phi, "feature_network.state_dict": self.feature_network.state_dict()}, path)
 
-    def load(self, path: str):
+    def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """Loads the pushforward operator from a file.
 
         Args:
             path (str): Path to load the pushforward operator from.
         """
-        data = torch.load(path)
+        data = torch.load(path, map_location=map_location)
         self.u = data["u"]
         self.b_u = data["b_u"]
         self.phi = data["phi"]
