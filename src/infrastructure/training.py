@@ -37,7 +37,7 @@ def train(experiment: Experiment) -> PushForwardOperator:
     Returns:
         PushForwardOperator: The trained model.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
+    dataset = name_to_dataset_map[experiment.dataset_name](experiment.tensor_parameteres, **experiment.dataset_parameters)
     pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
     X_dataset, Y_dataset = dataset.sample_joint(n_points=experiment.dataset_number_of_points)
     X_dataset = X_dataset.to(**experiment.tensor_parameteres)

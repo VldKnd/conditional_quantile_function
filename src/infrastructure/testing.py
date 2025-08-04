@@ -148,8 +148,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     """
     Test a model on a synthetic dataset.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
-
+    dataset = name_to_dataset_map[experiment.dataset_name](experiment.tensor_parameteres, **experiment.dataset_parameters)
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameteres)
