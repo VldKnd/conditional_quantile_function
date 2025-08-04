@@ -1,0 +1,33 @@
+{
+    "tensor_parameteres": {
+        "dtype": "float64",
+        "device": "cpu"
+    },
+    "dataset_name": "banana",
+    "dataset_number_of_points": 1000,
+    "dataloader_parameters": {
+        "batch_size": 256,
+        "shuffle": true
+    },
+    "pushforward_operator_name": "entropic_optimal_transport_quantile_regression",
+    "pushforward_operator_parameters": {
+        "feature_dimension": 1,
+        "response_dimension": 2,
+        "hidden_dimension": 8,
+        "number_of_hidden_layers": 4,
+        "epsilon": 1e-7,
+        "number_of_samples_for_entropy_dual_estimation": 2048,
+        "activation_function_name": "Softplus"
+    },
+    "train_parameters": {
+        "number_of_epochs_to_train": 10,
+        "verbose": true,
+        "optimizer_parameters": {
+            "lr": 0.01
+        },
+        "scheduler_parameters": {
+            "eta_min": 0
+        }
+    },
+    "path_to_result": "experiments/entropic_quantile_regression/weights.pth"
+}

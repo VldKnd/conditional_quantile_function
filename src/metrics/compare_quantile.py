@@ -2,13 +2,13 @@ from typing import Literal
 import scipy.stats as stats
 import torch
 
-def compare_coverage_in_latent_space(
+def compare_quantile_in_latent_space(
         discrete_quantile: torch.Tensor,
         alpha: float,
         distribution_type: Literal["gaussian", "sphere"] = "gaussian"
     ):
     """
-    Computes the coverage of a discrete quantile in the latent space.
+    Computes quantile levels created by the discrete quantile in the latent space.
 
     Args:
         discrete_quantile (torch.Tensor): The discrete quantile.
@@ -19,7 +19,7 @@ def compare_coverage_in_latent_space(
         RuntimeError: If the distribution type is not supported.
 
     Returns:
-        float: The coverage of the discrete quantile in the latent space.
+        float: Distance from the true quantile level in the latent space.
     """
     if distribution_type not in {"gaussian", "sphere"}:
         raise RuntimeError(f"Distribution type {distribution_type} is not supported")

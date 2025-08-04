@@ -4,7 +4,7 @@ import torch
 from typing import Dict, Optional, Tuple, List
 from metrics.wasserstein2 import wassertein2
 
-from infrastructure.dataclasses import Experiment
+from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 
 def test_from_json_file(path_to_experiment_file: str) -> float:

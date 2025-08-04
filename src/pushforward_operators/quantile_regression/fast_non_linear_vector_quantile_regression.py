@@ -1,5 +1,5 @@
 from pushforward_operators.protocol import PushForwardOperator
-from infrastructure.dataclasses import TrainParameters
+from infrastructure.classes import TrainParameters
 from tqdm import trange
 import torch
 import torch.nn as nn
