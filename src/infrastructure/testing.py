@@ -48,7 +48,7 @@ def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushFor
     pushforward_operator.to(**experiment.tensor_parameters)
 
     if experiment.path_to_weights is not None:
-        pushforward_operator.load(experiment.path_to_weights, map_location=torch.device(experiment.tensor_parameteres["device"]))
+        pushforward_operator.load(experiment.path_to_weights, map_location=torch.device(experiment.tensor_parameters["device"]))
     else:
         raise ValueError("Path to the model is not specified. Model can not be loaded.")
 
@@ -209,7 +209,7 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
     Returns:
         dict: The metrics.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
+    dataset = name_to_dataset_map[experiment.dataset_name](experiment.tensor_parameters, **experiment.dataset_parameters)
 
     if type(dataset) in {BananaDataset, TicTacDataset}:
         return test_on_synthetic_dataset(experiment, exclude_wasserstein2, exclude_gaussian_likelihood, exclude_quantile_similarity, verbose)

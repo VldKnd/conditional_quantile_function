@@ -165,8 +165,10 @@ class CPFlow(PushForwardOperator, nn.Module):
         """
         data = torch.load(path, map_location=map_location)
         with torch.no_grad():
-            y = torch.rand(8, self.config["response_dimension"])
-            x = torch.rand(8, self.config["feature_dimension"])
+            _dtype = list(self.flow.parameters())[0].dtype
+            _device = list(self.flow.parameters())[0].device
+            y = torch.rand(8, self.config["response_dimension"], dtype=_dtype, device=_device)
+            x = torch.rand(8, self.config["feature_dimension"], dtype=_dtype, device=_device)
         self.flow.forward_transform(y, context=x)
         self.flow.load_state_dict(data["state_dict"])
         self.config.update(data)
