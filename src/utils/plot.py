@@ -6,7 +6,7 @@ from pushforward_operators import PushForwardOperator
 from utils.quantile import get_quantile_level_analytically
 
 def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_conditional_points:int, number_of_points_to_sample:int, tensor_parameters: dict):
-    dataset = BananaDataset()
+    dataset = BananaDataset(tensor_parameters)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': '3d'})
     fig.suptitle('Separated 3D Plots', fontsize=16)
 
@@ -63,7 +63,7 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_co
     plt.show()
 
 def plot_quantile_levels_from_banana_dataset(model: PushForwardOperator, number_of_points_to_sample:int, tensor_parameters: dict, conditional_value: float, number_of_quantile_levels: int):
-    dataset = BananaDataset()
+    dataset = BananaDataset(tensor_parameters)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': '3d'})
     fig.suptitle('Separated 3D Plots', fontsize=16)
 
