@@ -106,7 +106,7 @@ def plot_quantile_levels_from_banana_dataset(model: PushForwardOperator, number_
         u = u.to(**tensor_parameteres)
 
         pushforward_of_u = model.push_forward_u_given_x(u, X=X_batch).detach().cpu()
-        u_approximated = dataset.push_backward_Y_given_X(pushforward_of_u, X_batch)
+        u_approximated = dataset.pushbackward_Y_given_X(pushforward_of_u, X_batch)
 
         z_line = torch.full((pushforward_of_u.shape[0], ), X.item())
 
