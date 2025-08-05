@@ -45,7 +45,7 @@ def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushFor
         PushForwardOperator: The loaded pushforward operator.
     """
     pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
-    pushforward_operator.to(**experiment.tensor_parameteres)
+    pushforward_operator.to(**experiment.tensor_parameters)
 
     if experiment.path_to_weights is not None:
         pushforward_operator.load(experiment.path_to_weights, map_location=torch.device(experiment.tensor_parameteres["device"]))
@@ -148,18 +148,17 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     """
     Test a model on a synthetic dataset.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
-
+    dataset = name_to_dataset_map[experiment.dataset_name](experiment.tensor_parameters, **experiment.dataset_parameters)
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
-    pushforward_operator.to(**experiment.tensor_parameteres)
+    pushforward_operator.to(**experiment.tensor_parameters)
 
     metrics = {}
 
     X_dataset = dataset.meshgrid_of_covariates(n_points_per_dimension=number_of_covariates_per_dimension)
-    X_dataset = X_dataset.to(**experiment.tensor_parameteres)
+    X_dataset = X_dataset.to(**experiment.tensor_parameters)
     Y_dataset = dataset.sample_conditional(n_points=2048, X=X_dataset)
-    Y_dataset = Y_dataset.to(**experiment.tensor_parameteres)
+    Y_dataset = Y_dataset.to(**experiment.tensor_parameters)
 
     try:
         if not exclude_gaussian_likelihood:

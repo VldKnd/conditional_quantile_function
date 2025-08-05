@@ -5,7 +5,7 @@ from datasets import BananaDataset
 from pushforward_operators import PushForwardOperator
 from utils.quantile import get_quantile_level_analytically
 
-def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_conditional_points:int, number_of_points_to_sample:int, tensor_parameteres: dict):
+def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_conditional_points:int, number_of_points_to_sample:int, tensor_parameters: dict):
     dataset = BananaDataset()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': '3d'})
     fig.suptitle('Separated 3D Plots', fontsize=16)
@@ -35,7 +35,7 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_co
     quantile_levels = torch.arange(0.05, 1, 0.1)
     radii = get_quantile_level_analytically(quantile_levels, distribution="gaussian", dimension=2)
     colors = [color_map(i / len(radii)) for i in range(len(radii))]
-    X = X.to(**tensor_parameteres)
+    X = X.to(**tensor_parameters)
 
     for j in range(number_of_conditional_points):
         X_batch = X[j].unsqueeze(0).repeat(100, 1)
@@ -47,7 +47,7 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_co
                 contour_radius * torch.cos(pi),
                 contour_radius * torch.sin(pi),
             ]).T
-            u = u.to(**tensor_parameteres)
+            u = u.to(**tensor_parameters)
 
             pushforward_of_u = model.push_forward_u_given_x(u, X=X_batch).detach().cpu()
             z_line = torch.full((pushforward_of_u.shape[0], ), X[j].item())
@@ -62,7 +62,7 @@ def plot_potentials_from_banana_dataset(model: PushForwardOperator, number_of_co
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
-def plot_quantile_levels_from_banana_dataset(model: PushForwardOperator, number_of_points_to_sample:int, tensor_parameteres: dict, conditional_value: float, number_of_quantile_levels: int):
+def plot_quantile_levels_from_banana_dataset(model: PushForwardOperator, number_of_points_to_sample:int, tensor_parameters: dict, conditional_value: float, number_of_quantile_levels: int):
     dataset = BananaDataset()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': '3d'})
     fig.suptitle('Separated 3D Plots', fontsize=16)
@@ -92,7 +92,7 @@ def plot_quantile_levels_from_banana_dataset(model: PushForwardOperator, number_
     quantile_levels = torch.linspace(0.05, 0.95, number_of_quantile_levels)
     radii = get_quantile_level_analytically(quantile_levels, distribution="gaussian", dimension=2)
     colors = [color_map(i / len(radii)) for i in range(len(radii))]
-    X = X.to(**tensor_parameteres)
+    X = X.to(**tensor_parameters)
 
     X_batch = X.repeat(100, 1)
     for i, contour_radius in enumerate(radii):
@@ -103,7 +103,7 @@ def plot_quantile_levels_from_banana_dataset(model: PushForwardOperator, number_
             contour_radius * torch.cos(pi),
             contour_radius * torch.sin(pi),
         ]).T
-        u = u.to(**tensor_parameteres)
+        u = u.to(**tensor_parameters)
 
         pushforward_of_u = model.push_forward_u_given_x(u, X=X_batch).detach().cpu()
         u_approximated = dataset.pushbackward_Y_given_X(pushforward_of_u, X_batch)
