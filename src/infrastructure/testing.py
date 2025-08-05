@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-from datasets import Dataset, BananaDataset, TicTacDataset
+from datasets import Dataset, BananaDataset, TicTacDataset, StarDataset
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 from metrics import wassertein2, compare_quantile_in_latent_space, compute_gaussian_negative_log_likelihood
@@ -148,7 +148,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     """
     Test a model on a synthetic dataset.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](experiment.tensor_parameters, **experiment.dataset_parameters)
+    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
@@ -209,9 +209,9 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
     Returns:
         dict: The metrics.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](experiment.tensor_parameters, **experiment.dataset_parameters)
+    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
 
-    if type(dataset) in {BananaDataset, TicTacDataset}:
+    if type(dataset) in {BananaDataset, TicTacDataset, StarDataset}:
         return test_on_synthetic_dataset(experiment, exclude_wasserstein2, exclude_gaussian_likelihood, exclude_quantile_similarity, verbose)
     else:
         raise NotImplementedError(f"Testing on the dataset {dataset.__class__.__name__} is not implemented.")

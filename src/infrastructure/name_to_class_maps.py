@@ -1,7 +1,8 @@
 from datasets import (
     BananaDataset,
     TicTacDataset,
-    Dataset
+    Dataset,
+    StarDataset,
 )
 from pushforward_operators import (
     PushForwardOperator,
@@ -16,6 +17,7 @@ from pushforward_operators import (
 name_to_dataset_map: dict[str, Dataset] = {
     "banana": BananaDataset,
     "tictac": TicTacDataset,
+    "star": StarDataset,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
