@@ -1,7 +1,8 @@
 from datasets import (
     BananaDataset,
     TicTacDataset,
-    Dataset
+    Dataset,
+    StarDataset,
 )
 from pushforward_operators import (
     PushForwardOperator,
@@ -10,11 +11,13 @@ from pushforward_operators import (
     UnconstrainedOTQuantileRegression,
     FastNonLinearVectorQuantileRegression,
     LinearVectorQuantileRegression,
+    PICNNEntropicOTQuantileRegression,
 )
 
 name_to_dataset_map: dict[str, Dataset] = {
     "banana": BananaDataset,
     "tictac": TicTacDataset,
+    "star": StarDataset,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
@@ -23,4 +26,5 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression,
     "fast_non_linear_vector_quantile_regression": FastNonLinearVectorQuantileRegression,
     "linear_vector_quantile_regression": LinearVectorQuantileRegression,
+    "picnn_entropic_optimal_transport_quantile_regression": PICNNEntropicOTQuantileRegression,
 }

@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-from datasets import Dataset, BananaDataset, TicTacDataset
+from datasets import Dataset, BananaDataset, TicTacDataset, StarDataset
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 from metrics import wassertein2, compare_quantile_in_latent_space, compute_gaussian_negative_log_likelihood
@@ -45,10 +45,10 @@ def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushFor
         PushForwardOperator: The loaded pushforward operator.
     """
     pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
-    pushforward_operator.to(**experiment.tensor_parameteres)
+    pushforward_operator.to(**experiment.tensor_parameters)
 
     if experiment.path_to_weights is not None:
-        pushforward_operator.load(experiment.path_to_weights, map_location=torch.device(experiment.tensor_parameteres["device"]))
+        pushforward_operator.load(experiment.path_to_weights, map_location=torch.device(experiment.tensor_parameters["device"]))
     else:
         raise ValueError("Path to the model is not specified. Model can not be loaded.")
 
@@ -148,18 +148,17 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     """
     Test a model on a synthetic dataset.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
-
+    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
-    pushforward_operator.to(**experiment.tensor_parameteres)
+    pushforward_operator.to(**experiment.tensor_parameters)
 
     metrics = {}
 
     X_dataset = dataset.meshgrid_of_covariates(n_points_per_dimension=number_of_covariates_per_dimension)
-    X_dataset = X_dataset.to(**experiment.tensor_parameteres)
+    X_dataset = X_dataset.to(**experiment.tensor_parameters)
     Y_dataset = dataset.sample_conditional(n_points=2048, X=X_dataset)
-    Y_dataset = Y_dataset.to(**experiment.tensor_parameteres)
+    Y_dataset = Y_dataset.to(**experiment.tensor_parameters)
 
     try:
         if not exclude_gaussian_likelihood:
@@ -210,9 +209,9 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
     Returns:
         dict: The metrics.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters)
+    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
 
-    if type(dataset) in {BananaDataset, TicTacDataset}:
+    if type(dataset) in {BananaDataset, TicTacDataset, StarDataset}:
         return test_on_synthetic_dataset(experiment, exclude_wasserstein2, exclude_gaussian_likelihood, exclude_quantile_similarity, verbose)
     else:
         raise NotImplementedError(f"Testing on the dataset {dataset.__class__.__name__} is not implemented.")

@@ -26,12 +26,12 @@ class Experiment(pydantic.BaseModel):
     pushforward_operator_name: str
     pushforward_operator_parameters: dict = pydantic.Field(default={})
     train_parameters: TrainParameters = pydantic.Field(default=TrainParameters())
-    tensor_parameteres: TensorParameters = pydantic.Field(default=TensorParameters())
+    tensor_parameters: TensorParameters = pydantic.Field(default=TensorParameters())
     path_to_weights: str | None = pydantic.Field(default=None)
     path_to_metrics: str | None = pydantic.Field(default=None)
 
     def __getattribute__(self, name):
-        if name == "tensor_parameteres":
-            return object.__getattribute__(self, 'tensor_parameteres').model_dump()
+        if name == "tensor_parameters":
+            return object.__getattribute__(self, 'tensor_parameters').model_dump()
         else:
             return object.__getattribute__(self, name)
