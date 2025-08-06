@@ -13,4 +13,4 @@ def compute_gaussian_negative_log_likelihood(
         The negative log likelihood.
     """
     constant = torch.log(torch.sqrt(torch.tensor(2 * torch.pi)))
-    return (((X)**2 / 2) + constant).sum()
+    return (((X)**2 / 2) + constant).mean()

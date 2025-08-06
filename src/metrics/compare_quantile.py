@@ -4,7 +4,7 @@ import torch
 
 def compare_quantile_in_latent_space(
         discrete_quantile: torch.Tensor,
-        alpha: float,
+        quantile_level: float,
         distribution_type: Literal["gaussian", "sphere"] = "gaussian"
     ):
     """
@@ -12,7 +12,7 @@ def compare_quantile_in_latent_space(
 
     Args:
         discrete_quantile (torch.Tensor): The discrete quantile.
-        alpha (float): The alpha level.
+        quantile_level (float): The quantile_level level.
         distribution_type (Literal["gaussian", "sphere"], optional): The distribution type. Defaults to "gaussian".
 
     Raises:
@@ -25,10 +25,11 @@ def compare_quantile_in_latent_space(
         raise RuntimeError(f"Distribution type {distribution_type} is not supported")
 
     if distribution_type == "gaussian":
-        scipy_quantile = stats.chi2.ppf([alpha], df=discrete_quantile.shape[-1])
+        scipy_quantile = stats.chi2.ppf([quantile_level], df=discrete_quantile.shape[-1])
         quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(discrete_quantile)
 
     elif distribution_type == "sphere":
-        quantile_level_radius = alpha**(1/discrete_quantile.shape[-1])
+        quantile_level_radius = quantile_level**(1/discrete_quantile.shape[-1])
 
-    return torch.mean((discrete_quantile - quantile_level_radius).norm(dim=-1))
+    discrete_quantile_direction = discrete_quantile / discrete_quantile.norm(dim=-1, keepdim=True)
+    return torch.mean((discrete_quantile - discrete_quantile_direction*quantile_level_radius).norm(dim=-1))
