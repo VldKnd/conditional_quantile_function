@@ -133,7 +133,7 @@ def sample_quantile_error_metrics(
     quantile_error_metrics = []
     quantile_levels = torch.linspace(0.05, 0.95, number_of_alphas)
     angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
-    angles.to(Y_dataset)
+    angles = angles.to(Y_dataset)
 
     scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
     quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
@@ -178,8 +178,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
 
     _, _Y = dataset.sample_joint(1)
     X = dataset.meshgrid_of_covariates(number_of_covariates_per_dimension)
-    U = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator)
-    U = U.to(**experiment.tensor_parameters)
+    U = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator, **experiment.tensor_parameters)
 
     X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
     Y_dataset = dataset.pushforward_U_given_X(U, X_dataset)
