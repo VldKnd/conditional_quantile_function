@@ -143,6 +143,7 @@ def sample_quantile_error_metrics(
         quantile_level_radius * torch.cos(angles),
         quantile_level_radius * torch.sin(angles),
     ], dim=-1)
+    U_dataset = U_dataset.to(Y_dataset)
 
     for i in quantile_error_progress_bar:
         X_batch = X_dataset[i, :, :]
@@ -172,7 +173,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
 
     metrics = {}
 
-    random_number_generator = torch.Generator(device=torch.device("cpu"))
+    random_number_generator = torch.Generator(device=experiment.tensor_parameters["device"])
     random_number_generator.manual_seed(42)
 
     _, _Y = dataset.sample_joint(1)
@@ -180,7 +181,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     U = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator)
     U = U.to(**experiment.tensor_parameters)
 
-    X_dataset = X.unsqueeze(1).repeat(1, 2000, 1)
+    X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
     Y_dataset = dataset.pushforward_U_given_X(U, X_dataset)
 
     try:
