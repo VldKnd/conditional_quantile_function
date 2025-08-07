@@ -204,7 +204,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=100,x
+                number_of_samples=100,
                 verbose=verbose
             )
     except NotImplementedError:
