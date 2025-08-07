@@ -30,5 +30,5 @@ pip install -r requirements.txt
 ### Project structure
 * notebooks/ - Contain different implementations of approaches to quantile regression.
 * src/ - Folder with main code snippets used in notebooks and experiments.
-* experiments/ - Notebooks with different experiments with Optimal Transport approach to quantile regression.
+* poc/ - Notebooks with different experiments with Optimal Transport approach to quantile regression.
 
