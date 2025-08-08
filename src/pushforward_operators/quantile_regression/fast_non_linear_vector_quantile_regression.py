@@ -208,7 +208,7 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
             raise ValueError(f"k ({k}) > number of samples ({N})")
 
         distances_sq = torch.cdist(query_points, u_samples, p=2).pow_(2)
-        knn_dists, knn_idx = torch.topk(distances_sq, k=k, largest=False)
+        _, knn_idx = torch.topk(distances_sq, k=k, largest=False)
 
         neighbours_u = u_samples[knn_idx]
         neighbours_f = f_samples.T.gather(1, knn_idx)
