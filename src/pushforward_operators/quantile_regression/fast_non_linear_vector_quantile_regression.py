@@ -3,6 +3,7 @@ from infrastructure.classes import TrainParameters
 from tqdm import trange
 import torch
 import torch.nn as nn
+from typing import List
 
 class FastNonLinearVectorQuantileRegression(PushForwardOperator):
     def __init__(self, input_dimension:int, embedding_dimension: int = 5, hidden_dimension: int = 100, number_of_hidden_layers: int = 1):
@@ -159,98 +160,65 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.fitted = True
         return self
 
-    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
-        device_type_and_specification = {
-            "device": X.device,
-            "dtype": X.dtype
-        }
+    @torch.inference_mode()
+    def push_forward_u_given_x(
+        self,
+        U: torch.Tensor,
+        X: torch.Tensor,
+        batch_size: int = 1_024,
+        k: int = 10,
+    ) -> torch.Tensor:
+        device, dtype = X.device, X.dtype
+        for name in ["b_u", "phi", "u"]:
+            setattr(self, name, getattr(self, name).to(device=device, dtype=dtype))
 
-        self.b_u = self.b_u.to(**device_type_and_specification)
-        self.phi = self.phi.to(**device_type_and_specification)
-        self.u = self.u.to(**device_type_and_specification)
-        self.feature_network.to(**device_type_and_specification)
+        self.feature_network.to(device).to(dtype)
 
-        potential = self.b_u @ self.feature_network(X).T + self.phi
-        potential = potential.to(**device_type_and_specification)
-        pushforward_of_u = self.estimate_gradients_for_points_knn(self.u, potential, points_of_interest=U, k=30)
-        return pushforward_of_u
+        outputs: List[torch.Tensor] = []
 
-    def estimate_gradient_knn(self, u_samples: torch.Tensor, f_samples: torch.Tensor, point: torch.Tensor, k: int) -> torch.Tensor:
-        """
-        Estimates the gradient of a scalar function f: R^d -> R at a single
-        given point using k-nearest neighbors and ordinary least-squares.
+        for i in range(0, X.shape[0], batch_size):
+            X_b = X[i : i + batch_size]
+            U_b = U[i : i + batch_size]
 
-        This function fits a local linear model (a hyperplane) to the k-nearest
-        neighbors of the target point. The gradient of that model is the
-        estimated gradient.
+            potential = (self.b_u @ self.feature_network(X_b).T).add_(self.phi)
 
-        Args:
-            u_samples (np.ndarray): An (N, d) array of N input samples in d dimensions.
-            f_samples (np.ndarray): An (N,) array of N corresponding scalar output samples.
-            point (tuple or np.ndarray): The d-dimensional point (u_1, ..., u_d) at
-                which to estimate the gradient.
-            k (int): The number of nearest neighbors to use for the estimation.
+            grads = self._estimate_gradients_knn(
+                u_samples=self.u,
+                f_samples=potential,
+                query_points=U_b,
+                k=k,
+            )
+            outputs.append(grads)
 
-        Returns:
-            np.ndarray: The estimated (d,) gradient vector.
-        """
-        f_samples = f_samples.flatten()
+        return torch.cat(outputs, dim=0)
 
-        if u_samples.shape[0] != f_samples.shape[0]:
-            raise ValueError("u_samples and f_samples must have the same number of samples.")
 
+    def _estimate_gradients_knn(
+        self,
+        u_samples: torch.Tensor,
+        f_samples: torch.Tensor,
+        query_points: torch.Tensor,
+        k: int,
+    ) -> torch.Tensor:
         N, d = u_samples.shape
-        point = torch.tensor(point)
-
-        if point.shape != (d,):
-            raise ValueError(f"The 'point' must be a d-dimensional vector, but got shape {point.shape} for d={d}.")
 
         if k < d + 1:
-            raise ValueError(f"k must be at least d+1 (which is {d+1}) to fit a hyperplane in R^{d}.")
+            raise ValueError(f"k must be ≥ d+1 (got k={k}, d={d})")
         if k > N:
-            raise ValueError(f"k ({k}) cannot be larger than the number of samples ({N}).")
+            raise ValueError(f"k ({k}) > number of samples ({N})")
 
-        distances_sq = torch.sum((u_samples - point)**2, axis=1)
-        knn_indices = torch.argsort(distances_sq)[:k]
+        distances_sq = torch.cdist(query_points, u_samples, p=2).pow_(2)
+        knn_dists, knn_idx = torch.topk(distances_sq, k=k, largest=False)
 
-        local_u_samples = u_samples[knn_indices]
-        local_f_samples = f_samples[knn_indices]
+        neighbours_u = u_samples[knn_idx]
+        neighbours_f = f_samples.T.gather(1, knn_idx)
 
-        A_design = torch.hstack([local_u_samples, torch.ones((k, 1), device=u_samples.device, dtype=u_samples.dtype)])
+        ones = torch.ones_like(neighbours_f)[..., None]
+        A = torch.cat((neighbours_u, ones), dim=-1)
+        b = neighbours_f.unsqueeze(-1)
 
-        try:
-            coeffs = torch.linalg.pinv(A_design) @ local_f_samples
-        except torch.linalg.LinAlgError:
-            return torch.full(d, torch.nan)
-
-        gradient = coeffs[:d]
-        return gradient
-
-
-    def estimate_gradients_for_points_knn(self, u_samples: torch.Tensor, f_samples: torch.Tensor, points_of_interest: torch.Tensor, k: int) -> torch.Tensor:
-        """
-        Estimates the gradient for multiple points of interest by calling
-        estimate_gradient_knn for each point.
-
-        Args:
-            u_samples (np.ndarray): An (N, d) array of input samples.
-            f_samples (np.ndarray): An (M, N) array of scalar output samples.
-            points_of_interest (np.ndarray): An (M, d) array of M points where
-                the gradient is to be estimated.
-            k (int): The number of nearest neighbors to use.
-
-        Returns:
-            np.ndarray: An (M, d) array containing the M estimated gradients.
-        """
-        if points_of_interest.ndim == 1:
-            points_of_interest = points_of_interest.reshape(1, -1)
-
-        all_gradients = torch.stack([
-            self.estimate_gradient_knn(u_samples, f_samples[:, i], point, k)
-            for i, point in enumerate(points_of_interest)
-        ])
-
-        return all_gradients
+        betas = torch.linalg.lstsq(A, b).solution.squeeze(-1)
+        return betas[..., :d]
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.
