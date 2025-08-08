@@ -216,7 +216,7 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         local_u_samples = u_samples[knn_indices]
         local_f_samples = f_samples[knn_indices]
 
-        A_design = torch.hstack([local_u_samples, torch.ones((k, 1))])
+        A_design = torch.hstack([local_u_samples, torch.ones((k, 1), device=u_samples.device, dtype=u_samples.dtype)])
 
         try:
             coeffs = torch.linalg.pinv(A_design) @ local_f_samples
