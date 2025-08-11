@@ -6,6 +6,10 @@ from datasets.protocol import Dataset
 
 
 class EightGaussians(Dataset):
+    """
+    2D mixture of eight Gaussians, conditional on one-dimensional covariate
+    Adapted from: https://github.com/CW-Huang/CP-Flow/blob/main/data/toy_data.py#L53
+    """
 
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         x = torch.rand(size=(n_points, 1)) * 2 + 0.5
