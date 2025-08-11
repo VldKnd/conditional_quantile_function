@@ -3,6 +3,7 @@ from pushforward_operators.quantile_regression.linear_quantile_regression import
 from pushforward_operators.quantile_regression.fast_non_linear_vector_quantile_regression import FastNonLinearVectorQuantileRegression
 from pushforward_operators.quantile_regression.unconstrained_optimal_transport_quantile_regression import UnconstrainedOTQuantileRegression
 from pushforward_operators.quantile_regression.picnn_entropic_optimal_transport_quantile_regression import PICNNEntropicOTQuantileRegression
+from pushforward_operators.quantile_regression.epsilon_augmented_entropic_optimal_transport_quantile_regression import EpsilonAugmentedEntropicOTQuantileRegression
 from pushforward_operators.cpflow.core_flow import CPFlow
 from pushforward_operators.protocol import PushForwardOperator
 
@@ -13,5 +14,6 @@ __all__ = [
     "UnconstrainedOTQuantileRegression",
     "CPFlow",
     "PushForwardOperator",
-    "PICNNEntropicOTQuantileRegression"
+    "PICNNEntropicOTQuantileRegression",
+    "EpsilonAugmentedEntropicOTQuantileRegression",
 ]

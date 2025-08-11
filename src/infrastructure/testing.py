@@ -5,6 +5,7 @@ from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 from metrics import wassertein2, compare_quantile_in_latent_space, compute_gaussian_negative_log_likelihood
 from pushforward_operators import PushForwardOperator
+from scipy import stats
 
 def test_from_json_file(path_to_experiment_file: str, verbose: bool = False, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False) -> dict:
     """
@@ -62,9 +63,9 @@ def sample_wasserstein2_metrics(
         number_of_samples: int,
         verbose: bool = False
     ) -> torch.Tensor:
-    number_of_covariates = X_dataset.shape[0]
+
     wasserstein2_progress_bar = tqdm(
-        range(number_of_covariates),
+        range(X_dataset.shape[0]),
         desc="Computing Wasserstein-2 metrics",
         disable=not verbose
     )
@@ -75,16 +76,16 @@ def sample_wasserstein2_metrics(
 
         for _ in range(number_of_samples):
             Y_batch = Y_dataset[i, :, :]
-            X_batch = X_dataset[i:i+1, :].repeat(Y_batch.shape[0], 1)
+            X_batch = X_dataset[i, :, :]
             U_batch = torch.randn_like(Y_batch)
-
             Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
+
             metrics_per_x.append(wassertein2(Y_batch, Y_approximation))
         wasserstein2_metrics.append(torch.tensor(metrics_per_x))
 
     return torch.stack(wasserstein2_metrics)
 
-def sample_gaussian_likelihood_metrics(
+def sample_gaussian_negative_log_likelihood_metrics(
         pushforward_operator: PushForwardOperator,
         dataset: Dataset,
         X_dataset: torch.Tensor,
@@ -92,25 +93,30 @@ def sample_gaussian_likelihood_metrics(
         number_of_samples: int,
         verbose: bool = False
     ) -> torch.Tensor:
-    number_of_covariates = X_dataset.shape[0]
-    likelihood_metrics = []
-    gaussian_likelihood_progress_bar = tqdm(range(number_of_covariates), desc="Computing Gaussian Likelihood metrics", disable=not verbose)
-    for i in gaussian_likelihood_progress_bar:
+
+    gaussian_negative_log_likelihood_progress_bar = tqdm(
+        range(X_dataset.shape[0]),
+        desc="Computing Negative Gaussian Log Likelihood metrics",
+        disable=not verbose
+    )
+    gaussian_negative_log_likelihood_metrics = []
+
+    for i in gaussian_negative_log_likelihood_progress_bar:
         metrics_per_x = []
         for _ in range(number_of_samples):
             Y_batch = Y_dataset[i, :, :]
-            X_batch = X_dataset[i:i+1, :].repeat(Y_batch.shape[0], 1)
+            X_batch = X_dataset[i, :, :]
             U_batch = torch.randn_like(Y_batch)
 
             Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
             U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
             metrics_per_x.append(compute_gaussian_negative_log_likelihood(U_approximation))
 
-        likelihood_metrics.append(torch.stack(metrics_per_x))
-    return torch.stack(likelihood_metrics)
+        gaussian_negative_log_likelihood_metrics.append(torch.stack(metrics_per_x))
 
+    return torch.stack(gaussian_negative_log_likelihood_metrics)
 
-def sample_quantile_similarity_metrics(
+def sample_quantile_error_metrics(
         pushforward_operator: PushForwardOperator,
         dataset: Dataset,
         X_dataset: torch.Tensor,
@@ -119,30 +125,42 @@ def sample_quantile_similarity_metrics(
         number_of_alphas: int = 10,
         verbose: bool = False
     ) -> torch.Tensor:
-    number_of_covariates = X_dataset.shape[0]
-    alpha_metrics = []
-    quantile_similarity_progress_bar = tqdm(
-        range(number_of_covariates),
-        desc="Computing Quantile Similarity metrics",
+    quantile_error_progress_bar = tqdm(
+        range(X_dataset.shape[0]),
+        desc="Computing Quantile Error metrics",
         disable=not verbose
     )
-    alphas = torch.linspace(0.05, 0.95, number_of_alphas)
-    for i in quantile_similarity_progress_bar:
-        metrics_per_x = []
-        for alpha in alphas:
-            metrics_per_alpha = []
-            for _ in range(number_of_samples):
-                Y_batch = Y_dataset[i, :, :]
-                X_batch = X_dataset[i:i+1, :].repeat(Y_batch.shape[0], 1)
-                U_batch = torch.randn_like(Y_batch)
+    quantile_error_metrics = []
+    quantile_levels = torch.linspace(0.05, 0.95, number_of_alphas)
+    angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
+    angles = angles.to(Y_dataset)
 
+    scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
+    quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
+    quantile_level_radius = quantile_level_radius.unsqueeze(0).unsqueeze(2)
+
+    U_dataset = torch.stack([
+        quantile_level_radius * torch.cos(angles),
+        quantile_level_radius * torch.sin(angles),
+    ], dim=-1)
+    U_dataset = U_dataset.to(Y_dataset)
+
+    for i in quantile_error_progress_bar:
+        X_batch = X_dataset[i, :, :]
+        metrics_per_x = []
+
+        for j in range(number_of_samples):
+            metrics_per_quantile_level = []
+
+            for k, quantile_level in enumerate(quantile_levels):
+                U_batch = U_dataset[j, k]
                 Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
                 U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
-                metrics_per_alpha.append(compare_quantile_in_latent_space(U_approximation, alpha, "gaussian"))
+                metrics_per_quantile_level.append(compare_quantile_in_latent_space(U_approximation, quantile_level, "gaussian"))
 
-            metrics_per_x.append(torch.stack(metrics_per_alpha))
-        alpha_metrics.append(torch.stack(metrics_per_x))
-    return torch.stack(alpha_metrics)
+            metrics_per_x.append(torch.stack(metrics_per_quantile_level))
+        quantile_error_metrics.append(torch.stack(metrics_per_x))
+    return torch.stack(quantile_error_metrics)
 
 def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
     """
@@ -155,19 +173,38 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
 
     metrics = {}
 
-    X_dataset = dataset.meshgrid_of_covariates(n_points_per_dimension=number_of_covariates_per_dimension)
-    X_dataset = X_dataset.to(**experiment.tensor_parameters)
-    Y_dataset = dataset.sample_conditional(n_points=2048, X=X_dataset)
-    Y_dataset = Y_dataset.to(**experiment.tensor_parameters)
+    random_number_generator = torch.Generator(device=experiment.tensor_parameters["device"])
+    random_number_generator.manual_seed(42)
+
+    _, _Y = dataset.sample_joint(1)
+    X = dataset.meshgrid_of_covariates(number_of_covariates_per_dimension)
+    U = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator, **experiment.tensor_parameters)
+
+    X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
+    Y_dataset = dataset.pushforward_U_given_X(U, X_dataset)
 
     try:
-        if not exclude_gaussian_likelihood:
-            metrics["gaussian_likelihood"] = sample_gaussian_likelihood_metrics(
+        if not exclude_quantile_similarity:
+            metrics["quantile_error"] = sample_quantile_error_metrics(
                 pushforward_operator=pushforward_operator,
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=10,
+                number_of_samples=100,
+                number_of_alphas=10,
+                verbose=verbose
+            )
+    except NotImplementedError:
+        print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
+
+    try:
+        if not exclude_gaussian_likelihood:
+            metrics["gaussian_negative_log_likelihood"] = sample_gaussian_negative_log_likelihood_metrics(
+                pushforward_operator=pushforward_operator,
+                dataset=dataset,
+                X_dataset=X_dataset,
+                Y_dataset=Y_dataset,
+                number_of_samples=100,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -179,23 +216,10 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
             pushforward_operator=pushforward_operator,
             X_dataset=X_dataset,
             Y_dataset=Y_dataset,
-            number_of_samples=10,
+            number_of_samples=200,
             verbose=verbose
         )
 
-    try:
-        if not exclude_quantile_similarity:
-            metrics["quantile_similarity"] = sample_quantile_similarity_metrics(
-                pushforward_operator=pushforward_operator,
-                dataset=dataset,
-            X_dataset=X_dataset,
-            Y_dataset=Y_dataset,
-            number_of_samples=10,
-            number_of_alphas=10,
-            verbose=verbose
-        )
-    except NotImplementedError:
-        print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
 
     return metrics
 
