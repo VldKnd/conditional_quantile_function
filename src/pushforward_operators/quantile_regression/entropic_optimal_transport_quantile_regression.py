@@ -6,9 +6,7 @@ from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
 
 
-
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
-
     def __init__(
         self,
         feature_dimension: int,
@@ -22,7 +20,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     ) -> None:
         super().__init__()
         self.epsilon = float(epsilon)
-        self.n_entropy_samples = int(number_of_samples_for_entropy_dual_estimation)
+        self.number_of_samples_for_entropy_dual_estimation = int(number_of_samples_for_entropy_dual_estimation)
 
         act_cls = getattr(nn, activation_function_name, None)
         if act_cls is None:
@@ -55,8 +53,8 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         self,
         dataloader: torch.utils.data.DataLoader,
         train_parameters: TrainParameters,
-        *_,
-        **__,
+        *args,
+        **kwargs,
     ) -> "EntropicOTQuantileRegression":
         """Fits the operator on the given data loader."""
 
@@ -93,7 +91,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                 psi = self._estimate_entropy_dual_psi(
                     X_tensor=X_batch,
                     U_tensor=torch.randn(
-                        self.n_entropy_samples,
+                        self.number_of_samples_for_entropy_dual_estimation,
                         Y_batch.shape[1],
                         device=Y_batch.device,
                         dtype=Y_batch.dtype,
@@ -109,12 +107,12 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
 
                 if train_parameters.verbose:
                     running_objective.append(objective.item())
-                    avg_last_10 = sum(running_objective[-10:]) / len(running_objective[-10:])
-                    lr_str = (
+                    running_mean_objective = sum(running_objective[-10:]) / len(running_objective[-10:])
+                    lr_string = (
                         f", LR: {scheduler.get_last_lr()[0]:.6f}" if scheduler else ""
                     )
                     pbar.set_description(
-                        f"Epoch {epoch_idx} | Objective: {avg_last_10:.3f}{lr_str}"
+                        f"Epoch {epoch_idx} | Objective: {running_mean_objective:.3f}{lr_string}"
                     )
 
         pbar.close()
@@ -147,7 +145,6 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
 
         slackness = cost - phi_vals  # (n, m)
 
-        # Log‑sum‑exp with row‑wise stabilisation
         row_max, _ = torch.max(slackness, dim=1, keepdim=True)
         stable = (slackness - row_max) / self.epsilon
         log_mean_exp = torch.logsumexp(stable, dim=1, keepdim=True) - torch.log(
@@ -159,7 +156,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     def push_forward_u_given_x(
         self, U: torch.Tensor, X: torch.Tensor, *, create_graph: bool = True
     ) -> torch.Tensor:
-        """Applies the learned push‑forward ∇φ to a noise sample *U|X*.
+        """Applies the learned push‑forward to a noise sample *U|X*.
 
         If you only need samples (no gradients through the result), wrap the call
         in ``with torch.no_grad():`` for memory savings.
@@ -170,7 +167,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         phi_value = self.phi_potential_network(torch.cat([X, U], dim=-1)).sum()
         grad_U = torch.autograd.grad(phi_value, U, create_graph=create_graph)[0]
 
-        grad_U = grad_U * torch.sqrt(self.y_scaler.running_var + self.epsilon) + self.y_scaler.running_mean
+        grad_U = grad_U * torch.sqrt(self.y_scaler.running_var + 1e-5) + self.y_scaler.running_mean
 
         U.requires_grad = requires_grad_backup
         return grad_U
