@@ -40,8 +40,8 @@ class EightGaussians(Dataset):
 
         points = torch.randn(size=(n_x, n_points, 2)) * 0.5
 
-        y = (points + selected_centers) * torch.abs(x).reshape(-1, 1,
-                                                               1) / 1.414
+        y = (points + selected_centers * torch.abs(x).reshape(-1, 1,
+                                                               1)) / 1.414
 
         return y
 
