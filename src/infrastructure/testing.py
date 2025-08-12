@@ -162,6 +162,52 @@ def sample_quantile_error_metrics(
         quantile_error_metrics.append(torch.stack(metrics_per_x))
     return torch.stack(quantile_error_metrics)
 
+def sample_quantile_error_v2_metrics(
+        pushforward_operator: PushForwardOperator,
+        dataset: Dataset,
+        X_dataset: torch.Tensor,
+        Y_dataset: torch.Tensor,
+        number_of_samples: int,
+        number_of_alphas: int = 10,
+        verbose: bool = False
+    ) -> torch.Tensor:
+    quantile_error_progress_bar = tqdm(
+        range(X_dataset.shape[0]),
+        desc="Computing Quantile Error metrics",
+        disable=not verbose
+    )
+    quantile_error_metrics = []
+    quantile_levels = torch.linspace(0.05, 0.95, number_of_alphas)
+    angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
+    angles = angles.to(Y_dataset)
+
+    scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
+    quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
+    quantile_level_radius = quantile_level_radius.unsqueeze(0).unsqueeze(2)
+
+    U_dataset = torch.stack([
+        quantile_level_radius * torch.cos(angles),
+        quantile_level_radius * torch.sin(angles),
+    ], dim=-1)
+    U_dataset = U_dataset.to(Y_dataset)
+
+    for i in quantile_error_progress_bar:
+        X_batch = X_dataset[i, :, :]
+        metrics_per_x = []
+
+        for j in range(number_of_samples):
+            metrics_per_quantile_level = []
+
+            for k, quantile_level in enumerate(quantile_levels):
+                U_batch = U_dataset[j, k]
+                Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
+                U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
+                metrics_per_quantile_level.append(compare_quantile_in_latent_space(U_approximation, quantile_level, "gaussian"))
+
+            metrics_per_x.append(torch.stack(metrics_per_quantile_level))
+        quantile_error_metrics.append(torch.stack(metrics_per_x))
+    return torch.stack(quantile_error_metrics)
+
 def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
     """
     Test a model on a synthetic dataset.
@@ -196,6 +242,21 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
             )
     except NotImplementedError:
         print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
+
+    try:
+        if not exclude_quantile_similarity:
+            metrics["quantile_error_v2"] = sample_quantile_error_v2_metrics(
+                pushforward_operator=pushforward_operator,
+                dataset=dataset,
+                X_dataset=X_dataset,
+                Y_dataset=Y_dataset,
+                number_of_samples=100,
+                number_of_alphas=10,
+                verbose=verbose
+            )
+    except NotImplementedError:
+        print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
+
 
     try:
         if not exclude_gaussian_likelihood:

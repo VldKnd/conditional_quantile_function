@@ -23,6 +23,7 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         self.number_of_hidden_layers = number_of_hidden_layers
         self.epsilon = epsilon
         self.number_of_samples_for_entropy_dual_estimation = number_of_samples_for_entropy_dual_estimation
+
         self.Y_scaler = nn.BatchNorm1d(y_dimension, affine=False)
 
         self.phi_potential_network = PICNN(
@@ -34,6 +35,16 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             number_of_hidden_layers=number_of_hidden_layers
         )
 
+    def warmup_Y_scaler(self, dataloader: torch.utils.data.DataLoader, num_passes: int = 1):
+        """Run over the data (no grad) to populate BatchNorm running stats."""
+        self.Y_scaler.train()
+        with torch.no_grad():
+            for _ in range(num_passes):
+                for _, Y in dataloader:
+                    _ = self.Y_scaler(Y)
+        self.Y_scaler.eval()
+
+
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
 
@@ -41,6 +52,9 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             dataloader (torch.utils.data.DataLoader): Data loader.
             train_parameters (TrainParameters): Training parameters.
         """
+        self.train()
+        self.warmup_Y_scaler(dataloader)
+
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
@@ -98,41 +112,57 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         progress_bar.close()
         return self
 
-    def estimate_entropy_dual_psi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
-        """Estimates the entropy dual psi.
+    def estimate_entropy_dual_psi(
+        self,
+        *,
+        X_tensor: torch.Tensor,
+        U_tensor: torch.Tensor,
+        Y_tensor: torch.Tensor,
+    ) -> torch.Tensor:
+        """Numerically stable estimation of the entropy‑dual ψ.
 
         Args:
             X_tensor (torch.Tensor): Input tensor.
             U_tensor (torch.Tensor): Random variable to be pushed forward.
             Y_tensor (torch.Tensor): Output tensor.
         """
-        n, _ = X_tensor.shape
-        m, _ = U_tensor.shape
+        n = X_tensor.shape[0]
+        m = U_tensor.shape[0]
 
-        U_expanded = U_tensor.unsqueeze(0).expand(n, -1, -1)
-        X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, m, -1)
+        U_expanded = U_tensor.unsqueeze(0).expand(n, -1, -1)  # (n, m, d)
+        X_expanded = X_tensor.unsqueeze(1).expand(-1, m, -1)  # (n, m, p)
 
-        phi_vals = self.phi_potential_network(X_expanded_for_U, U_expanded).squeeze(-1)
-        cost_matrix = Y_tensor @ U_tensor.T
+        phi_vals = self.phi_potential_network(X_expanded, U_expanded).squeeze(-1)  # (n, m)
+        cost = Y_tensor @ U_tensor.T  # (n, m)
 
-        slackness = cost_matrix - phi_vals
+        slackness = cost - phi_vals  # (n, m)
 
-        log_mean_exp = torch.logsumexp(slackness / self.epsilon, dim=1, keepdim=True) \
-                - torch.log(torch.tensor(m, device=slackness.device, dtype=slackness.dtype))
-
-        psi_estimate = self.epsilon * log_mean_exp
-
+        row_max, _ = torch.max(slackness, dim=1, keepdim=True)
+        stable = (slackness - row_max) / self.epsilon
+        log_mean_exp = torch.logsumexp(stable, dim=1, keepdim=True) - torch.log(
+            torch.tensor(m, device=slackness.device, dtype=slackness.dtype)
+        )
+        psi_estimate = self.epsilon * (log_mean_exp + row_max / self.epsilon)
         return psi_estimate
 
-    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
-        """Generates Y|X by applying a push forward operator to U.
+    def push_forward_u_given_x(
+        self, U: torch.Tensor, X: torch.Tensor, *, create_graph: bool = False
+    ) -> torch.Tensor:
+        """Applies the learned push‑forward operator to a noise sample *U|X*.
+
+        If you only need samples (no gradients through the result), wrap the call
+        in ``with torch.no_grad():`` for memory savings.
         """
         requires_grad_backup = U.requires_grad
         U.requires_grad = True
-        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(X, U).sum(), U, create_graph=False)[0]
-        pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
+
+        phi_value = self.phi_potential_network(X, U).sum()
+        grad_U = torch.autograd.grad(phi_value, U, create_graph=create_graph)[0]
+
+        grad_U = grad_U * torch.sqrt(self.Y_scaler.running_var + self.epsilon) + self.Y_scaler.running_mean
+
         U.requires_grad = requires_grad_backup
-        return pushforward_of_u
+        return grad_U
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.

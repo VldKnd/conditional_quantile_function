@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from tqdm import trange
 from pushforward_operators.picnn import SCPICNN
+from torch.func import vmap
+
 
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
@@ -37,6 +39,15 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             number_of_hidden_layers=number_of_hidden_layers
         )
 
+    def warmup_Y_scaler(self, dataloader: torch.utils.data.DataLoader, num_passes: int = 1):
+        """Run over the data (no grad) to populate BatchNorm running stats."""
+        self.Y_scaler.train()
+        with torch.no_grad():
+            for _ in range(num_passes):
+                for _, Y in dataloader:
+                    _ = self.Y_scaler(Y)
+        self.Y_scaler.eval()
+
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
 
@@ -56,100 +67,123 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         training_information = []
         progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
 
+        self.warmup_Y_scaler(dataloader)
+
         for epoch_idx in progress_bar:
-                for X_batch, Y_batch in dataloader:
-                    U_batch = torch.randn_like(Y_batch)
-                    Y_batch_scaled = self.Y_scaler(Y_batch)
+            for X_batch, Y_batch in dataloader:
+                U_batch = torch.randn_like(Y_batch)
+                Y_batch_scaled = self.Y_scaler(Y_batch)
 
-                    U_batch_for_psi = self.estimate_U_from_phi(
-                            X_tensor=X_batch,
-                            Y_tensor=Y_batch_scaled,
-                            verbose=False,
-                    )
+                U_batch_for_psi = self.estimate_U_from_phi(
+                        X_tensor=X_batch,
+                        Y_tensor=Y_batch_scaled,
+                        verbose=True,
+                ).detach()
 
-                    self.phi_potential_network.zero_grad()
+                self.phi_potential_network.zero_grad()
 
-                    phi = self.phi_potential_network(X_batch, U_batch)
-                    psi = torch.sum(U_batch_for_psi * Y_batch_scaled, dim=-1, keepdims=True) \
-                            - self.phi_potential_network(X_batch, U_batch_for_psi)
-                    objective = torch.mean(phi) + torch.mean(psi)
-                    objective.backward()
+                phi = self.phi_potential_network(X_batch, U_batch)
+                psi = torch.sum(U_batch_for_psi * Y_batch_scaled, dim=-1, keepdims=True) \
+                        - self.phi_potential_network(X_batch, U_batch_for_psi)
+                objective = torch.mean(phi) + torch.mean(psi)
+                objective.backward()
 
-                    phi_potential_network_optimizer.step()
-                    if phi_potential_network_scheduler is not None:
-                        phi_potential_network_scheduler.step()
+                phi_potential_network_optimizer.step()
+                if phi_potential_network_scheduler is not None:
+                    phi_potential_network_scheduler.step()
 
-                    if verbose:
-                        training_information.append({
-                                "objective": objective.item(),
-                                "epoch_index": epoch_idx
-                        })
+                if verbose:
+                    training_information.append({
+                            "objective": objective.item(),
+                            "epoch_index": epoch_idx
+                    })
 
-                        running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
-                        progress_bar.set_description(
-                            (
-                                f"Epoch: {epoch_idx}, "
-                                f"Objective: {running_mean_objective:.3f}"
-                            ) + \
-                            (
-                                f", LR: {phi_potential_network_scheduler.get_last_lr()[0]:.6f}"
-                                if phi_potential_network_scheduler is not None
-                                else ""
-                            )
+                    running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
+                    progress_bar.set_description(
+                        (
+                            f"Epoch: {epoch_idx}, "
+                            f"Objective: {running_mean_objective:.3f}"
+                        ) + \
+                        (
+                            f", LR: {phi_potential_network_scheduler.get_last_lr()[0]:.6f}"
+                            if phi_potential_network_scheduler is not None
+                            else ""
                         )
+                    )
 
         progress_bar.close()
         return self
 
-    def estimate_U_from_phi(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, verbose: bool = False):
-            """
-            Estimate U tensor by minimizing u^T y - phi(x, u) for given x and y.
-            phi(x, u) is assume to be a potential function convex in u.
+    def estimate_U_from_phi(
+        self,
+        X_tensor: torch.Tensor,
+        Y_tensor: torch.Tensor,
+        max_iter: int = 100,
+        tol_grad: float = 1e-6,
+        tol_change: float = 1e-9,
+        verbose: bool = False,
+    ):
+        """
+        Estimate U tensor by minimizing u^T y - phi(x, u) for given x and y.
+        phi(x, u) is assume to be a potential function convex in u.
 
-            Args:
-            X_tensor (torch.Tensor): The input tensor for x, with shape [n, p].
-            Y_tensor (torch.Tensor): The tensor of oversampled variables y, with shape [n, q].
+        Args:
+        X_tensor (torch.Tensor): The input tensor for x, with shape [n, p].
+        Y_tensor (torch.Tensor): The tensor of oversampled variables y, with shape [n, q].
 
-            Returns:
-            torch.Tensor: A scalar tensor representing the estimated phi value.
-            """
-            U_tensor = torch.randn_like(Y_tensor)
-            U_tensor.requires_grad = True
+        Returns:
+        torch.Tensor: A scalar tensor representing the estimated phi value.
+        """
+        if not hasattr(self, "_U_cache"):
+            self._U_cache = {}
+        U = (
+            self._U_cache.get(Y_tensor.shape, torch.randn_like(Y_tensor, device=Y_tensor.device))
+            .clone()
+            .detach()
+            .requires_grad_(True)
+        )
 
-            optimizer = torch.optim.LBFGS(
-                [U_tensor],
-                lr=1,
-                line_search_fn="strong_wolfe",
-                max_iter=1000,
-                tolerance_grad=1e-10,
-                tolerance_change=1e-10
-            )
+        opt = torch.optim.LBFGS(
+            (U,),
+            lr=1.0,
+            max_iter=max_iter,
+            tolerance_grad=tol_grad,
+            tolerance_change=tol_change,
+        )
 
-            def slackness_closure():
-                optimizer.zero_grad()
-                cost_matrix = torch.sum(U_tensor * Y_tensor, dim=-1, keepdims=True)
-                phi_potential = self.phi_potential_network(X_tensor, U_tensor)
-                slackness = (phi_potential - cost_matrix).sum()
-                slackness.backward()
-                return slackness
+        def obj(u, x, y):
+            return self.phi_potential_network(x.unsqueeze(0), u.unsqueeze(0)).squeeze() - (
+                u * y
+            ).sum()
 
-            optimizer.step(slackness_closure)
+        f_batched = vmap(obj, in_dims=(0, 0, 0))
 
-            if verbose:
-                optimal_U_tensor_potential = self.phi_potential_network(X_tensor, U_tensor).sum()
-                approximated_Y_tensor = torch.autograd.grad(optimal_U_tensor_potential.sum(), U_tensor)[0]
-                estimation_error = (approximated_Y_tensor - Y_tensor)
-                print(f"Maximal dual problem vector approximation error: {estimation_error.abs().max().item()}")
+        def closure():
+            opt.zero_grad()
+            loss = f_batched(U, X_tensor, Y_tensor).sum()
+            loss.backward()
+            return loss
 
-            return U_tensor
+        opt.step(closure)
+
+        self._U_cache[Y_tensor.shape] = U.detach()
+
+        if verbose:
+            err = f_batched(U.detach(), X_tensor, Y_tensor).abs().max().item()
+            print(f"[estimate_U] max |φ - u·y| = {err:.2e}")
+
+        return U.detach()
 
     def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         """Generates Y|X by applying a push forward operator to U.
         """
+        self.Y_scaler.eval()
         requires_grad_backup = U.requires_grad
         U.requires_grad = True
         pushforward_of_u = torch.autograd.grad(self.phi_potential_network(X, U).sum(), U, create_graph=False)[0]
-        pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
+        eps   = self.Y_scaler.eps
+        scale = torch.sqrt(self.Y_scaler.running_var + eps)
+        pushforward_of_u = pushforward_of_u * scale + self.Y_scaler.running_mean
         U.requires_grad = requires_grad_backup
         return pushforward_of_u
 
