@@ -15,10 +15,10 @@ class EightGaussians(Dataset):
         x = torch.rand(size=(n_points, 1)) * 2 + 0.5
         return x.to(**self.tensor_prameters)
 
-    def meshgrid_of_covariates(self, n_points_per_dimension):
-        return np.linspace(0.5, 2.5, num=n_points_per_dimension)
+    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
+        return torch.linspace(0.5, 2.5, steps=n_points_per_dimension, **self.tensor_prameters)
 
-    def sample_conditional(self, n_points, x):
+    def sample_conditional(self, n_points: int, x: torch.Tensor) -> torch.Tensor:
         n_x, d = x.shape
         #print(f"{x.shape=}")
         scale = 4.
@@ -45,7 +45,7 @@ class EightGaussians(Dataset):
 
         return y
 
-    def sample_joint(self, n_points):
+    def sample_joint(self, n_points: int) -> torch.Tensor:
         x = self.sample_covariates(n_points=n_points)
         y = self.sample_conditional(n_points=1, x=x).squeeze(dim=1)
         return x, y
