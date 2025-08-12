@@ -6,7 +6,6 @@ from tqdm import trange
 from pushforward_operators.picnn import SCPICNN
 from torch.func import vmap
 
-
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
         alpha: float,
@@ -118,8 +117,8 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         self,
         X_tensor: torch.Tensor,
         Y_tensor: torch.Tensor,
-        max_iter: int = 100,
-        tol_grad: float = 1e-6,
+        max_iter: int = 1000,
+        tol_grad: float = 1e-9,
         tol_change: float = 1e-9,
         verbose: bool = False,
     ):
@@ -143,34 +142,34 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             .requires_grad_(True)
         )
 
-        opt = torch.optim.LBFGS(
+        optimizer = torch.optim.LBFGS(
             (U,),
-            lr=1.0,
-            max_iter=max_iter,
-            tolerance_grad=tol_grad,
-            tolerance_change=tol_change,
+            lr=1,
+            line_search_fn="strong_wolfe",
+            max_iter=1000,
+            tolerance_grad=1e-10,
+            tolerance_change=1e-10
         )
-
-        def obj(u, x, y):
+        def objective(u, x, y):
             return self.phi_potential_network(x.unsqueeze(0), u.unsqueeze(0)).squeeze() - (
                 u * y
             ).sum()
 
-        f_batched = vmap(obj, in_dims=(0, 0, 0))
+        f_batched = vmap(objective, in_dims=(0, 0, 0))
 
         def closure():
-            opt.zero_grad()
+            optimizer.zero_grad()
             loss = f_batched(U, X_tensor, Y_tensor).sum()
             loss.backward()
             return loss
 
-        opt.step(closure)
+        optimizer.step(closure)
 
         self._U_cache[Y_tensor.shape] = U.detach()
 
         if verbose:
             err = f_batched(U.detach(), X_tensor, Y_tensor).abs().max().item()
-            print(f"[estimate_U] max |φ - u·y| = {err:.2e}")
+            print(f"[estimate_U] max {err:.2e}")
 
         return U.detach()
 
