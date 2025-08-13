@@ -12,7 +12,6 @@ from pushforward_operators import (
     FastNonLinearVectorQuantileRegression,
     LinearVectorQuantileRegression,
     PICNNEntropicOTQuantileRegression,
-    EpsilonAugmentedEntropicOTQuantileRegression,
 )
 
 name_to_dataset_map: dict[str, Dataset] = {
@@ -23,7 +22,6 @@ name_to_dataset_map: dict[str, Dataset] = {
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "entropic_optimal_transport_quantile_regression": EntropicOTQuantileRegression,
-    "epsilon_augmented_entropic_optimal_transport_quantile_regression": EpsilonAugmentedEntropicOTQuantileRegression,
     "convex_potential_flow": CPFlow,
     "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression,
     "fast_non_linear_vector_quantile_regression": FastNonLinearVectorQuantileRegression,

@@ -73,20 +73,20 @@ class StarDataset:
         Y = self.sample_conditional(1, X).squeeze(1)
         return X, Y
 
-    def pushforward_U_given_X(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes forward the noise given the covariates."""
-        radius, angle = self._to_polar(U)
-        lobe_strength = X[:, 0:1]
-        swirl_strength = X[:, 1:2]
+        radius, angle = self._to_polar(u)
+        lobe_strength = x[:, 0:1]
+        swirl_strength = x[:, 1:2]
         radius_star = radius * (1 + lobe_strength * torch.sin(self.n_lobes * angle))
         angle_star = angle + swirl_strength * radius_star
         Y = self._to_cartesian(radius_star, angle_star)
         return Y
 
-    def pushbackward_Y_given_X(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
-        final_radius, final_angle = self._to_polar(Y)
-        lobe_strength = X[:, 0:1]
-        swirl_strength = X[:, 1:2]
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        final_radius, final_angle = self._to_polar(y)
+        lobe_strength = x[:, 0:1]
+        swirl_strength = x[:, 1:2]
 
         original_angle = final_angle - swirl_strength * final_radius
         denominator = (1 + lobe_strength * torch.sin(self.n_lobes * original_angle))

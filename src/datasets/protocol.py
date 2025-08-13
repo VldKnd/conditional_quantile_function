@@ -40,13 +40,7 @@ class Dataset:
         """
         pass
 
-    def pushbackward_Y_given_X(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
-        """
-        Push backwards the conditional distribution of the response given the covariates.
-        """
-        raise NotImplementedError("Pushbackward of y is not implemented for this dataset.")
-
-    def pushforward_U_given_X(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
         Push forward the conditional distribution of the covariates given the response.
         """
