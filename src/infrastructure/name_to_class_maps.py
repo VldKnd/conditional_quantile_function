@@ -9,8 +9,7 @@ from pushforward_operators import (
     EntropicOTQuantileRegression,
     CPFlow,
     UnconstrainedOTQuantileRegression,
-    FastNonLinearVectorQuantileRegression,
-    LinearVectorQuantileRegression,
+    UnconstrainedAmortizedOTQuantileRegression,
     PICNNEntropicOTQuantileRegression,
 )
 
@@ -24,7 +23,6 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "entropic_optimal_transport_quantile_regression": EntropicOTQuantileRegression,
     "convex_potential_flow": CPFlow,
     "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression,
-    "fast_non_linear_vector_quantile_regression": FastNonLinearVectorQuantileRegression,
-    "linear_vector_quantile_regression": LinearVectorQuantileRegression,
+    "unconstrained_amortized_optimal_transport_quantile_regression": UnconstrainedAmortizedOTQuantileRegression,
     "picnn_entropic_optimal_transport_quantile_regression": PICNNEntropicOTQuantileRegression,
 }
