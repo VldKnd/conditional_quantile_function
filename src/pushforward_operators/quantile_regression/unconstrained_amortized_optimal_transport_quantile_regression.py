@@ -63,10 +63,10 @@ class AmortizationNetwork(nn.Module):
 
         self.identity_projection = nn.Linear(response_dimension, response_dimension)
 
-    def forward(self, X: torch.Tensor, Y: torch.Tensor):
-        input_tensor = torch.cat([X, Y], dim=-1)
+    def forward(self, X: torch.Tensor, U: torch.Tensor):
+        input_tensor = torch.cat([X, U], dim=-1)
         output_tensor = self.amortization_network(input_tensor)
-        input_projection = self.identity_projection(Y)
+        input_projection = self.identity_projection(U)
         return output_tensor + input_projection
 
 class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module):
@@ -133,27 +133,20 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
                 for X_batch, Y_batch in dataloader:
                     U_batch = torch.randn_like(Y_batch)
 
-                    Y_batch_for_phi = self.estimate_Y_from_psi(
-                            X_tensor=X_batch,
-                            U_tensor=U_batch,
-                            Y_init=Y_batch
-                    )
-                    
                     self.amortization_network.zero_grad()
-                    Y_amortized = self.amortization_network(X_batch, Y_batch)
-                    phi_amortized = (
-                        torch.sum(U_batch * Y_amortized, dim=-1, keepdims=True) 
-                        - self.psi_potential_network(X_batch, Y_amortized)
-                    )
-                    amortization_network_objective = -torch.mean(phi_amortized)
-                    amortization_network_objective.backward()
-                    amortization_network_optimizer.step()
-
+                    Y_amortized = self.amortization_network(X_batch, U_batch)
                     Y_batch_for_phi = self.estimate_Y_from_psi(
                         X_tensor=X_batch,
                         U_tensor=U_batch,
                         Y_init=Y_amortized
                     )
+                    phi_amortized = (
+                        torch.sum(U_batch * Y_batch_for_phi, dim=-1, keepdims=True) 
+                        - self.psi_potential_network(X_batch, Y_batch_for_phi)
+                    )
+                    amortization_network_objective = -torch.mean(phi_amortized)
+                    amortization_network_objective.backward()
+                    amortization_network_optimizer.step()
 
                     self.psi_potential_network.zero_grad()
                     psi = self.psi_potential_network(X_batch, Y_batch)
