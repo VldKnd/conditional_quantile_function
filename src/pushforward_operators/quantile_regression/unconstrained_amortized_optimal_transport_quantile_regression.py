@@ -135,18 +135,22 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
 
                     self.amortization_network.zero_grad()
                     Y_amortized = self.amortization_network(X_batch, U_batch)
-                    Y_batch_for_phi = self.estimate_Y_from_psi(
-                        X_tensor=X_batch,
-                        U_tensor=U_batch,
-                        Y_init=Y_amortized
-                    )
+
+                    amortized_psi_potential = self.psi_potential_network(X_batch, Y_amortized)
+                    
                     phi_amortized = (
-                        torch.sum(U_batch * Y_batch_for_phi, dim=-1, keepdims=True) 
-                        - self.psi_potential_network(X_batch, Y_batch_for_phi)
+                        torch.sum(U_batch * Y_amortized, dim=-1, keepdims=True) 
+                        - amortized_psi_potential
                     )
                     amortization_network_objective = -torch.mean(phi_amortized)
                     amortization_network_objective.backward()
                     amortization_network_optimizer.step()
+                        
+                    Y_batch_for_phi = self.estimate_Y_from_psi(
+                        X_tensor=X_batch,
+                        U_tensor=U_batch,
+                        Y_init=Y_amortized.detach()
+                    )
 
                     self.psi_potential_network.zero_grad()
                     psi = self.psi_potential_network(X_batch, Y_batch)
@@ -234,7 +238,7 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         """
         requires_grad_backup = y.requires_grad
         y.requires_grad = True
-        pushforward_of_u = -torch.autograd.grad(self.psi_potential_network(x, y).sum(), y, create_graph=False)[0]
+        pushforward_of_u = torch.autograd.grad(self.psi_potential_network(x, y).sum(), y, create_graph=False)[0]
         y.requires_grad = requires_grad_backup
         return pushforward_of_u
 
