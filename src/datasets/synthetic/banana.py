@@ -3,7 +3,6 @@ import torch
 from typing import Tuple
 from datasets.protocol import Dataset
 
-
 class BananaDataset(Dataset):
     """
     Creating data in the form of a banana with x values distributed between 1 and 5.

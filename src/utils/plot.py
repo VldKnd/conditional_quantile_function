@@ -22,7 +22,7 @@ def plot_quantile_levels_from_dataset(model: PushForwardOperator, dataset: Datas
 
     X = conditional_value
 
-    y_x_gt = dataset.sample_conditional(n_points=100, X=X)
+    y_x_gt = dataset.sample_conditional(n_points=100, x=X)
 
     y_0 = y_x_gt[:, :, 0].flatten()
     y_1 = y_x_gt[:, :, 1].flatten()
