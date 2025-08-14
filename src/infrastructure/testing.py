@@ -78,9 +78,9 @@ def sample_wasserstein2_metrics(
             Y_batch = Y_dataset[i, :, :]
             X_batch = X_dataset[i, :, :]
             U_batch = torch.randn_like(Y_batch)
-            Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
-
-            metrics_per_x.append(wassertein2(Y_batch, Y_approximation))
+            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
+            metrics_per_x.append(wassertein2(U_batch, U_approximation))
+    
         wasserstein2_metrics.append(torch.tensor(metrics_per_x))
 
     return torch.stack(wasserstein2_metrics)
@@ -108,8 +108,8 @@ def sample_gaussian_negative_log_likelihood_metrics(
             X_batch = X_dataset[i, :, :]
             U_batch = torch.randn_like(Y_batch)
 
-            Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
-            U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
+            Y_approximation = dataset.push_u_given_x(u=U_batch, x=X_batch)
+            U_approximation = pushforward_operator.push_y_given_x(y=Y_approximation, x=X_batch)
             metrics_per_x.append(compute_gaussian_negative_log_likelihood(U_approximation))
 
         gaussian_negative_log_likelihood_metrics.append(torch.stack(metrics_per_x))
@@ -154,8 +154,8 @@ def sample_quantile_error_metrics(
 
             for k, quantile_level in enumerate(quantile_levels):
                 U_batch = U_dataset[j, k]
-                Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
-                U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
+                Y_approximation = dataset.push_u_given_x(u=U_batch, x=X_batch)
+                U_approximation = pushforward_operator.push_y_given_x(y=Y_approximation, x=X_batch)
                 metrics_per_quantile_level.append(compare_quantile_in_latent_space(U_approximation, quantile_level, "gaussian"))
 
             metrics_per_x.append(torch.stack(metrics_per_quantile_level))
@@ -166,7 +166,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     """
     Test a model on a synthetic dataset.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
+    dataset: Dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
@@ -181,7 +181,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     U = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator, **experiment.tensor_parameters)
 
     X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
-    Y_dataset = dataset.pushforward_U_given_X(U, X_dataset)
+    Y_dataset = dataset.push_u_given_x(u=U, x=X_dataset)
 
     try:
         if not exclude_quantile_similarity:

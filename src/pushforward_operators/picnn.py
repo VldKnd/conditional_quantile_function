@@ -108,10 +108,10 @@ class SCPICNN(PICNN):
     """Strongly convex variant of PICNN.
     alpha: regularization parameter
     """
-    def __init__(self, alpha: float, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(SCPICNN, self).__init__(*args, **kwargs)
-        self.register_buffer('alpha', torch.tensor(alpha))
+        self.log_alpha = nn.Parameter(torch.tensor(0.))
 
     def forward(self, x, y):
         output = super().forward(x, y)
-        return output + 0.5 * self.alpha * torch.norm(y, dim=-1, keepdim=True)**2
+        return output + 0.5 * torch.exp(self.log_alpha) * torch.norm(y, dim=-1, keepdim=True)**2

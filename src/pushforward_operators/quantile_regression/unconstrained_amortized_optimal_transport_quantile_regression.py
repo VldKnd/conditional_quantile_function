@@ -12,29 +12,29 @@ class PotentialNN(nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         activation_function_name: str,
-        alpha: float = 1e-2
     ):
         super().__init__()
-        self.alpha = alpha
+        self.log_alpha = nn.Parameter(torch.tensor(0.))
         self.activation_function_name = activation_function_name
         self.activation_function = getattr(nn, activation_function_name)()
-    
+        self.feature_expansion_layer = nn.Linear(feature_dimension, response_dimension*2)
+
         hidden_layers = []
         for _ in range(number_of_hidden_layers):
             hidden_layers.append(nn.Linear(hidden_dimension, hidden_dimension))
             hidden_layers.append(self.activation_function)
 
         self.potential_network = nn.Sequential(
-            nn.Linear(feature_dimension + response_dimension, hidden_dimension),
+            nn.Linear(3*response_dimension, hidden_dimension),
             self.activation_function,
             *hidden_layers,
             nn.Linear(hidden_dimension, 1)
         )
 
     def forward(self, X: torch.Tensor, Y: torch.Tensor):
-        input_tensor = torch.cat([X, Y], dim=-1)
+        input_tensor = torch.cat([self.feature_expansion_layer(X), Y], dim=-1)
         output_tensor = self.potential_network(input_tensor)
-        return output_tensor + self.alpha * ( 0.5 * torch.norm(Y, dim=-1, keepdim=True)**2 )
+        return output_tensor + torch.exp(self.log_alpha) * ( 0.5 * torch.norm(Y, dim=-1, keepdim=True)**2 )
 
 class AmortizationNetwork(nn.Module):
     def __init__(
@@ -48,6 +48,7 @@ class AmortizationNetwork(nn.Module):
         super().__init__()
         self.activation_function_name = activation_function_name
         self.activation_function = getattr(nn, activation_function_name)()
+        self.feature_expansion_layer = nn.Linear(feature_dimension, response_dimension*2)
     
         hidden_layers = []
         for _ in range(number_of_hidden_layers):
@@ -55,7 +56,7 @@ class AmortizationNetwork(nn.Module):
             hidden_layers.append(self.activation_function)
 
         self.amortization_network = nn.Sequential(
-            nn.Linear(feature_dimension + response_dimension, hidden_dimension),
+            nn.Linear(3*response_dimension, hidden_dimension),
             self.activation_function,
             *hidden_layers,
             nn.Linear(hidden_dimension, response_dimension)
@@ -64,14 +65,13 @@ class AmortizationNetwork(nn.Module):
         self.identity_projection = nn.Linear(response_dimension, response_dimension)
 
     def forward(self, X: torch.Tensor, U: torch.Tensor):
-        input_tensor = torch.cat([X, U], dim=-1)
+        input_tensor = torch.cat([self.feature_expansion_layer(X), U], dim=-1)
         output_tensor = self.amortization_network(input_tensor)
         input_projection = self.identity_projection(U)
         return output_tensor + input_projection
 
 class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
-        alpha: float,
         feature_dimension: int,
         response_dimension: int,
         hidden_dimension: int,
@@ -81,7 +81,6 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         super().__init__()
         self.init_dict = {
             "class_name": "UnconstrainedAmortizedOTQuantileRegression",
-            "alpha": alpha,
             "feature_dimension": feature_dimension,
             "response_dimension": response_dimension,
             "hidden_dimension": hidden_dimension,
@@ -90,7 +89,6 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         }
 
         self.psi_potential_network = PotentialNN(
-            alpha=alpha,
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
@@ -133,24 +131,15 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
                 for X_batch, Y_batch in dataloader:
                     U_batch = torch.randn_like(Y_batch)
 
-                    self.amortization_network.zero_grad()
                     Y_amortized = self.amortization_network(X_batch, U_batch)
+                    Y_amortized_detached = Y_amortized.detach()
 
-                    amortized_psi_potential = self.psi_potential_network(X_batch, Y_amortized)
-                    
-                    phi_amortized = (
-                        torch.sum(U_batch * Y_amortized, dim=-1, keepdims=True) 
-                        - amortized_psi_potential
-                    )
-                    amortization_network_objective = -torch.mean(phi_amortized)
-                    amortization_network_objective.backward()
-                    amortization_network_optimizer.step()
-                        
-                    Y_batch_for_phi = self.estimate_Y_from_psi(
-                        X_tensor=X_batch,
-                        U_tensor=U_batch,
-                        Y_init=Y_amortized.detach()
-                    )
+                    with torch.no_grad():
+                        Y_batch_for_phi = self.estimate_Y_from_psi(
+                            X_tensor=X_batch,
+                            U_tensor=U_batch,
+                            Y_init=Y_amortized_detached
+                        )
 
                     self.psi_potential_network.zero_grad()
                     psi = self.psi_potential_network(X_batch, Y_batch)
@@ -158,7 +147,19 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
                             - self.psi_potential_network(X_batch, Y_batch_for_phi)
                     potential_network_objective = torch.mean(phi) + torch.mean(psi)
                     potential_network_objective.backward()
+                    torch.nn.utils.clip_grad.clip_grad_norm_(
+                        self.psi_potential_network.parameters(), max_norm=10
+                    ).item()
                     psi_potential_network_optimizer.step()
+
+
+                    self.amortization_network.zero_grad()  
+                    amortization_network_objective = torch.norm(Y_amortized - Y_batch_for_phi, dim=-1).mean()
+                    amortization_network_objective.backward()
+                    torch.nn.utils.clip_grad.clip_grad_norm_(
+                        self.amortization_network.parameters(), max_norm=10
+                    ).item()
+                    amortization_network_optimizer.step()
 
                     if psi_potential_network_scheduler is not None and amortization_network_scheduler is not None:
                         psi_potential_network_scheduler.step()

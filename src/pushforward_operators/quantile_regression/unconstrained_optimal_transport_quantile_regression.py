@@ -7,7 +7,6 @@ from pushforward_operators.picnn import SCPICNN
 
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
-        alpha: float,
         x_dimension: int,
         y_dimension: int,
         u_dimension: int,
@@ -17,7 +16,6 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         super().__init__()
         self.init_dict = {
             "class_name": "UnconstrainedOTQuantileRegression",
-            "alpha": alpha,
             "x_dimension": x_dimension,
             "y_dimension": y_dimension,
             "u_dimension": u_dimension,
@@ -26,7 +24,6 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         }
 
         self.psi_potential_network = SCPICNN(
-            alpha=alpha,
             x_dimension=x_dimension,
             y_dimension=y_dimension,
             u_dimension=u_dimension,
@@ -73,6 +70,10 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
 
                     objective = torch.mean(phi) + torch.mean(psi)
                     objective.backward()
+                    torch.nn.utils.clip_grad.clip_grad_norm_(
+                        self.psi_potential_network.parameters(), max_norm=10
+                    ).item()
+
 
                     psi_potential_network_optimizer.step()
                     if psi_potential_network_scheduler is not None:
@@ -149,7 +150,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         """
         requires_grad_backup = y.requires_grad
         y.requires_grad = True
-        pushforward_of_u = -torch.autograd.grad(self.psi_potential_network(x, y).sum(), y, create_graph=False)[0]
+        pushforward_of_u = torch.autograd.grad(self.psi_potential_network(x, y).sum(), y, create_graph=False)[0]
         y.requires_grad = requires_grad_backup
         return pushforward_of_u
 

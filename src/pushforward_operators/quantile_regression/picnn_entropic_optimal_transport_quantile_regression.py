@@ -51,18 +51,18 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
-        phi_potential_network_optimizer = torch.optim.AdamW(
+        psi_potential_network_optimizer = torch.optim.AdamW(
             params=self.psi_potential_network.parameters(),
             **train_parameters.optimizer_parameters
         )
         if train_parameters.scheduler_parameters:
-            phi_potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer=phi_potential_network_optimizer, 
+            psi_potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=psi_potential_network_optimizer, 
                 T_max=total_number_of_optimizer_steps,
                 **train_parameters.scheduler_parameters
             )
         else:
-            phi_potential_network_scheduler = None
+            psi_potential_network_scheduler = None
 
         self.warmup_Y_scaler(dataloader)
         training_information = []
@@ -83,10 +83,14 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                     )
                     objective = torch.mean(phi) + torch.mean(psi)
 
+                    torch.nn.utils.clip_grad.clip_grad_norm_(
+                        self.psi_potential_network.parameters(), max_norm=10
+                    ).item()
+
                     objective.backward()
-                    phi_potential_network_optimizer.step()
-                    if phi_potential_network_scheduler is not None:
-                        phi_potential_network_scheduler.step()
+                    psi_potential_network_optimizer.step()
+                    if psi_potential_network_scheduler is not None:
+                        psi_potential_network_scheduler.step()
 
                     if verbose:
                         training_information.append({
@@ -101,8 +105,8 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                                 f"Objective: {running_mean_objective:.3f}"
                             ) + \
                             (
-                                f", LR: {phi_potential_network_scheduler.get_last_lr()[0]:.6f}"
-                                if phi_potential_network_scheduler is not None
+                                f", LR: {psi_potential_network_scheduler.get_last_lr()[0]:.6f}"
+                                if psi_potential_network_scheduler is not None
                                 else ""
                             )
                         )
@@ -146,7 +150,7 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         y.requires_grad = True
         Y_scaled = self.Y_scaler(y)
         potential = self.psi_potential_network(x, Y_scaled)
-        U = -torch.autograd.grad(potential.sum(), Y_scaled, create_graph=False)[0]
+        U = torch.autograd.grad(potential.sum(), Y_scaled, create_graph=False)[0]
         y.requires_grad = requires_grad_backup
         return U.detach()
 
@@ -156,7 +160,8 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon, "activation_function_name": self.activation_function_name}, path)
+    
+        torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon}, path)
 
     def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """Loads the pushforward operator from a file.
@@ -167,5 +172,4 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         data = torch.load(path, map_location=map_location)
         self.load_state_dict(data["state_dict"])
         self.epsilon = data["epsilon"]
-        self.activation_function_name = data["activation_function_name"]
         return self

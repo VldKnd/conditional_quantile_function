@@ -5,7 +5,14 @@ from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
-    def __init__(self, feature_dimension: int, response_dimension: int, hidden_dimension: int = 100, number_of_hidden_layers: int = 1, epsilon: float = 1e-7, activation_function_name: str = "Softplus"):
+    def __init__(self,
+            feature_dimension: int,
+            response_dimension: int,
+            hidden_dimension: int,
+            number_of_hidden_layers: int,
+            epsilon: float,
+            activation_function_name: str = "Softplus",
+        ):
         super().__init__()
         self.activation_function_name = activation_function_name
         self.activation_function = getattr(nn, activation_function_name)()
@@ -74,8 +81,12 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                             Y_tensor=Y_scaled_batch
                     )
                     objective = torch.mean(phi) + torch.mean(psi)
-
                     objective.backward()
+
+                    torch.nn.utils.clip_grad.clip_grad_norm_(
+                        self.psi_potential_network.parameters(), max_norm=10
+                    ).item()
+
                     phi_potential_network_optimizer.step()
                     if phi_potential_network_scheduler is not None:
                         phi_potential_network_scheduler.step()
@@ -138,7 +149,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         requires_grad_backup = y.requires_grad
         y.requires_grad = True
         Y_scaled = self.Y_scaler(y)
-        U = - torch.autograd.grad(self.psi_potential_network(torch.cat([x, Y_scaled], dim=-1)).sum(), Y_scaled, create_graph=False)[0]
+        U = torch.autograd.grad(self.psi_potential_network(torch.cat([x, Y_scaled], dim=-1)).sum(), Y_scaled, create_graph=False)[0]
         y.requires_grad = requires_grad_backup
         return U.detach()
 
