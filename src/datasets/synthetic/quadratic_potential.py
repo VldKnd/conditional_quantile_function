@@ -11,13 +11,18 @@ class ConvexQuadraticPotential(nn.Module):
                        [A_xu^T, A_uu]]
     where A_uu = L L^T + eps*I  (PD), ensuring strict convexity in u.
     """
-    def __init__(self, number_of_functions: int, response_size: int, covariate_size: int, epsilon: float = 1e-3):
+    def __init__(self,
+            number_of_functions: int,
+            response_size: int,
+            covariate_size: int,
+            epsilon: float = 1e-3,
+        ):
         super().__init__()
         self.init_dict = {
             "number_of_functions": number_of_functions,
             "response_size": response_size,
             "covariate_size": covariate_size,
-            "epsilon": epsilon,
+            "epsilon": epsilon
         }
         self.number_of_functions = number_of_functions
         self.response_size = response_size
