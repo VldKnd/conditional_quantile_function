@@ -99,7 +99,7 @@ class CPFlow(PushForwardOperator, nn.Module):
         self.is_fitted_ = True
         return self
 
-    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
@@ -109,11 +109,12 @@ class CPFlow(PushForwardOperator, nn.Module):
             self.flow.eval()
             for f in self.flow.flows[1::2]:
                 f.no_bruteforce = False
-            y = self.flow.reverse(U, context=X)
+            y = self.flow.reverse(u, context=x)
 
         return y
 
-    def push_backward_y_given_x(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes y variable to the latent space given condition x"""
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
@@ -123,7 +124,7 @@ class CPFlow(PushForwardOperator, nn.Module):
             self.flow.eval()
             for f in self.flow.flows[1::2]:
                 f.no_bruteforce = False
-            u, _ = self.flow.forward_transform(Y, context=X)
+            u, _ = self.flow.forward_transform(y, context=x)
         return u
 
     def sample_y_given_x(self, n_samples: int, X: torch.Tensor) -> torch.Tensor:
@@ -133,7 +134,7 @@ class CPFlow(PushForwardOperator, nn.Module):
             device=X.device,
             dtype=torch.float32,
         )
-        y = self.push_forward_u_given_x(u, X)
+        y = self.push_u_given_x(u=u, x=X)
         return y
 
     def logp_cond(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:

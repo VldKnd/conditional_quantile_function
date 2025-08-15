@@ -2,6 +2,7 @@ from datasets import (
     BananaDataset,
     TicTacDataset,
     Dataset,
+    ConvexBananaDataset,
     StarDataset,
 )
 from pushforward_operators import (
@@ -9,24 +10,21 @@ from pushforward_operators import (
     EntropicOTQuantileRegression,
     CPFlow,
     UnconstrainedOTQuantileRegression,
-    FastNonLinearVectorQuantileRegression,
-    LinearVectorQuantileRegression,
+    UnconstrainedAmortizedOTQuantileRegression,
     PICNNEntropicOTQuantileRegression,
-    EpsilonAugmentedEntropicOTQuantileRegression,
 )
 
 name_to_dataset_map: dict[str, Dataset] = {
     "banana": BananaDataset,
     "tictac": TicTacDataset,
+    "convex_banana":ConvexBananaDataset,
     "star": StarDataset,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
-    "entropic_optimal_transport_quantile_regression": EntropicOTQuantileRegression,
-    "epsilon_augmented_entropic_optimal_transport_quantile_regression": EpsilonAugmentedEntropicOTQuantileRegression,
-    "convex_potential_flow": CPFlow,
-    "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression,
-    "fast_non_linear_vector_quantile_regression": FastNonLinearVectorQuantileRegression,
-    "linear_vector_quantile_regression": LinearVectorQuantileRegression,
-    "picnn_entropic_optimal_transport_quantile_regression": PICNNEntropicOTQuantileRegression,
+    "entropic_optimal_transport_quantile_regression": EntropicOTQuantileRegression, # Paragraph 2.4.3
+    "convex_potential_flow": CPFlow, # Paragraph 2.4.5
+    "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression, # Paragraph 2.4.4
+    "unconstrained_amortized_optimal_transport_quantile_regression": UnconstrainedAmortizedOTQuantileRegression, # Amortized varient of Paragraph 2.4.4, https://arxiv.org/abs/2210.12153
+    "picnn_entropic_optimal_transport_quantile_regression": PICNNEntropicOTQuantileRegression, # Paragraph 2.4.3 with convex network parametrization 
 }

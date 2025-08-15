@@ -3,7 +3,6 @@ import torch
 from typing import Tuple
 from datasets.protocol import Dataset
 
-
 class BananaDataset(Dataset):
     """
     Creating data in the form of a banana with x values distributed between 1 and 5.
@@ -56,17 +55,15 @@ class BananaDataset(Dataset):
 
         return X, Y
 
-    def pushbackward_Y_given_X(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
-        """
-        Push backwards the conditional distribution of the response given the covariates.
-        """
-        assert Y.shape[0] == X.shape[0], (
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes y variable to the latent space given condition x"""
+        assert y.shape[0] == x.shape[0], (
             "The number of rows in Y and X must be the same."
         )
 
-        U_shape = Y.shape[:-1] + (2,)
-        Y_flat = Y.reshape(-1, 2)
-        X_flat = X.reshape(-1, 1)
+        U_shape = y.shape[:-1] + (2,)
+        Y_flat = x.reshape(-1, 2)
+        X_flat = x.reshape(-1, 1)
 
         U = torch.concatenate(
             [
@@ -79,17 +76,17 @@ class BananaDataset(Dataset):
 
         return U.reshape(U_shape)
 
-    def pushforward_U_given_X(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
         Push forward the conditional distribution of the covariates given the response.
         """
-        assert U.shape[:-1] == X.shape[:-1], (
+        assert u.shape[:-1] == x.shape[:-1], (
             "The number of rows in U and X must be the same."
         )
-        Y_shape = U.shape[:-1] + (2,)
+        Y_shape = u.shape[:-1] + (2,)
 
-        U_flat = U.reshape(-1, 2)
-        X_flat = X.reshape(-1, 1)
+        U_flat = u.reshape(-1, 2)
+        X_flat = x.reshape(-1, 1)
         Y_flat = torch.concatenate(
             [
                 U_flat[:, 0:1] * X_flat,

@@ -1,13 +1,13 @@
 import torch
 from tqdm import tqdm
-from datasets import Dataset, BananaDataset, TicTacDataset, StarDataset
+from datasets import Dataset, BananaDataset, TicTacDataset, StarDataset, ConvexBananaDataset
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
-from metrics import wassertein2, compare_quantile_in_latent_space, compute_gaussian_negative_log_likelihood
+from metrics import wassertein2, compare_quantile_in_latent_space
 from pushforward_operators import PushForwardOperator
 from scipy import stats
 
-def test_from_json_file(path_to_experiment_file: str, verbose: bool = False, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False) -> dict:
+def test_from_json_file(path_to_experiment_file: str, verbose: bool = False, exclude_wasserstein2: bool = False, exclude_l2_distance: bool = False, exclude_quantile_similarity: bool = False) -> dict:
     """
     Test a model on a synthetic dataset from an experiment set in a JSON file.
 
@@ -28,7 +28,7 @@ def test_from_json_file(path_to_experiment_file: str, verbose: bool = False, exc
     except Exception as e:
         raise ValueError(f"Error loading experiment from {path_to_experiment_file}: {e}. Make sure the file is a valid JSON file and is consistent with the Experiment class.")
 
-    metrics = test(experiment, verbose=verbose, exclude_wasserstein2=exclude_wasserstein2, exclude_gaussian_likelihood=exclude_gaussian_likelihood, exclude_quantile_similarity=exclude_quantile_similarity)
+    metrics = test(experiment, verbose=verbose, exclude_wasserstein2=exclude_wasserstein2, exclude_l2_distance=exclude_l2_distance, exclude_quantile_similarity=exclude_quantile_similarity)
 
     if experiment.path_to_metrics is not None:
         torch.save(metrics, experiment.path_to_metrics)
@@ -78,43 +78,43 @@ def sample_wasserstein2_metrics(
             Y_batch = Y_dataset[i, :, :]
             X_batch = X_dataset[i, :, :]
             U_batch = torch.randn_like(Y_batch)
-            Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
-
-            metrics_per_x.append(wassertein2(Y_batch, Y_approximation))
+            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
+            metrics_per_x.append(wassertein2(U_batch, U_approximation))
+    
         wasserstein2_metrics.append(torch.tensor(metrics_per_x))
 
     return torch.stack(wasserstein2_metrics)
 
-def sample_gaussian_negative_log_likelihood_metrics(
+def sample_l2_distance_metrics(
         pushforward_operator: PushForwardOperator,
-        dataset: Dataset,
         X_dataset: torch.Tensor,
         Y_dataset: torch.Tensor,
+        U_dataset: torch.Tensor,
         number_of_samples: int,
         verbose: bool = False
     ) -> torch.Tensor:
 
-    gaussian_negative_log_likelihood_progress_bar = tqdm(
+    l2_progress_bar = tqdm(
         range(X_dataset.shape[0]),
-        desc="Computing Negative Gaussian Log Likelihood metrics",
+        desc="Computing l2 distances",
         disable=not verbose
     )
-    gaussian_negative_log_likelihood_metrics = []
+    l2_metrics = []
 
-    for i in gaussian_negative_log_likelihood_progress_bar:
+    for i in l2_progress_bar:
         metrics_per_x = []
         for _ in range(number_of_samples):
             Y_batch = Y_dataset[i, :, :]
             X_batch = X_dataset[i, :, :]
-            U_batch = torch.randn_like(Y_batch)
+            U_batch = U_dataset[i, :, :]
 
-            Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
-            U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
-            metrics_per_x.append(compute_gaussian_negative_log_likelihood(U_approximation))
+            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
+            l2_distance = torch.norm((U_approximation - U_batch),dim=-1)**2
+            metrics_per_x.append(l2_distance.mean())
 
-        gaussian_negative_log_likelihood_metrics.append(torch.stack(metrics_per_x))
+        l2_metrics.append(torch.stack(metrics_per_x))
 
-    return torch.stack(gaussian_negative_log_likelihood_metrics)
+    return torch.stack(l2_metrics)
 
 def sample_quantile_error_metrics(
         pushforward_operator: PushForwardOperator,
@@ -154,19 +154,19 @@ def sample_quantile_error_metrics(
 
             for k, quantile_level in enumerate(quantile_levels):
                 U_batch = U_dataset[j, k]
-                Y_approximation = pushforward_operator.push_forward_u_given_x(U=U_batch, X=X_batch)
-                U_approximation = dataset.pushbackward_Y_given_X(Y=Y_approximation, X=X_batch)
+                Y_approximation = dataset.push_u_given_x(u=U_batch, x=X_batch)
+                U_approximation = pushforward_operator.push_y_given_x(y=Y_approximation, x=X_batch)
                 metrics_per_quantile_level.append(compare_quantile_in_latent_space(U_approximation, quantile_level, "gaussian"))
 
             metrics_per_x.append(torch.stack(metrics_per_quantile_level))
         quantile_error_metrics.append(torch.stack(metrics_per_x))
     return torch.stack(quantile_error_metrics)
 
-def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
+def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_l2_distance: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
     """
     Test a model on a synthetic dataset.
     """
-    dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
+    dataset: Dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
     number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
@@ -181,7 +181,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     U = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator, **experiment.tensor_parameters)
 
     X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
-    Y_dataset = dataset.pushforward_U_given_X(U, X_dataset)
+    Y_dataset = dataset.push_u_given_x(u=U, x=X_dataset)
 
     try:
         if not exclude_quantile_similarity:
@@ -198,12 +198,12 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
         print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
 
     try:
-        if not exclude_gaussian_likelihood:
-            metrics["gaussian_negative_log_likelihood"] = sample_gaussian_negative_log_likelihood_metrics(
+        if not exclude_l2_distance:
+            metrics["l2_distance"] = sample_l2_distance_metrics(
                 pushforward_operator=pushforward_operator,
-                dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
+                U_dataset=U,
                 number_of_samples=100,
                 verbose=verbose
             )
@@ -223,7 +223,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
 
     return metrics
 
-def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gaussian_likelihood: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
+def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_l2_distance: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
     """
     Test a model on a synthetic dataset.
 
@@ -235,8 +235,8 @@ def test(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_gau
     """
     dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
 
-    if type(dataset) in {BananaDataset, TicTacDataset, StarDataset}:
-        return test_on_synthetic_dataset(experiment, exclude_wasserstein2, exclude_gaussian_likelihood, exclude_quantile_similarity, verbose)
+    if type(dataset) in {BananaDataset, TicTacDataset, StarDataset, ConvexBananaDataset}:
+        return test_on_synthetic_dataset(experiment, exclude_wasserstein2, exclude_l2_distance, exclude_quantile_similarity, verbose)
     else:
         raise NotImplementedError(f"Testing on the dataset {dataset.__class__.__name__} is not implemented.")
 
@@ -247,8 +247,8 @@ if __name__ == "__main__":
     parser.add_argument("--path_to_experiment_file", type=str, required=True)
     parser.add_argument("--verbose", type=bool, required=False, default=True)
     parser.add_argument("--exclude-wasserstein2", action="store_true", required=False, default=False)
-    parser.add_argument("--exclude-gaussian-likelihood", type=bool, required=False, default=False)
-    parser.add_argument("--exclude-quantile-similarity", type=bool, required=False, default=False)
+    parser.add_argument("--exclude-l2-distance",  action="store_true", required=False, default=False)
+    parser.add_argument("--exclude-quantile-similarity", action="store_true", required=False, default=False)
     args = parser.parse_args()
 
-    test_from_json_file(args.path_to_experiment_file, args.verbose, args.exclude_wasserstein2, args.exclude_gaussian_likelihood, args.exclude_quantile_similarity)
+    test_from_json_file(args.path_to_experiment_file, args.verbose, args.exclude_wasserstein2, args.exclude_l2_distance, args.exclude_quantile_similarity)

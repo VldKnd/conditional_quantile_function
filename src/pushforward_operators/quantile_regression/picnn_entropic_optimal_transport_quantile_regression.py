@@ -13,7 +13,6 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         z_dimension: int,
         number_of_hidden_layers: int = 1,
         epsilon: float = 1e-7,
-        number_of_samples_for_entropy_dual_estimation: int = 2048
     ):
         super().__init__()
         self.x_dimension = x_dimension
@@ -22,10 +21,9 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         self.z_dimension = z_dimension
         self.number_of_hidden_layers = number_of_hidden_layers
         self.epsilon = epsilon
-        self.number_of_samples_for_entropy_dual_estimation = number_of_samples_for_entropy_dual_estimation
         self.Y_scaler = nn.BatchNorm1d(y_dimension, affine=False)
 
-        self.phi_potential_network = PICNN(
+        self.psi_potential_network = PICNN(
             x_dimension=x_dimension,
             y_dimension=y_dimension,
             u_dimension=u_dimension,
@@ -33,6 +31,15 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             output_dimension=1,
             number_of_hidden_layers=number_of_hidden_layers
         )
+
+    def warmup_Y_scaler(self, dataloader: torch.utils.data.DataLoader, num_passes: int = 1):
+        """Run over the data (no grad) to populate BatchNorm running stats."""
+        self.Y_scaler.train()
+        with torch.no_grad():
+            for _ in range(num_passes):
+                for _, Y in dataloader:
+                    _ = self.Y_scaler(Y)
+        self.Y_scaler.eval()
 
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
@@ -44,37 +51,46 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
-        phi_potential_network_optimizer = torch.optim.AdamW(self.phi_potential_network.parameters(), **train_parameters.optimizer_parameters)
+        psi_potential_network_optimizer = torch.optim.AdamW(
+            params=self.psi_potential_network.parameters(),
+            **train_parameters.optimizer_parameters
+        )
         if train_parameters.scheduler_parameters:
-            phi_potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(phi_potential_network_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+            psi_potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=psi_potential_network_optimizer, 
+                T_max=total_number_of_optimizer_steps,
+                **train_parameters.scheduler_parameters
+            )
         else:
-            phi_potential_network_scheduler = None
+            psi_potential_network_scheduler = None
 
+        self.warmup_Y_scaler(dataloader)
         training_information = []
         progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
 
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
-                    self.phi_potential_network.zero_grad()
+                    self.psi_potential_network.zero_grad()
 
                     Y_scaled_batch = self.Y_scaler(Y_batch)
                     U_batch = torch.randn_like(Y_scaled_batch)
 
-                    phi = self.phi_potential_network(X_batch, U_batch)
-                    psi = self.estimate_entropy_dual_psi(
+                    psi = self.psi_potential_network(X_batch, Y_scaled_batch)
+                    phi = self.estimate_entropy_dual_phi(
                             X_tensor=X_batch,
-                            U_tensor=torch.randn(
-                                    self.number_of_samples_for_entropy_dual_estimation, Y_batch.shape[1],
-                                    **{"device": Y_batch.device, "dtype": Y_batch.dtype}
-                            ),
+                            U_tensor=U_batch,
                             Y_tensor=Y_scaled_batch
                     )
                     objective = torch.mean(phi) + torch.mean(psi)
 
+                    torch.nn.utils.clip_grad.clip_grad_norm_(
+                        self.psi_potential_network.parameters(), max_norm=10
+                    ).item()
+
                     objective.backward()
-                    phi_potential_network_optimizer.step()
-                    if phi_potential_network_scheduler is not None:
-                        phi_potential_network_scheduler.step()
+                    psi_potential_network_optimizer.step()
+                    if psi_potential_network_scheduler is not None:
+                        psi_potential_network_scheduler.step()
 
                     if verbose:
                         training_information.append({
@@ -89,8 +105,8 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                                 f"Objective: {running_mean_objective:.3f}"
                             ) + \
                             (
-                                f", LR: {phi_potential_network_scheduler.get_last_lr()[0]:.6f}"
-                                if phi_potential_network_scheduler is not None
+                                f", LR: {psi_potential_network_scheduler.get_last_lr()[0]:.6f}"
+                                if psi_potential_network_scheduler is not None
                                 else ""
                             )
                         )
@@ -98,7 +114,7 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         progress_bar.close()
         return self
 
-    def estimate_entropy_dual_psi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
+    def estimate_entropy_dual_phi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
         """Estimates the entropy dual psi.
 
         Args:
@@ -107,32 +123,35 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             Y_tensor (torch.Tensor): Output tensor.
         """
         n, _ = X_tensor.shape
-        m, _ = U_tensor.shape
 
-        U_expanded = U_tensor.unsqueeze(0).expand(n, -1, -1)
-        X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, m, -1)
+        Y_expanded_for_X = Y_tensor.unsqueeze(0).expand(n, -1, -1)
+        X_expanded_for_Y = X_tensor.unsqueeze(1).expand(-1, n, -1)
 
-        phi_vals = self.phi_potential_network(X_expanded_for_U, U_expanded).squeeze(-1)
-        cost_matrix = Y_tensor @ U_tensor.T
+        psi_vals = self.psi_potential_network(X_expanded_for_Y, Y_expanded_for_X).squeeze(-1)
+        cost_matrix = U_tensor @ Y_tensor.T
 
-        slackness = cost_matrix - phi_vals
-
-        log_mean_exp = torch.logsumexp(slackness / self.epsilon, dim=1, keepdim=True) \
-                - torch.log(torch.tensor(m, device=slackness.device, dtype=slackness.dtype))
+        slackness = cost_matrix - psi_vals
+        max_slackness, _ = torch.max(slackness, dim=1, keepdim=True)
+        slackness_stable = (slackness - max_slackness) / self.epsilon
+        log_mean_exp = torch.logsumexp(slackness_stable, dim=1, keepdim=True) \
+                - torch.log(torch.tensor(n, device=slackness.device, dtype=slackness.dtype))
+        
+        log_mean_exp += max_slackness / self.epsilon
 
         psi_estimate = self.epsilon * log_mean_exp
 
         return psi_estimate
-
-    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
-        """Generates Y|X by applying a push forward operator to U.
-        """
-        requires_grad_backup = U.requires_grad
-        U.requires_grad = True
-        pushforward_of_u = torch.autograd.grad(self.phi_potential_network(X, U).sum(), U, create_graph=False)[0]
-        pushforward_of_u = pushforward_of_u * torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
-        U.requires_grad = requires_grad_backup
-        return pushforward_of_u
+    
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes y variable to the latent space given condition x"""
+        self.Y_scaler.eval()
+        requires_grad_backup = y.requires_grad
+        y.requires_grad = True
+        Y_scaled = self.Y_scaler(y)
+        potential = self.psi_potential_network(x, Y_scaled)
+        U = torch.autograd.grad(potential.sum(), Y_scaled, create_graph=False)[0]
+        y.requires_grad = requires_grad_backup
+        return U.detach()
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.
@@ -140,9 +159,10 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         Args:
             path (str): Path to save the pushforward operator.
         """
+    
         torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon}, path)
 
-    def load(self, path: str, map_location: torch.device = torch.device("cpu")):
+    def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """Loads the pushforward operator from a file.
 
         Args:
