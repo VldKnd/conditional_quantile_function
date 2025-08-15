@@ -3,15 +3,7 @@ import torch
 
 class PushForwardOperator(ABC):
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """Generates U by applying a push forward operator to Y|X.
-
-        Args:
-            Y (torch.Tensor): Data distribution.
-            X (torch.Tensor): Condition.
-
-        Returns:
-            torch.Tensor: U.
-        """
+        """Pushes y variable to the latent space given condition x"""
         ...
 
     def save(self, path: str):

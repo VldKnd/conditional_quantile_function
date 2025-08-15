@@ -104,12 +104,12 @@ class PICNN(nn.Module):
 
         return output
 
-class SCPICNN(PICNN):
+class PISCNN(PICNN):
     """Strongly convex variant of PICNN.
     alpha: regularization parameter
     """
     def __init__(self, *args, **kwargs):
-        super(SCPICNN, self).__init__(*args, **kwargs)
+        super(PISCNN, self).__init__(*args, **kwargs)
         self.log_alpha = nn.Parameter(torch.tensor(0.))
 
     def forward(self, x, y):

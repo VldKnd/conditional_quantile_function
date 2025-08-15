@@ -235,8 +235,7 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
             return Y_tensor.detach()
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """Generates Y|X by applying a push forward operator to U.
-        """
+        """Pushes y variable to the latent space given condition x"""
         requires_grad_backup = y.requires_grad
         y.requires_grad = True
         pushforward_of_u = torch.autograd.grad(self.psi_potential_network(x, y).sum(), y, create_graph=False)[0]

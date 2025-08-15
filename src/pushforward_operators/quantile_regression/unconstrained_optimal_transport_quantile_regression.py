@@ -3,7 +3,7 @@ from infrastructure.classes import TrainParameters
 import torch
 import torch.nn as nn
 from tqdm import trange
-from pushforward_operators.picnn import SCPICNN
+from pushforward_operators.picnn import PISCNN
 
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
@@ -23,7 +23,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             "number_of_hidden_layers": number_of_hidden_layers
         }
 
-        self.psi_potential_network = SCPICNN(
+        self.psi_potential_network = PISCNN(
             x_dimension=x_dimension,
             y_dimension=y_dimension,
             u_dimension=u_dimension,
@@ -146,8 +146,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             return Y_tensor.detach()
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """Generates Y|X by applying a push forward operator to U.
-        """
+        """Pushes y variable to the latent space given condition x"""
         requires_grad_backup = y.requires_grad
         y.requires_grad = True
         pushforward_of_u = torch.autograd.grad(self.psi_potential_network(x, y).sum(), y, create_graph=False)[0]

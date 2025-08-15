@@ -84,6 +84,7 @@ class StarDataset:
         return Y
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes y variable to the latent space given condition x"""
         final_radius, final_angle = self._to_polar(y)
         lobe_strength = x[:, 0:1]
         swirl_strength = x[:, 1:2]

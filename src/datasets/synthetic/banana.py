@@ -56,9 +56,7 @@ class BananaDataset(Dataset):
         return X, Y
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """
-        Push backwards the conditional distribution of the response given the covariates.
-        """
+        """Pushes y variable to the latent space given condition x"""
         assert y.shape[0] == x.shape[0], (
             "The number of rows in Y and X must be the same."
         )

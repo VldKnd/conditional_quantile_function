@@ -114,6 +114,7 @@ class CPFlow(PushForwardOperator, nn.Module):
         return y
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes y variable to the latent space given condition x"""
         if not self.is_fitted_:
             raise ValueError(
                 "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."

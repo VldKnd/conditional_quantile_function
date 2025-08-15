@@ -143,8 +143,7 @@ class PICNNEntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         return psi_estimate
     
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """Generates U by applying a push forward operator to Y given X.
-        """
+        """Pushes y variable to the latent space given condition x"""
         self.Y_scaler.eval()
         requires_grad_backup = y.requires_grad
         y.requires_grad = True
