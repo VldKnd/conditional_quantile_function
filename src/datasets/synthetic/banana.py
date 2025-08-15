@@ -13,22 +13,55 @@ class BananaDataset(Dataset):
     """
 
     def __init__(self, tensor_parameters: dict, seed: int = 31337, *args, **kwargs):
+        """
+        Initialize the BananaDataset.
+
+        Parameters
+        ----------
+        tensor_parameters : dict
+            Dictionary of tensor device and dtype parameters.
+        seed : int, optional
+            Random seed for reproducibility (default is 31337).
+        *args, **kwargs
+            Additional arguments passed to the base Dataset.
+        """
         super().__init__(*args, **kwargs)
         self.tensor_parameters = tensor_parameters
         self.seed = seed
 
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """
-        Sample the covariates from the uniform distribution between 1 and 5.
+        Sample covariates from a uniform distribution between 0.5 and 2.5.
+
+        Parameters
+        ----------
+        n_points : int
+            Number of covariate samples to generate.
+
+        Returns
+        -------
+        x : torch.Tensor
+            Covariate tensor of shape (n_points, 1).
         """
         x = torch.rand(size=(n_points, 1)) * 2 + 0.5
         return x.to(**self.tensor_parameters)
 
     def sample_conditional(self, n_points: int, X: torch.Tensor) -> torch.Tensor:
         """
-        Sample the conditional distribution of the response given the covariates.
-        """
+        Sample the conditional distribution of the response given covariates.
 
+        Parameters
+        ----------
+        n_points : int
+            Number of response samples per covariate.
+        X : torch.Tensor
+            Covariate tensor of shape (batch_size, 1).
+
+        Returns
+        -------
+        y : torch.Tensor
+            Response tensor of shape (batch_size, n_points, 2).
+        """
         U = torch.randn(size=(X.shape[0], n_points, 2)).to(**self.tensor_parameters)
         X_unsqueezed = X.unsqueeze(1)
         y = torch.concatenate(
@@ -42,7 +75,19 @@ class BananaDataset(Dataset):
 
     def sample_joint(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Sample the joint distribution of the covariates and the response.
+        Sample the joint distribution of covariates and responses.
+
+        Parameters
+        ----------
+        n_points : int
+            Number of joint samples to generate.
+
+        Returns
+        -------
+        X : torch.Tensor
+            Covariate tensor of shape (n_points, 1).
+        Y : torch.Tensor
+            Response tensor of shape (n_points, 2).
         """
         X = self.sample_covariates(n_points=n_points)
         U = torch.randn(size=(X.shape[0], 2)).to(**self.tensor_parameters)
@@ -58,7 +103,19 @@ class BananaDataset(Dataset):
 
     def pushbackward_Y_given_X(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         """
-        Push backwards the conditional distribution of the response given the covariates.
+        Compute the latent variable U given response Y and covariate X.
+
+        Parameters
+        ----------
+        Y : torch.Tensor
+            Response tensor of shape (..., 2).
+        X : torch.Tensor
+            Covariate tensor of shape (..., 1).
+
+        Returns
+        -------
+        U : torch.Tensor
+            Latent variable tensor of shape (..., 2).
         """
         assert Y.shape[0] == X.shape[0], (
             "The number of rows in Y and X must be the same."
@@ -81,7 +138,19 @@ class BananaDataset(Dataset):
 
     def pushforward_U_given_X(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         """
-        Push forward the conditional distribution of the covariates given the response.
+        Compute the response Y given latent variable U and covariate X.
+
+        Parameters
+        ----------
+        U : torch.Tensor
+            Latent variable tensor of shape (..., 2).
+        X : torch.Tensor
+            Covariate tensor of shape (..., 1).
+
+        Returns
+        -------
+        Y : torch.Tensor
+            Response tensor of shape (..., 2).
         """
         assert U.shape[:-1] == X.shape[:-1], (
             "The number of rows in U and X must be the same."
@@ -101,7 +170,17 @@ class BananaDataset(Dataset):
 
     def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
         """
-        Create a meshgrid of covariates.
+        Create a meshgrid of covariates in the range [0.5, 2.5].
+
+        Parameters
+        ----------
+        n_points_per_dimension : int
+            Number of points per dimension for the meshgrid.
+
+        Returns
+        -------
+        x : torch.Tensor
+            Covariate tensor of shape (n_points_per_dimension, 1).
         """
         x = torch.linspace(0.5, 2.5, n_points_per_dimension)
         return x.unsqueeze(1)
