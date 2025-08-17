@@ -161,14 +161,8 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         return self
 
     @torch.inference_mode()
-    def push_forward_u_given_x(
-        self,
-        U: torch.Tensor,
-        X: torch.Tensor,
-        batch_size: int = 1_024,
-        k: int = 10,
-    ) -> torch.Tensor:
-        device, dtype = X.device, X.dtype
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor, batch_size: int = 1024, k: int = 10) -> torch.Tensor:
+        device, dtype = x.device, x.dtype
         for name in ["b_u", "phi", "u"]:
             setattr(self, name, getattr(self, name).to(device=device, dtype=dtype))
 
@@ -176,9 +170,9 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
 
         outputs: List[torch.Tensor] = []
 
-        for i in range(0, X.shape[0], batch_size):
-            X_b = X[i : i + batch_size]
-            U_b = U[i : i + batch_size]
+        for i in range(0, x.shape[0], batch_size):
+            X_b = x[i : i + batch_size]
+            U_b = u[i : i + batch_size]
 
             potential = (self.b_u @ self.feature_network(X_b).T).add_(self.phi)
 
@@ -191,7 +185,6 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
             outputs.append(grads)
 
         return torch.cat(outputs, dim=0)
-
 
     def _estimate_gradients_knn(
         self,
@@ -219,6 +212,9 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
 
         betas = torch.linalg.lstsq(A, b).solution.squeeze(-1)
         return betas[..., :d]
+
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError("Pushforward of Y|X if not implemented for FastNonLinearVectorQuantileRegression")
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.
