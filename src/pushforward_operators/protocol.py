@@ -2,6 +2,10 @@ from abc import ABC
 import torch
 
 class PushForwardOperator(ABC):
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes u variable to the y space given condition x"""
+        ...
+
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
         ...

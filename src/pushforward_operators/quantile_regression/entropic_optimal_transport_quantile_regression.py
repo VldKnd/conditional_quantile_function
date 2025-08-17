@@ -1,8 +1,10 @@
 import torch.nn as nn
 import torch
 from tqdm import trange
+from typing import Literal
 from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
+from pushforward_operators.picnn import network_name_to_network_type
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
@@ -12,23 +14,24 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             number_of_hidden_layers: int,
             epsilon: float,
             activation_function_name: str = "Softplus",
+            network_type: Literal["SCFFNN", "FFNN", "PICNN", "PISCNN"] = "FFNN",
+            potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
         ):
         super().__init__()
         self.activation_function_name = activation_function_name
         self.activation_function = getattr(nn, activation_function_name)()
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
+        self.network_type = network_type
+        self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network 
 
-        hidden_layers = []
-        for _ in range(number_of_hidden_layers):
-            hidden_layers.append(nn.Linear(hidden_dimension, hidden_dimension))
-            hidden_layers.append(self.activation_function)
-
-        self.psi_potential_network = nn.Sequential(
-            nn.Linear(feature_dimension + response_dimension, hidden_dimension),
-            self.activation_function,
-            *hidden_layers,
-            nn.Linear(hidden_dimension, 1)
+        self.potential_network = network_name_to_network_type[network_type](
+            feature_dimension=feature_dimension,
+            response_dimension=response_dimension,
+            hidden_dimension=hidden_dimension,
+            number_of_hidden_layers=number_of_hidden_layers,
+            activation_function_name=activation_function_name
         )
+
         self.epsilon = epsilon
 
     def warmup_Y_scaler(self, dataloader: torch.utils.data.DataLoader, num_passes: int = 1):
@@ -50,18 +53,18 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
-        phi_potential_network_optimizer = torch.optim.AdamW(
-            params=self.psi_potential_network.parameters(),
+        potential_network_optimizer = torch.optim.AdamW(
+            params=self.potential_network.parameters(),
             **train_parameters.optimizer_parameters
         )
         if train_parameters.scheduler_parameters:
-            phi_potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer=phi_potential_network_optimizer, 
+            potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=potential_network_optimizer, 
                 T_max=total_number_of_optimizer_steps,
                 **train_parameters.scheduler_parameters
             )
         else:
-            phi_potential_network_scheduler = None
+            potential_network_scheduler = None
 
         self.warmup_Y_scaler(dataloader)
         training_information = []
@@ -69,27 +72,32 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
 
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
-                    self.psi_potential_network.zero_grad()
+                    self.potential_network.zero_grad()
 
                     Y_scaled_batch = self.Y_scaler(Y_batch)
                     U_batch = torch.randn_like(Y_scaled_batch)
 
-                    psi = self.psi_potential_network(torch.cat([X_batch, Y_scaled_batch], dim=1))
-                    phi = self.estimate_entropy_dual_phi(
+                    psi = self.estimate_psi(
                             X_tensor=X_batch,
                             U_tensor=U_batch,
                             Y_tensor=Y_scaled_batch
                     )
+                    phi = self.estimate_phi(
+                            X_tensor=X_batch,
+                            U_tensor=U_batch,
+                            Y_tensor=Y_scaled_batch
+                    )
+                    
                     objective = torch.mean(phi) + torch.mean(psi)
                     objective.backward()
 
                     torch.nn.utils.clip_grad.clip_grad_norm_(
-                        self.psi_potential_network.parameters(), max_norm=10
+                        self.potential_network.parameters(), max_norm=10
                     ).item()
 
-                    phi_potential_network_optimizer.step()
-                    if phi_potential_network_scheduler is not None:
-                        phi_potential_network_scheduler.step()
+                    potential_network_optimizer.step()
+                    if potential_network_scheduler is not None:
+                        potential_network_scheduler.step()
 
                     if verbose:
                         training_information.append({
@@ -104,30 +112,64 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                                 f"Objective: {running_mean_objective:.3f}"
                             ) + \
                             (
-                                f", LR: {phi_potential_network_scheduler.get_last_lr()[0]:.6f}"
-                                if phi_potential_network_scheduler is not None
+                                f", LR: {potential_network_scheduler.get_last_lr()[0]:.6f}"
+                                if potential_network_scheduler is not None
                                 else ""
                             )
                         )
 
         progress_bar.close()
         return self
-
-    def estimate_entropy_dual_phi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
-        """Estimates the entropy dual psi.
+    
+    def estimate_psi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
+        """Estimates psi, either with Neural Network or entropic dual.
 
         Args:
             X_tensor (torch.Tensor): Input tensor.
             U_tensor (torch.Tensor): Random variable to be pushed forward.
             Y_tensor (torch.Tensor): Output tensor.
         """
+        if self.potential_to_estimate_with_neural_network == "y":
+            return self.potential_network(X_tensor, Y_tensor)
+        
         n, _ = X_tensor.shape
 
-        Y_expanded = Y_tensor.unsqueeze(0).expand(n, -1, -1)
-        X_expanded_for_Y = X_tensor.unsqueeze(1).expand(-1, n, -1)
-        XY = torch.cat((X_expanded_for_Y, Y_expanded), dim=-1)
+        U_expanded_for_X = U_tensor.unsqueeze(0).expand(n, -1, -1)
+        X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, n, -1)
 
-        psi_vals = self.psi_potential_network(XY).squeeze(-1)
+        phi_values = self.potential_network(X_expanded_for_U, U_expanded_for_X).squeeze(-1)
+        cost_matrix = Y_tensor @ U_tensor.T
+
+        slackness = cost_matrix - phi_values
+        max_slackness, _ = torch.max(slackness, dim=1, keepdim=True)
+        slackness_stable = (slackness - max_slackness) / self.epsilon
+        log_mean_exp = torch.logsumexp(slackness_stable, dim=1, keepdim=True) \
+                - torch.log(torch.tensor(n, device=slackness.device, dtype=slackness.dtype))
+        
+        log_mean_exp += max_slackness / self.epsilon
+
+        phi_estimate = self.epsilon * log_mean_exp
+
+        return phi_estimate
+    
+    
+    def estimate_phi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor):
+        """Estimates phi, either with Neural Network or entropic dual.
+
+        Args:
+            X_tensor (torch.Tensor): Input tensor.
+            U_tensor (torch.Tensor): Random variable to be pushed forward.
+            Y_tensor (torch.Tensor): Output tensor.
+        """
+        if self.potential_to_estimate_with_neural_network == "u":
+            return self.potential_network(X_tensor, U_tensor)
+        
+        n, _ = X_tensor.shape
+
+        Y_expanded_for_X = Y_tensor.unsqueeze(0).expand(n, -1, -1)
+        X_expanded_for_Y = X_tensor.unsqueeze(1).expand(-1, n, -1)
+
+        psi_vals = self.potential_network(X_expanded_for_Y, Y_expanded_for_X).squeeze(-1)
         cost_matrix = U_tensor @ Y_tensor.T
 
         slackness = cost_matrix - psi_vals
@@ -142,15 +184,97 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
 
         return psi_estimate
     
+    @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
         self.Y_scaler.eval()
-        requires_grad_backup = y.requires_grad
-        y.requires_grad = True
-        Y_scaled = self.Y_scaler(y)
-        U = torch.autograd.grad(self.psi_potential_network(torch.cat([x, Y_scaled], dim=-1)).sum(), Y_scaled, create_graph=False)[0]
-        y.requires_grad = requires_grad_backup
-        return U.detach()
+        if self.potential_to_estimate_with_neural_network == "y":
+            requires_grad_backup, y.requires_grad = y.requires_grad, True
+            Y_scaled = self.Y_scaler(y)
+            potential_value = self.potential_network(x, Y_scaled).sum()
+
+            U_tensor = torch.autograd.grad(potential_value, Y_scaled, create_graph=False)[0]
+            y.requires_grad = requires_grad_backup
+            return U_tensor.detach()
+        else:
+            if self.network_type in {"SCFFNN", "FFNN"}:
+                error_message = f"Convergence is not guarenteed for {self.network_type} network"
+                raise NotImplementedError(error_message)
+            
+            U_init = torch.randn_like(y)
+            U_tensor = torch.nn.Parameter(U_init.clone().contiguous())
+
+            X_tensor = x.clone()
+            Y_tensor = self.Y_scaler(y)
+
+            optimizer = torch.optim.LBFGS(
+                [U_tensor],
+                lr=0.01,
+                line_search_fn="strong_wolfe",
+                max_iter=1000,
+                tolerance_grad=1e-10,
+                tolerance_change=1e-10
+            )
+
+            def slackness_closure():
+                optimizer.zero_grad()
+                potential = self.potential_network(X_tensor, U_tensor)
+                objective = (potential - torch.sum(Y_tensor*U_tensor, dim=-1, keepdim=True)).sum()
+                objective.backward()
+                return objective
+
+            optimizer.step(slackness_closure)
+
+            return U_tensor.requires_grad_(False).detach()
+
+    @torch.enable_grad()
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes u variable to the y space given condition x"""
+        self.Y_scaler.eval()
+
+        if self.potential_to_estimate_with_neural_network == "u":
+            requires_grad_backup, u.requires_grad = u.requires_grad, True
+            potential_value = self.potential_network(x, u).sum()
+
+            Y_scaled = torch.autograd.grad(potential_value, u, create_graph=False)[0]
+            Y_tensor = Y_scaled*torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
+            u.requires_grad = requires_grad_backup
+
+            return Y_tensor.detach()
+    
+        else:
+            if self.network_type in {"SCFFNN", "FFNN"}:
+                error_message = f"Convergence is not guarenteed for {self.network_type} network"
+                raise NotImplementedError(error_message)
+            
+            Y_init = torch.randn_like(u)
+            Y_tensor = torch.nn.Parameter(Y_init.clone().contiguous())
+            U_tensor = u.clone()
+            X_tensor = x.clone()
+
+            optimizer = torch.optim.LBFGS(
+                [Y_tensor],
+                lr=1,
+                line_search_fn="strong_wolfe",
+                max_iter=1000,
+                tolerance_grad=1e-10,
+                tolerance_change=1e-10
+            )
+
+            def slackness_closure():
+                optimizer.zero_grad()
+                potential = self.potential_network(X_tensor, Y_tensor)
+                objective = (potential - torch.sum(Y_tensor*U_tensor, dim=-1, keepdim=True)).sum()
+                objective.backward()
+                return objective
+            
+            optimizer.step(slackness_closure)
+
+            return (
+                Y_tensor.requires_grad_(False)*torch.sqrt(self.Y_scaler.running_var) 
+                + self.Y_scaler.running_mean
+            ).detach()
+
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.

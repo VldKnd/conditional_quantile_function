@@ -52,7 +52,8 @@ class ConvexBananaDataset(Dataset):
         y = torch.autograd.grad(u_potential.sum(), u)[0]
 
         return x, y
-
+    
+    @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
         Push forward the conditional distribution of the covariates given the response.

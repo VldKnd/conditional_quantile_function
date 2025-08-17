@@ -1,40 +1,9 @@
 from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.classes import TrainParameters
+from pushforward_operators.picnn import SCFFNN
 import torch
 import torch.nn as nn
 from tqdm import trange
-
-class PotentialNN(nn.Module):
-    def __init__(
-        self,
-        feature_dimension: int,
-        response_dimension: int,
-        hidden_dimension: int,
-        number_of_hidden_layers: int,
-        activation_function_name: str,
-    ):
-        super().__init__()
-        self.log_alpha = nn.Parameter(torch.tensor(0.))
-        self.activation_function_name = activation_function_name
-        self.activation_function = getattr(nn, activation_function_name)()
-        self.feature_expansion_layer = nn.Linear(feature_dimension, response_dimension*2)
-
-        hidden_layers = []
-        for _ in range(number_of_hidden_layers):
-            hidden_layers.append(nn.Linear(hidden_dimension, hidden_dimension))
-            hidden_layers.append(self.activation_function)
-
-        self.potential_network = nn.Sequential(
-            nn.Linear(3*response_dimension, hidden_dimension),
-            self.activation_function,
-            *hidden_layers,
-            nn.Linear(hidden_dimension, 1)
-        )
-
-    def forward(self, X: torch.Tensor, Y: torch.Tensor):
-        input_tensor = torch.cat([self.feature_expansion_layer(X), Y], dim=-1)
-        output_tensor = self.potential_network(input_tensor)
-        return output_tensor + torch.exp(self.log_alpha) * ( 0.5 * torch.norm(Y, dim=-1, keepdim=True)**2 )
 
 class AmortizationNetwork(nn.Module):
     def __init__(
@@ -88,7 +57,7 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
             "activation_function_name": activation_function_name
         }
 
-        self.psi_potential_network = PotentialNN(
+        self.psi_potential_network = SCFFNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
