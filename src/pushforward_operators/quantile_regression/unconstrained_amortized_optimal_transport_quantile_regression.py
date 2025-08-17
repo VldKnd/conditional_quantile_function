@@ -211,6 +211,14 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         y.requires_grad = requires_grad_backup
         return pushforward_of_u
 
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Pushes u variable to the y space given condition x"""
+        return self.estimate_Y_from_psi(
+                X_tensor=x,
+                U_tensor=u,
+                Y_init=torch.randn_like(u)
+        )
+
     def save(self, path: str):
         """Saves the pushforward operator to a file.
 
