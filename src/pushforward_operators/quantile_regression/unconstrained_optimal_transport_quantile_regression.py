@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from tqdm import trange
 from typing import Literal
-from pushforward_operators.picnn import network_name_to_network_type
+from pushforward_operators.picnn import network_type_name_to_network_type
 
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,

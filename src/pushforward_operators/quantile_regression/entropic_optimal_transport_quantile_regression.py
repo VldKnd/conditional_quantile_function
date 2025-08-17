@@ -4,7 +4,7 @@ from tqdm import trange
 from typing import Literal
 from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
-from pushforward_operators.picnn import network_name_to_network_type
+from pushforward_operators.picnn import network_type_name_to_network_type
 
 class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
