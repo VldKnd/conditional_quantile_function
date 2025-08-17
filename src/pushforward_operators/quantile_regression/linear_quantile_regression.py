@@ -145,7 +145,10 @@ class LinearVectorQuantileRegression(PushForwardOperator):
 
         return result
 
-    def push_forward_u_given_x(self, U: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError("Pushforward of Y|X if not implemented for LinearVectorQuantileRegression")
+
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
         Computes the pushforward map T_x(u) for given u and x.
         This is equivalent to estimating nabla_u phi(u,x).
@@ -161,17 +164,17 @@ class LinearVectorQuantileRegression(PushForwardOperator):
             raise RuntimeError("The model must be fitted before calling push_forward.")
 
         # The number of points in U and X must be the same
-        if U.shape[0] != X.shape[0]:
-            raise ValueError(f"The number of samples in U and X must be the same, but got {U.shape[0]} and {X.shape[0]}.")
+        if u.shape[0] != x.shape[0]:
+            raise ValueError(f"The number of samples in U and X must be the same, but got {u.shape[0]} and {x.shape[0]}.")
 
 
-        phi_u_at_x = -X @ self.b_u.T  # Shape: (M, m)
+        phi_u_at_x = -x @ self.b_u.T  # Shape: (M, m)
 
         # Estimate the gradient for each point of interest
         pushforward_of_u = self.estimate_gradients_for_points_knn(
             u_samples=self.u,
             f_samples=phi_u_at_x,
-            points_of_interest=U,
+            points_of_interest=u,
             k=10
         )
         return pushforward_of_u
