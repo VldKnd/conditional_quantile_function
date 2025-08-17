@@ -165,7 +165,7 @@ class SCFFNN(FFNN):
         output = super().forward(condition, tensor)
         return output + 0.5 * torch.exp(self.log_alpha) * torch.norm(tensor, dim=-1, keepdim=True)**2
 
-network_name_to_network_type: dict[str, nn.Module] = {
+network_type_name_to_network_type: dict[str, nn.Module] = {
     "SCFFNN":SCFFNN,
     "FFNN":FFNN,
     "PICNN":PICNN,

@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from tqdm import trange
 from typing import Literal
-from pushforward_operators.picnn import SCFFNN
+from pushforward_operators.picnn import network_name_to_network_type
 
 class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(self,
@@ -13,6 +13,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         activation_function_name: str,
+        network_type: Literal["SCFFNN", "PISCNN"] = "SCFFNN",
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
     ):
         super().__init__()
@@ -28,7 +29,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         }
         
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network
-        self.potential_network = SCFFNN(
+        self.potential_network = network_type_name_to_network_type[network_type](
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,

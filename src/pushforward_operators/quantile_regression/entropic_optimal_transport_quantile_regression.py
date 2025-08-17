@@ -24,7 +24,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         self.network_type = network_type
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network 
 
-        self.potential_network = network_name_to_network_type[network_type](
+        self.potential_network = network_type_name_to_network_type[network_type](
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
