@@ -47,7 +47,7 @@ while IFS= read -r -d '' CFG; do
   # Build command
   cmd=(uv run python src/infrastructure/training.py
        --path_to_experiment_file "$CFG"
-       "${PASS_ARGS[@]}"
+      #  "${PASS_ARGS[@]}"
   )
 
   # Decide logging
