@@ -17,17 +17,17 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
     ):
         super().__init__()
+
         self.init_dict = {
-            "class_name": "UnconstrainedOTQuantileRegression",
             "feature_dimension": feature_dimension,
             "response_dimension": response_dimension,
             "hidden_dimension": hidden_dimension,
             "number_of_hidden_layers": number_of_hidden_layers,
             "activation_function_name": activation_function_name,
-            "number_of_hidden_layers": number_of_hidden_layers,
+            "network_type":network_type,
             "potential_to_estimate_with_neural_network":potential_to_estimate_with_neural_network
         }
-        
+
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network
         self.potential_network = network_type_name_to_network_type[network_type](
             feature_dimension=feature_dimension,
@@ -47,6 +47,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             train_parameters (TrainParameters): Training parameters.
         """
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
+        number_of_epochs_to_train = 1
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
         potential_network_optimizer = torch.optim.AdamW(self.potential_network.parameters(), **train_parameters.optimizer_parameters)
@@ -207,7 +208,11 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        torch.save({"init_dict": self.init_dict, "state_dict": self.state_dict()}, path)
+        torch.save({
+            "init_dict": self.init_dict,
+            "state_dict": self.state_dict(),
+            "class_name":"UnconstrainedOTQuantileRegression"
+        }, path)
 
     def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         """Loads the pushforward operator from a file.
@@ -217,5 +222,11 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         """
         data = torch.load(path, map_location=map_location)
         self.load_state_dict(data["state_dict"])
-        self.init_dict = data["init_dict"]
         return self
+    
+    @classmethod
+    def load(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "UnconstrainedOTQuantileRegression":
+        data = torch.load(path, map_location=map_location)
+        quadratic_potential = cls(**data["init_dict"])
+        quadratic_potential.load_state_dict(data["state_dict"])
+        return quadratic_potential

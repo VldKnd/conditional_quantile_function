@@ -18,6 +18,17 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
         ):
         super().__init__()
+        self.init_dict = {
+            "feature_dimension": feature_dimension,
+            "response_dimension": response_dimension,
+            "hidden_dimension": hidden_dimension,
+            "number_of_hidden_layers": number_of_hidden_layers,
+            "epsilon":epsilon,
+            "activation_function_name": activation_function_name,
+            "network_type":network_type,
+            "potential_to_estimate_with_neural_network":potential_to_estimate_with_neural_network
+        }
+
         self.activation_function_name = activation_function_name
         self.activation_function = getattr(nn, activation_function_name)()
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
@@ -51,6 +62,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             train_parameters (TrainParameters): Training parameters.
         """
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
+        number_of_epochs_to_train = 1
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
         potential_network_optimizer = torch.optim.AdamW(
@@ -282,16 +294,20 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         Args:
             path (str): Path to save the pushforward operator.
         """
-        torch.save({"state_dict": self.state_dict(), "epsilon": self.epsilon, "activation_function_name": self.activation_function_name}, path)
+        torch.save({
+            "init_dict": self.init_dict,
+            "state_dict": self.state_dict(),
+            "class_name":"EntropicOTQuantileRegression"
+        }, path)
 
     def load(self, path: str, map_location: torch.device = torch.device('cpu')):
-        """Loads the pushforward operator from a file.
-
-        Args:
-            path (str): Path to load the pushforward operator from.
-        """
         data = torch.load(path, map_location=map_location)
         self.load_state_dict(data["state_dict"])
-        self.epsilon = data["epsilon"]
-        self.activation_function_name = data["activation_function_name"]
         return self
+    
+    @classmethod
+    def load(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "EntropicOTQuantileRegression":
+        data = torch.load(path, map_location=map_location)
+        quadratic_potential = cls(**data["init_dict"])
+        quadratic_potential.load_state_dict(data["state_dict"])
+        return quadratic_potential

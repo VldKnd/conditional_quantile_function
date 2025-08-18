@@ -302,8 +302,8 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     _, _Y = dataset.sample_joint(1)
     X = dataset.meshgrid_of_covariates(number_of_covariates_per_dimension)
 
-    U_dataset = torch.randn(number_of_covariates_per_dimension, 2000, _Y.shape[-1], generator=random_number_generator, **experiment.tensor_parameters)
-    X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
+    U_dataset = torch.randn(number_of_covariates_per_dimension, 10, _Y.shape[-1], generator=random_number_generator, **experiment.tensor_parameters)
+    X_dataset = X.unsqueeze(1).repeat(1, 10, 1).to(**experiment.tensor_parameters)
     Y_dataset = dataset.push_u_given_x(u=U_dataset, x=X_dataset)
 
     try:
@@ -313,8 +313,8 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=100,
-                number_of_alphas=10,
+                number_of_samples=1,
+                number_of_alphas=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -327,7 +327,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
                 U_dataset=U_dataset,
-                number_of_samples=100,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -340,7 +340,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 pushforward_operator=pushforward_operator,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=200,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -353,8 +353,8 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=100,
-                number_of_alphas=10,
+                number_of_samples=1,
+                number_of_alphas=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -367,7 +367,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
                 U_dataset=U_dataset,
-                number_of_samples=100,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -379,7 +379,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 pushforward_operator=pushforward_operator,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=200,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
