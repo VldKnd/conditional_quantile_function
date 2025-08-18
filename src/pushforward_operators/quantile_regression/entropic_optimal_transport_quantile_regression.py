@@ -62,7 +62,6 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             train_parameters (TrainParameters): Training parameters.
         """
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
-        number_of_epochs_to_train = 1
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
         potential_network_optimizer = torch.optim.AdamW(

@@ -50,7 +50,6 @@ class CPFlow(PushForwardOperator, nn.Module):
 
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
-        number_of_epochs_to_train = 1
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
         verbose = train_parameters.verbose
 

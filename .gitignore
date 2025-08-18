@@ -13,7 +13,7 @@ experiments*/
 
 # Model weights
 *.pth
-
+!src/datasets/synthetic/parameters/*.pth
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
