@@ -196,8 +196,8 @@ def sample_quantile_hausdorff_distance(
     angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
     angles = angles.to(Y_dataset)
     multivariate_normal_distribution = multivariate_normal.MultivariateNormal(
-        loc=torch.zeros(Y_dataset.shape[-1]),
-        covariance_matrix=torch.eye(Y_dataset.shape[-1])
+        loc=torch.zeros(Y_dataset.shape[-1]).to(Y_dataset),
+        covariance_matrix=torch.eye(Y_dataset.shape[-1]).to(Y_dataset)
     )
 
     scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
@@ -248,8 +248,8 @@ def sample_inverse_quantile_hausdorff_distance(
     angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
     angles = angles.to(Y_dataset)
     multivariate_normal_distribution = multivariate_normal.MultivariateNormal(
-        loc=torch.zeros(Y_dataset.shape[-1]),
-        covariance_matrix=torch.eye(Y_dataset.shape[-1])
+        loc=torch.zeros(Y_dataset.shape[-1]).to(Y_dataset),
+        covariance_matrix=torch.eye(Y_dataset.shape[-1]).to(Y_dataset)
     )
 
     scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
