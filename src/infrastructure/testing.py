@@ -57,35 +57,6 @@ def load_pushforward_operator_from_experiment(experiment: Experiment) -> PushFor
     pushforward_operator.eval()
     return pushforward_operator
 
-def sample_quantile_wasserstein2_distance(
-        pushforward_operator: PushForwardOperator,
-        X_dataset: torch.Tensor,
-        Y_dataset: torch.Tensor,
-        number_of_samples: int,
-        verbose: bool = False
-    ) -> torch.Tensor:
-
-    wasserstein2_progress_bar = tqdm(
-        range(X_dataset.shape[0]),
-        desc="Computing Quantile Wasserstein-2 metrics",
-        disable=not verbose
-    )
-    wasserstein2_metrics = []
-
-    for i in wasserstein2_progress_bar:
-        metrics_per_x = []
-
-        for _ in range(number_of_samples):
-            Y_batch = Y_dataset[i, :, :]
-            X_batch = X_dataset[i, :, :]
-            U_batch = torch.randn_like(Y_batch)
-            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
-            metrics_per_x.append(wassertein2(U_batch, U_approximation))
-    
-        wasserstein2_metrics.append(torch.tensor(metrics_per_x))
-
-    return torch.stack(wasserstein2_metrics)
-
 def sample_inverse_quantile_wasserstein2_distance(
         pushforward_operator: PushForwardOperator,
         X_dataset: torch.Tensor,
@@ -108,43 +79,41 @@ def sample_inverse_quantile_wasserstein2_distance(
             Y_batch = Y_dataset[i, :, :]
             X_batch = X_dataset[i, :, :]
             U_batch = torch.randn_like(Y_batch)
+            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
+            metrics_per_x.append(wassertein2(U_batch, U_approximation))
+    
+        wasserstein2_metrics.append(torch.tensor(metrics_per_x))
+
+    return torch.stack(wasserstein2_metrics)
+
+def sample_quantile_wasserstein2_distance(
+        pushforward_operator: PushForwardOperator,
+        X_dataset: torch.Tensor,
+        Y_dataset: torch.Tensor,
+        number_of_samples: int,
+        verbose: bool = False
+    ) -> torch.Tensor:
+
+    wasserstein2_progress_bar = tqdm(
+        range(X_dataset.shape[0]),
+        desc="Computing Quantile Wasserstein-2 metrics",
+        disable=not verbose
+    )
+    wasserstein2_metrics = []
+
+    for i in wasserstein2_progress_bar:
+        metrics_per_x = []
+
+        for _ in range(number_of_samples):
+            Y_batch = Y_dataset[i, :, :]
+            X_batch = X_dataset[i, :, :]
+            U_batch = torch.randn_like(Y_batch)
             Y_approximation = pushforward_operator.push_u_given_x(u=U_batch, x=X_batch)
             metrics_per_x.append(wassertein2(Y_batch, Y_approximation))
     
         wasserstein2_metrics.append(torch.tensor(metrics_per_x))
 
     return torch.stack(wasserstein2_metrics)
-
-def sample_quantile_l2_distance(
-        pushforward_operator: PushForwardOperator,
-        X_dataset: torch.Tensor,
-        Y_dataset: torch.Tensor,
-        U_dataset: torch.Tensor,
-        number_of_samples: int,
-        verbose: bool = False
-    ) -> torch.Tensor:
-
-    l2_progress_bar = tqdm(
-        range(X_dataset.shape[0]),
-        desc="Computing Quantile l2 distances",
-        disable=not verbose
-    )
-    l2_metrics = []
-
-    for i in l2_progress_bar:
-        metrics_per_x = []
-        for _ in range(number_of_samples):
-            Y_batch = Y_dataset[i, :, :]
-            X_batch = X_dataset[i, :, :]
-            U_batch = U_dataset[i, :, :]
-
-            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
-            l2_distance = torch.norm((U_approximation - U_batch),dim=-1)**2
-            metrics_per_x.append(l2_distance.mean())
-
-        l2_metrics.append(torch.stack(metrics_per_x))
-
-    return torch.stack(l2_metrics)
 
 def sample_inverse_quantile_l2_distance(
         pushforward_operator: PushForwardOperator,
@@ -169,6 +138,37 @@ def sample_inverse_quantile_l2_distance(
             X_batch = X_dataset[i, :, :]
             U_batch = U_dataset[i, :, :]
 
+            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
+            l2_distance = torch.norm((U_approximation - U_batch),dim=-1)**2
+            metrics_per_x.append(l2_distance.mean())
+
+        l2_metrics.append(torch.stack(metrics_per_x))
+
+    return torch.stack(l2_metrics)
+
+def sample_quantile_l2_distance(
+        pushforward_operator: PushForwardOperator,
+        X_dataset: torch.Tensor,
+        Y_dataset: torch.Tensor,
+        U_dataset: torch.Tensor,
+        number_of_samples: int,
+        verbose: bool = False
+    ) -> torch.Tensor:
+
+    l2_progress_bar = tqdm(
+        range(X_dataset.shape[0]),
+        desc="Computing Quantile l2 distances",
+        disable=not verbose
+    )
+    l2_metrics = []
+
+    for i in l2_progress_bar:
+        metrics_per_x = []
+        for _ in range(number_of_samples):
+            Y_batch = Y_dataset[i, :, :]
+            X_batch = X_dataset[i, :, :]
+            U_batch = U_dataset[i, :, :]
+
             Y_approximation = pushforward_operator.push_u_given_x(u=U_batch, x=X_batch)
             l2_distance = torch.norm((Y_approximation - Y_batch),dim=-1)**2
             metrics_per_x.append(l2_distance.mean())
@@ -177,7 +177,7 @@ def sample_inverse_quantile_l2_distance(
 
     return torch.stack(l2_metrics)
 
-def sample_quantile_hausdorff_distance(
+def sample_inverse_quantile_hausdorff_distance(
         pushforward_operator: PushForwardOperator,
         dataset: Dataset,
         X_dataset: torch.Tensor,
@@ -188,7 +188,7 @@ def sample_quantile_hausdorff_distance(
     ) -> torch.Tensor:
     quantile_error_progress_bar = tqdm(
         range(X_dataset.shape[0]),
-        desc="Computing Quantile Average Hausdorf Distance",
+        desc="Computing Inverse Quantile Average Hausdorff Distance",
         disable=not verbose
     )
     quantile_error_metrics = []
@@ -229,7 +229,7 @@ def sample_quantile_hausdorff_distance(
         quantile_error_metrics.append(torch.stack(metrics_per_x))
     return torch.stack(quantile_error_metrics)
 
-def sample_inverse_quantile_hausdorff_distance(
+def sample_quantile_hausdorff_distance(
         pushforward_operator: PushForwardOperator,
         dataset: Dataset,
         X_dataset: torch.Tensor,
@@ -240,21 +240,21 @@ def sample_inverse_quantile_hausdorff_distance(
     ) -> torch.Tensor:
     quantile_error_progress_bar = tqdm(
         range(X_dataset.shape[0]),
-        desc="Computing Inverse Quantile Average Hausdorf Distance",
+        desc="Computing Quantile Average Hausdorf Distance",
         disable=not verbose
     )
     quantile_error_metrics = []
     quantile_levels = torch.linspace(0.05, 0.95, number_of_alphas)
-    angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
+    angles = torch.rand(number_of_samples, number_of_alphas, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
     angles = angles.to(Y_dataset)
+    scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
+    quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
+    quantile_level_radius = quantile_level_radius.unsqueeze(0).unsqueeze(2)
+
     multivariate_normal_distribution = multivariate_normal.MultivariateNormal(
         loc=torch.zeros(Y_dataset.shape[-1]).to(Y_dataset),
         covariance_matrix=torch.eye(Y_dataset.shape[-1]).to(Y_dataset)
     )
-
-    scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
-    quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
-    quantile_level_radius = quantile_level_radius.unsqueeze(0).unsqueeze(2)
 
     U_dataset = torch.stack([
         quantile_level_radius * torch.cos(angles),
@@ -313,7 +313,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=100,
+                number_of_samples=15,
                 number_of_alphas=10,
                 verbose=verbose
             )
@@ -327,7 +327,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
                 U_dataset=U_dataset,
-                number_of_samples=100,
+                number_of_samples=10,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -353,7 +353,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 dataset=dataset,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=100,
+                number_of_samples=15,
                 number_of_alphas=10,
                 verbose=verbose
             )
@@ -367,7 +367,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
                 U_dataset=U_dataset,
-                number_of_samples=100,
+                number_of_samples=15,
                 verbose=verbose
             )
     except NotImplementedError:
