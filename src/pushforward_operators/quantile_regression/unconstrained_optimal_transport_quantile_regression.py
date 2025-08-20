@@ -224,7 +224,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         return self
     
     @classmethod
-    def load(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "UnconstrainedOTQuantileRegression":
+    def load_class(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "UnconstrainedOTQuantileRegression":
         data = torch.load(path, map_location=map_location)
         quadratic_potential = cls(**data["init_dict"])
         quadratic_potential.load_state_dict(data["state_dict"])

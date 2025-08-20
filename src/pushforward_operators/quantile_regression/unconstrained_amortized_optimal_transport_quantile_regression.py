@@ -294,14 +294,13 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
             "class_name":"UnconstrainedAmortizedOTQuantileRegression"
         }, path)
 
-
     def load(self, path: str, map_location: torch.device = torch.device('cpu')):
         data = torch.load(path, map_location=map_location)
         self.load_state_dict(data["state_dict"])
         return self
     
     @classmethod
-    def load(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "UnconstrainedAmortizedOTQuantileRegression":
+    def load_class(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "UnconstrainedAmortizedOTQuantileRegression":
         data = torch.load(path, map_location=map_location)
         quadratic_potential = cls(**data["init_dict"])
         quadratic_potential.load_state_dict(data["state_dict"])
