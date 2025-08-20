@@ -208,7 +208,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             y.requires_grad = requires_grad_backup
             return U_tensor.detach()
         else:
-            if self.network_type in {"SCFFNN", "FFNN"}:
+            if self.network_type in {"FFNN", "PICNN"}:
                 error_message = f"Convergence is not guarenteed for {self.network_type} network"
                 raise NotImplementedError(error_message)
             
@@ -254,7 +254,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             return Y_tensor.detach()
     
         else:
-            if self.network_type in {"SCFFNN", "FFNN"}:
+            if self.network_type in {"FFNN", "PICNN"}:
                 error_message = f"Convergence is not guarenteed for {self.network_type} network"
                 raise NotImplementedError(error_message)
             
