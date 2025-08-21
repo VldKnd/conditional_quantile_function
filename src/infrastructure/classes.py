@@ -16,11 +16,11 @@ class TensorParameters(pydantic.BaseModel):
     device: torch.device | str = pydantic.Field(default="cpu")
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
-#    def model_post_init(self, *args, **kwargs):
-#        if isinstance(self.dtype, str):
-#            self.dtype = getattr(torch, self.dtype)
-#        if isinstance(self.device, str):
-#            self.device = torch.device(self.device)
+    def model_post_init(self, *args, **kwargs):
+        if isinstance(self.dtype, str):
+            self.dtype = getattr(torch, self.dtype)
+        if isinstance(self.device, str):
+            self.device = torch.device(self.device)
 
 
 class Experiment(pydantic.BaseModel):
@@ -39,9 +39,9 @@ class Experiment(pydantic.BaseModel):
     relative_path_to_weights: str | None = pydantic.Field(default=None)
     relative_path_to_metrics: str | None = pydantic.Field(default=None)
 
-#    def __getattribute__(self, name):
-#        if name == "tensor_parameters":
-#            return object.__getattribute__(self,
-#                                           'tensor_parameters').model_dump()
-#        else:
-#            return object.__getattribute__(self, name)
+    def __getattribute__(self, name):
+        if name == "tensor_parameters":
+            return object.__getattribute__(self,
+                                           'tensor_parameters').model_dump()
+        else:
+            return object.__getattribute__(self, name)

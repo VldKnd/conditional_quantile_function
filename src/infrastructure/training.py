@@ -1,3 +1,4 @@
+from pathlib import Path
 import torch
 from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.classes import Experiment
@@ -24,6 +25,12 @@ def train_from_json_file(path_to_experiment_file: str) -> PushForwardOperator:
         experiment = Experiment.model_validate_json(experiment_as_json)
     except Exception as e:
         raise ValueError(f"Error loading experiment from {path_to_experiment_file}: {e}. Make sure the file is a valid JSON file and is consistent with the Experiment class.")
+    
+    if experiment.path_to_weights is None:
+        if experiment.relative_path_to_weights is not None:
+            base_path = Path(path_to_experiment_file).parent
+            path_to_weights = base_path / experiment.relative_path_to_weights
+            experiment.path_to_weights = path_to_weights    
 
     return train(experiment=experiment)
 
