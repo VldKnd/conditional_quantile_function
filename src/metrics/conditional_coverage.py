@@ -14,7 +14,7 @@ def sample_conditional_and_marginal_coverage(
         Y_dataset: torch.Tensor,
         X_calibration: torch.Tensor,
         Y_calibration: torch.Tensor,
-        number_of_quantile_levels: int = 20,
+        number_of_quantile_levels: int = 19,
         verbose: bool = False):
     quantile_levels = torch.linspace(0.05, 0.95, number_of_quantile_levels)
     radii_true = get_quantile_level_analytically(

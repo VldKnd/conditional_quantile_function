@@ -476,7 +476,7 @@ def test_on_real_dataset(experiment: Experiment,
                                                    Y_dataset=dataset.Y_test,
                                                    X_calibration=dataset.X_cal,
                                                    Y_calibration=dataset.Y_cal,
-                                                   number_of_quantile_levels=20,
+                                                   number_of_quantile_levels=19,
                                                    verbose=verbose)
 
     return metrics
