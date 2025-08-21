@@ -63,7 +63,7 @@ def test_from_json_file(path_to_experiment_file: str,
 
     if path_to_metrics is not None:
         # Create missing directories
-        path_to_metrics.mkdir(parents=True, exist_ok=True)
+        path_to_metrics.parent.mkdir(parents=True, exist_ok=True)
         torch.save(metrics, path_to_metrics)
 
     return metrics
@@ -469,10 +469,13 @@ def test_on_real_dataset(experiment: Experiment,
     random_number_generator.manual_seed(42)
     np.random.seed(42)
 
-    metrics["quantile_levels"], metrics["coverage"], metrics["wsc"] \
+    metrics["quantile_levels"], metrics["coverage"], metrics["wsc"], \
+        metrics["coverage_conformal"], metrics["wsc_conformal"] \
         = sample_conditional_and_marginal_coverage(pushforward_operator=pushforward_operator,
                                                    X_dataset=dataset.X_test,
                                                    Y_dataset=dataset.Y_test,
+                                                   X_calibration=dataset.X_cal,
+                                                   Y_calibration=dataset.Y_cal,
                                                    number_of_quantile_levels=20,
                                                    verbose=verbose)
 
