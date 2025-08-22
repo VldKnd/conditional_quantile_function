@@ -14,17 +14,7 @@ def train_from_json_file(path_to_experiment_file: str) -> PushForwardOperator:
     Returns:
         PushForwardOperator: The trained model.
     """
-    try:
-        with open(path_to_experiment_file, "r") as f:
-            experiment_as_json = f.read()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File {path_to_experiment_file} not found. Make sure the file exists and path is correct.")
-
-    try:
-        experiment = Experiment.model_validate_json(experiment_as_json)
-    except Exception as e:
-        raise ValueError(f"Error loading experiment from {path_to_experiment_file}: {e}. Make sure the file is a valid JSON file and is consistent with the Experiment class.")
-
+    experiment = Experiment.load_from_path_to_experiment_file(path_to_experiment_file)
     return train(experiment=experiment)
 
 def train(experiment: Experiment) -> PushForwardOperator:

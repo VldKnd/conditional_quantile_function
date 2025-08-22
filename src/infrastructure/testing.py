@@ -18,17 +18,7 @@ def test_from_json_file(path_to_experiment_file: str, verbose: bool = False, exc
     Returns:
         dict: The metrics.
     """
-    try:
-        with open(path_to_experiment_file, "r") as f:
-            experiment_as_json = f.read()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File {path_to_experiment_file} not found. Make sure the file exists and path is correct.")
-
-    try:
-        experiment = Experiment.model_validate_json(experiment_as_json)
-    except Exception as e:
-        raise ValueError(f"Error loading experiment from {path_to_experiment_file}: {e}. Make sure the file is a valid JSON file and is consistent with the Experiment class.")
-
+    experiment = Experiment.load_from_path_to_experiment_file(path_to_experiment_file=path_to_experiment_file)
     metrics = test(experiment, verbose=verbose, exclude_wasserstein2=exclude_wasserstein2, exclude_l2_distance=exclude_l2_distance, exclude_quantile_similarity=exclude_quantile_similarity)
 
     if experiment.path_to_metrics is not None:
@@ -177,111 +167,6 @@ def sample_quantile_l2_distance(
 
     return torch.stack(l2_metrics)
 
-def sample_inverse_quantile_hausdorff_distance(
-        pushforward_operator: PushForwardOperator,
-        dataset: Dataset,
-        X_dataset: torch.Tensor,
-        Y_dataset: torch.Tensor,
-        number_of_samples: int,
-        number_of_alphas: int = 10,
-        verbose: bool = False
-    ) -> torch.Tensor:
-    quantile_error_progress_bar = tqdm(
-        range(X_dataset.shape[0]),
-        desc="Computing Inverse Quantile Average Hausdorff Distance",
-        disable=not verbose
-    )
-    quantile_error_metrics = []
-    quantile_levels = torch.linspace(0.05, 0.95, number_of_alphas)
-    angles = torch.rand(number_of_samples, 10, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
-    angles = angles.to(Y_dataset)
-    multivariate_normal_distribution = multivariate_normal.MultivariateNormal(
-        loc=torch.zeros(Y_dataset.shape[-1]).to(Y_dataset),
-        covariance_matrix=torch.eye(Y_dataset.shape[-1]).to(Y_dataset)
-    )
-
-    scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
-    quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
-    quantile_level_radius = quantile_level_radius.unsqueeze(0).unsqueeze(2)
-
-    U_dataset = torch.stack([
-        quantile_level_radius * torch.cos(angles),
-        quantile_level_radius * torch.sin(angles),
-    ], dim=-1)
-    U_dataset = U_dataset.to(Y_dataset)
-
-    for i in quantile_error_progress_bar:
-        X_batch = X_dataset[i, :, :]
-        metrics_per_x = []
-
-        for j in range(number_of_samples):
-            mean_quantile_metrics = 0.
-
-            for k, _ in enumerate(quantile_levels):
-                U_batch = U_dataset[j, k]
-                Y_approximation = dataset.push_u_given_x(u=U_batch, x=X_batch)
-                U_approximation = pushforward_operator.push_y_given_x(y=Y_approximation, x=X_batch)
-                quantile_hausdorff_distance = compute_hausdorff_distance(U_approximation, U_batch)
-                quantile_hausdorff_distance *= torch.exp(multivariate_normal_distribution.log_prob(U_batch[0]))
-                mean_quantile_metrics += quantile_hausdorff_distance
-
-            metrics_per_x.append(mean_quantile_metrics)
-        quantile_error_metrics.append(torch.stack(metrics_per_x))
-    return torch.stack(quantile_error_metrics)
-
-def sample_quantile_hausdorff_distance(
-        pushforward_operator: PushForwardOperator,
-        dataset: Dataset,
-        X_dataset: torch.Tensor,
-        Y_dataset: torch.Tensor,
-        number_of_samples: int,
-        number_of_alphas: int = 10,
-        verbose: bool = False
-    ) -> torch.Tensor:
-    quantile_error_progress_bar = tqdm(
-        range(X_dataset.shape[0]),
-        desc="Computing Quantile Average Hausdorf Distance",
-        disable=not verbose
-    )
-    quantile_error_metrics = []
-    quantile_levels = torch.linspace(0.05, 0.95, number_of_alphas)
-    angles = torch.rand(number_of_samples, number_of_alphas, X_dataset.shape[1]) * 2 * torch.pi - torch.pi
-    angles = angles.to(Y_dataset)
-    scipy_quantile = stats.chi2.ppf(quantile_levels, df=Y_dataset.shape[-1])
-    quantile_level_radius = torch.from_numpy(scipy_quantile**(1/2)).to(Y_dataset)
-    quantile_level_radius = quantile_level_radius.unsqueeze(0).unsqueeze(2)
-
-    multivariate_normal_distribution = multivariate_normal.MultivariateNormal(
-        loc=torch.zeros(Y_dataset.shape[-1]).to(Y_dataset),
-        covariance_matrix=torch.eye(Y_dataset.shape[-1]).to(Y_dataset)
-    )
-
-    U_dataset = torch.stack([
-        quantile_level_radius * torch.cos(angles),
-        quantile_level_radius * torch.sin(angles),
-    ], dim=-1)
-    U_dataset = U_dataset.to(Y_dataset)
-
-    for i in quantile_error_progress_bar:
-        X_batch = X_dataset[i, :, :]
-        metrics_per_x = []
-
-        for j in range(number_of_samples):
-            mean_quantile_metrics = 0.
-
-            for k, _ in enumerate(quantile_levels):
-                U_batch = U_dataset[j, k]
-                Y_ground_truth = dataset.push_u_given_x(u=U_batch, x=X_batch)
-                Y_approximation = pushforward_operator.push_u_given_x(u=U_batch, x=X_batch)
-                quantile_hausdorff_distance = compute_hausdorff_distance(Y_ground_truth, Y_approximation)
-                quantile_hausdorff_distance *= torch.exp(multivariate_normal_distribution.log_prob(U_batch[0]))
-                mean_quantile_metrics += quantile_hausdorff_distance
-
-            metrics_per_x.append(mean_quantile_metrics)
-
-        quantile_error_metrics.append(torch.stack(metrics_per_x))
-    return torch.stack(quantile_error_metrics)
-
 def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool = False, exclude_l2_distance: bool = False, exclude_quantile_similarity: bool = False, verbose: bool = False) -> dict:
     """
     Test a model on a synthetic dataset.
@@ -307,27 +192,13 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
     Y_dataset = dataset.push_u_given_x(u=U_dataset, x=X_dataset)
 
     try:
-        if not exclude_quantile_similarity:
-            metrics["inverse_quantile"]["hausdorff_distance"] = sample_inverse_quantile_hausdorff_distance(
-                pushforward_operator=pushforward_operator,
-                dataset=dataset,
-                X_dataset=X_dataset,
-                Y_dataset=Y_dataset,
-                number_of_samples=15,
-                number_of_alphas=10,
-                verbose=verbose
-            )
-    except NotImplementedError:
-        print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
-
-    try:
         if not exclude_l2_distance:
             metrics["inverse_quantile"]["l2_distance"] = sample_inverse_quantile_l2_distance(
                 pushforward_operator=pushforward_operator,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
                 U_dataset=U_dataset,
-                number_of_samples=10,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -340,25 +211,11 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 pushforward_operator=pushforward_operator,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=200,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
         print("Pushbackward of u is not implemented for this dataset. Skipping Gaussian Likelihood metrics.")
-
-    try:
-        if not exclude_quantile_similarity:
-            metrics["quantile"]["hausdorff_distance"] = sample_quantile_hausdorff_distance(
-                pushforward_operator=pushforward_operator,
-                dataset=dataset,
-                X_dataset=X_dataset,
-                Y_dataset=Y_dataset,
-                number_of_samples=15,
-                number_of_alphas=10,
-                verbose=verbose
-            )
-    except NotImplementedError:
-        print("Pushbackward of u is not implemented for this dataset. Skipping Quantile Similarity metrics.")
 
     try:
         if not exclude_l2_distance:
@@ -367,7 +224,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
                 U_dataset=U_dataset,
-                number_of_samples=15,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
@@ -379,7 +236,7 @@ def test_on_synthetic_dataset(experiment: Experiment, exclude_wasserstein2: bool
                 pushforward_operator=pushforward_operator,
                 X_dataset=X_dataset,
                 Y_dataset=Y_dataset,
-                number_of_samples=200,
+                number_of_samples=1,
                 verbose=verbose
             )
     except NotImplementedError:
