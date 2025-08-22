@@ -80,9 +80,70 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
             activation_function_name=activation_function_name,
         )
 
-        self.Y_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
-        self.X_scaler = nn.BatchNorm1d(response_dimension, affine=False)
+        self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
+        self.X_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
     
+    def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
+        """Run over the data (no grad) to populate BatchNorm running stats."""
+        self.X_scaler.train(), self.Y_scaler.train()
+
+        with torch.no_grad():
+            for X, Y in dataloader:
+                _, _ = self.Y_scaler(Y), self.X_scaler(X)
+
+        self.X_scaler.eval(), self.Y_scaler.eval()
+
+    def make_progress_bar_message(self, training_information: list[dict], epoch_idx:int, last_learning_rate: float | None):
+        running_mean_potential_objective = sum(
+            [information["potential"] for information in training_information[-10:]]
+        ) / len(training_information[-10:])
+        running_mean_amortization_objective = sum(
+            [information["amortization"] for information in training_information[-10:]]
+        ) / len(training_information[-10:])
+
+        description_message = (
+                f"Epoch: {epoch_idx}, "
+                f"Potential Objective: {running_mean_potential_objective:.3f}, "
+                f"Amortization Objective: {running_mean_amortization_objective:.3f}"
+            ) + (
+            f", LR: {last_learning_rate:.6f}"
+            if last_learning_rate is not None
+            else ""
+        )
+        
+        return description_message
+        
+    def gradient_inverse(self, condition_tensor: torch.Tensor, point_tensor: torch.Tensor):
+        requires_grad_backup, point_tensor.requires_grad = point_tensor.requires_grad, True
+        inverse_tensor = torch.autograd.grad(
+            self.potential_network(condition_tensor, point_tensor).sum(),
+            point_tensor, create_graph=False
+        )[0]
+        point_tensor.requires_grad = requires_grad_backup
+        return inverse_tensor.detach()
+
+    def c_transform_inverse(self, condition_tensor: torch.Tensor, point_tensor: torch.Tensor, approximation_of_inverse_tensor: torch.Tensor):
+        inverse_tensor = torch.nn.Parameter(approximation_of_inverse_tensor.clone().contiguous())
+
+        optimizer = torch.optim.LBFGS(
+            [inverse_tensor],
+            lr=1,
+            line_search_fn="strong_wolfe",
+            max_iter=1000,
+            tolerance_grad=1e-10,
+            tolerance_change=1e-10
+        )
+
+        def slackness_closure():
+            optimizer.zero_grad()
+            cost_matrix = torch.sum(point_tensor * inverse_tensor, dim=-1, keepdims=True)
+            potential = self.potential_network(condition_tensor, inverse_tensor)
+            slackness = (potential - cost_matrix).sum()
+            slackness.backward()
+            return slackness
+        
+        optimizer.step(slackness_closure)
+        return inverse_tensor.detach()
 
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
@@ -94,17 +155,32 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
-        potential_network_optimizer = torch.optim.AdamW(self.potential_network.parameters(), **train_parameters.optimizer_parameters)
-        amortization_network_optimizer = torch.optim.AdamW(self.amortization_network.parameters(), **train_parameters.optimizer_parameters)
+        potential_network_optimizer = torch.optim.AdamW(
+        params=self.potential_network.parameters(), 
+            **train_parameters.optimizer_parameters
+        )
+        amortization_network_optimizer = torch.optim.AdamW(
+            self.amortization_network.parameters(),
+            **train_parameters.optimizer_parameters
+        )
 
         if train_parameters.scheduler_parameters:
-            amortization_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(amortization_network_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
-            potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(potential_network_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+            amortization_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=amortization_network_optimizer,
+                T_max=total_number_of_optimizer_steps,
+                **train_parameters.scheduler_parameters
+            )
+            potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=potential_network_optimizer,
+                T_max=total_number_of_optimizer_steps,
+                **train_parameters.scheduler_parameters
+            )
         else:
             amortization_network_scheduler = None
             potential_network_scheduler = None
 
         training_information = []
+        self.warmup_scalers(dataloader=dataloader)
         progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
 
         for epoch_idx in progress_bar:
@@ -114,49 +190,26 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
                     U_batch = torch.randn_like(Y_batch)
 
                     if self.potential_to_estimate_with_neural_network == "y":
-                        Y_amortized, U_amortized = self.amortization_network(X_scaled, U_batch), None
-                        Y_amortized_detached = Y_amortized.detach()
-                        with torch.no_grad():
-                            Y_batch_for_phi, U_batch_for_psi = self.push_u_given_x(
-                                x=X_scaled,
-                                u=U_batch,
-                                y_initial=Y_amortized_detached
-                            ), None
-
-                        self.amortization_network.zero_grad()  
-                        amortization_network_objective = torch.norm(Y_amortized - Y_batch_for_phi, dim=-1).mean()
-                        amortization_network_objective.backward()
-                        torch.nn.utils.clip_grad.clip_grad_norm_(
-                            self.amortization_network.parameters(), max_norm=10
-                        ).item()
-                        amortization_network_optimizer.step()
-                            
+                        amortized_tensor = self.amortization_network(X_scaled, U_batch)
+                        inverse_tensor = self.c_transform_inverse(X_scaled, U_batch, amortized_tensor) 
+                        Y_batch_for_phi, U_batch_for_psi = inverse_tensor, None
                     else:
-                        U_amortized = self.amortization_network(X_scaled, Y_scaled)
-                        U_amortized_detached = U_amortized.detach()
-                        with torch.no_grad():
-                            U_batch_for_psi, Y_batch_for_phi = self.push_y_given_x(
-                                x=X_scaled,
-                                y=Y_scaled,
-                                u_initial=U_amortized_detached
-                            ), None
+                        amortized_tensor = self.amortization_network(X_scaled, Y_scaled)
+                        inverse_tensor = self.c_transform_inverse(X_scaled, Y_scaled, amortized_tensor)
+                        Y_batch_for_phi, U_batch_for_psi = None, inverse_tensor
 
-                        self.amortization_network.zero_grad()  
-                        amortization_network_objective = torch.norm(U_amortized - U_batch_for_psi, dim=-1).mean()
-                        amortization_network_objective.backward()
-                        torch.nn.utils.clip_grad.clip_grad_norm_(
-                            self.amortization_network.parameters(), max_norm=10
-                        ).item()
-                        amortization_network_optimizer.step()
+                    self.amortization_network.zero_grad()  
+                    amortization_network_objective = torch.norm(amortized_tensor - inverse_tensor, dim=-1).mean()
+                    amortization_network_objective.backward()
+                    torch.nn.utils.clip_grad.clip_grad_norm_(self.amortization_network.parameters(), max_norm=10)
+                    amortization_network_optimizer.step()
 
                     potential_network_optimizer.zero_grad()
                     psi = self.estimate_psi(X_tensor=X_scaled, Y_tensor=Y_scaled, U_tensor=U_batch_for_psi)
                     phi = self.estimate_phi(X_tensor=X_scaled, U_tensor=U_batch, Y_tensor=Y_batch_for_phi)
                     potential_network_objective = torch.mean(phi) + torch.mean(psi)
                     potential_network_objective.backward()
-                    torch.nn.utils.clip_grad.clip_grad_norm_(
-                        self.potential_network.parameters(), max_norm=10
-                    ).item()
+                    torch.nn.utils.clip_grad.clip_grad_norm_(self.potential_network.parameters(), max_norm=10)
                     potential_network_optimizer.step()
 
                     if potential_network_scheduler is not None and amortization_network_scheduler is not None:
@@ -170,23 +223,18 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
                                 "epoch_index": epoch_idx
                         })
 
-                        running_mean_potential_objective = sum(
-                            [information["potential"] for information in training_information[-10:]]
-                        ) / len(training_information[-10:])
-                        running_mean_amortization_objective = sum(
-                            [information["amortization"] for information in training_information[-10:]]
-                        ) / len(training_information[-10:])
-
-                        description_message = (
-                                f"Epoch: {epoch_idx}, "
-                                f"Potential Objective: {running_mean_potential_objective:.3f}, "
-                                f"Amortization Objective: {running_mean_amortization_objective:.3f}"
-                            ) + (
-                            f", LR: {potential_network_scheduler.get_last_lr()[0]:.6f}"
+                        last_learning_rate=(
+                            potential_network_scheduler.get_last_lr()[0]
                             if potential_network_scheduler is not None
-                            else ""
+                            else None
                         )
-                        
+
+                        description_message = self.make_progress_bar_message(
+                            training_information=training_information,
+                            epoch_idx=epoch_idx,
+                            last_learning_rate=last_learning_rate
+                        )
+
                         progress_bar.set_description(description_message)
 
         progress_bar.close()
@@ -221,93 +269,35 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
     @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor, u_initial: torch.Tensor | None = None) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
-        self.X_scaler.eval()
-        self.Y_scaler.eval()
-        
         X_scaled = self.X_scaler(x)
         Y_scaled = self.Y_scaler(y)
 
         if self.potential_to_estimate_with_neural_network == "y":
-            requires_grad_backup, Y_scaled.requires_grad = Y_scaled.requires_grad, True
-            U_tensor = torch.autograd.grad(
-                self.potential_network(X_scaled, Y_scaled).sum(),
-                Y_scaled, create_graph=False
-            )[0]
-            Y_scaled.requires_grad = requires_grad_backup
-            return U_tensor.detach()
-    
-        if u_initial is None:
-            u_initial = self.amortization_network(X_scaled, Y_scaled)
+            U_tensor = self.gradient_inverse(X_scaled, Y_scaled)
+        else:
+            if u_initial is None:
+                u_initial = self.amortization_network(X_scaled, Y_scaled)
+            U_tensor = self.c_transform_inverse(X_scaled, Y_scaled, u_initial)
 
-        U_tensor = torch.nn.Parameter(u_initial.clone().contiguous())
-
-        optimizer = torch.optim.LBFGS(
-            [U_tensor],
-            lr=1,
-            line_search_fn="strong_wolfe",
-            max_iter=1000,
-            tolerance_grad=1e-10,
-            tolerance_change=1e-10
-        )
-
-        def slackness_closure():
-            optimizer.zero_grad()
-            cost_matrix = torch.sum(Y_scaled * U_tensor, dim=-1, keepdims=True)
-            psi_potential = self.potential_network(X_scaled, U_tensor)
-            slackness = (psi_potential - cost_matrix).sum()
-            slackness.backward()
-            return slackness
-        
-        optimizer.step(slackness_closure)
-
-        return U_tensor.detach()
+        return U_tensor.requires_grad_(False).detach()
 
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor, y_initial: torch.Tensor | None = None) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
-        self.X_scaler.eval()
-        self.Y_scaler.eval()
-
         X_scaled = self.X_scaler(x)
 
         if self.potential_to_estimate_with_neural_network == "u":
-            requires_grad_backup, u.requires_grad = u.requires_grad, True
-            Y_tensor = torch.autograd.grad(self.potential_network(X_scaled, u).sum(), u, create_graph=False)[0]
-            u.requires_grad = requires_grad_backup
-            return (
-                Y_tensor.requires_grad_(False)*torch.sqrt(self.Y_scaler.running_var) 
-                + self.Y_scaler.running_mean
-            ).detach()
-    
-        if y_initial is None:
-            y_initial = self.amortization_network(X_scaled, u)
-
-        Y_tensor = torch.nn.Parameter(y_initial.clone().contiguous())
-
-        optimizer = torch.optim.LBFGS(
-            [Y_tensor],
-            lr=1,
-            line_search_fn="strong_wolfe",
-            max_iter=1000,
-            tolerance_grad=1e-10,
-            tolerance_change=1e-10
-        )
-
-        def slackness_closure():
-            optimizer.zero_grad()
-            cost_matrix = torch.sum(u * Y_tensor, dim=-1, keepdims=True)
-            psi_potential = self.potential_network(X_scaled, Y_tensor)
-            slackness = (psi_potential - cost_matrix).sum()
-            slackness.backward()
-            return slackness
+            Y_tensor = self.gradient_inverse(X_scaled, u)
+        else:
+            if y_initial is None:
+                y_initial = self.amortization_network(X_scaled, u)
+            Y_tensor = self.c_transform_inverse(X_scaled, u, y_initial)
         
-        optimizer.step(slackness_closure)
-
         return (
             Y_tensor.requires_grad_(False)*torch.sqrt(self.Y_scaler.running_var) 
             + self.Y_scaler.running_mean
         ).detach()
-
+        
     def save(self, path: str):
         """Saves the pushforward operator to a file.
 
@@ -328,6 +318,6 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
     @classmethod
     def load_class(cls, path: str, map_location: torch.device = torch.device('cpu')) -> "UnconstrainedAmortizedOTQuantileRegression":
         data = torch.load(path, map_location=map_location)
-        quadratic_potential = cls(**data["init_dict"])
-        quadratic_potential.load_state_dict(data["state_dict"])
-        return quadratic_potential
+        operator = cls(**data["init_dict"])
+        operator.load_state_dict(data["state_dict"])
+        return operator
