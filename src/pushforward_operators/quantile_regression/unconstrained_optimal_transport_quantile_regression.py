@@ -37,6 +37,8 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
             activation_function_name=activation_function_name,
             output_dimension=1
         )
+        self.Y_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
+        self.X_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
 
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
@@ -60,14 +62,18 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
 
         for epoch_idx in progress_bar:
                 for X_batch, Y_batch in dataloader:
+                    
+                    X_scaled = self.X_scaler(X_batch)
+                    Y_scaled = self.Y_scaler(Y_batch)
                     U_batch = torch.randn_like(Y_batch)
 
+
                     psi = self.estimate_psi(
-                        X_tensor=X_batch,
-                        Y_tensor=Y_batch,
+                        X_tensor=X_scaled,
+                        Y_tensor=Y_scaled,
                     )
                     phi = self.estimate_phi(
-                        X_tensor=X_batch,
+                        X_tensor=X_scaled,
                         U_tensor=U_batch,
                     )
 
@@ -135,15 +141,19 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
+        self.X_scaler.eval()
+        self.Y_scaler.eval()
+    
+        X_scaled = self.X_scaler(x)
+        Y_scaled = self.Y_scaler(y)
         if self.potential_to_estimate_with_neural_network == "y":
-            requires_grad_backup, y.requires_grad = y.requires_grad, True
-            potential_value = self.potential_network(x, y).sum()
-
-            U_tensor = torch.autograd.grad(potential_value, y, create_graph=False)[0]
-            y.requires_grad = requires_grad_backup
+            requires_grad_backup, Y_scaled.requires_grad = Y_scaled.requires_grad, True
+            potential_value = self.potential_network(X_scaled, Y_scaled).sum()
+            U_tensor = torch.autograd.grad(potential_value, Y_scaled, create_graph=False)[0]
+            Y_scaled.requires_grad = requires_grad_backup
             return U_tensor.detach()
         
-        U_init = torch.randn_like(y)
+        U_init = torch.randn_like(Y_scaled)
         U_tensor = torch.nn.Parameter(U_init.clone().contiguous())
 
         optimizer = torch.optim.LBFGS(
@@ -157,8 +167,8 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
 
         def slackness_closure():
             optimizer.zero_grad()
-            cost_matrix = torch.sum(y * U_tensor, dim=-1, keepdims=True)
-            psi_potential = self.potential_network(x, U_tensor)
+            cost_matrix = torch.sum(Y_scaled * U_tensor, dim=-1, keepdims=True)
+            psi_potential = self.potential_network(X_scaled, U_tensor)
             slackness = (psi_potential - cost_matrix).sum()
             slackness.backward()
             return slackness
@@ -168,14 +178,23 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         return U_tensor.detach()
 
     @torch.enable_grad()
-    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    def push_u_given_x(self, u: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
+        self.X_scaler.eval()
+        self.Y_scaler.eval()
+
+        X_scaled = self.X_scaler(X_scaled)
+
         if self.potential_to_estimate_with_neural_network == "u":
             requires_grad_backup, u.requires_grad = u.requires_grad, True
-            potential_value = self.potential_network(x, u).sum()
+            potential_value = self.potential_network(X_scaled, u).sum()
             Y_tensor = torch.autograd.grad(potential_value, u, create_graph=False)[0]
             u.requires_grad = requires_grad_backup
-            return Y_tensor.detach()
+
+            return (
+                Y_tensor.requires_grad_(False)*torch.sqrt(self.Y_scaler.running_var) 
+                + self.Y_scaler.running_mean
+            ).detach()
         
         Y_init = torch.randn_like(u)
         Y_tensor = torch.nn.Parameter(Y_init.clone().contiguous())
@@ -192,14 +211,17 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         def slackness_closure():
             optimizer.zero_grad()
             cost_matrix = torch.sum(u * Y_tensor, dim=-1, keepdims=True)
-            psi_potential = self.potential_network(x, Y_tensor)
+            psi_potential = self.potential_network(X_scaled, Y_tensor)
             slackness = (psi_potential - cost_matrix).sum()
             slackness.backward()
             return slackness
 
         optimizer.step(slackness_closure)
 
-        return Y_tensor.detach()
+        return (
+            Y_tensor.requires_grad_(False)*torch.sqrt(self.Y_scaler.running_var) 
+            + self.Y_scaler.running_mean
+        ).detach()
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.

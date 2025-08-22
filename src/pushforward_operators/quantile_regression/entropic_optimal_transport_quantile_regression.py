@@ -31,7 +31,9 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
 
         self.activation_function_name = activation_function_name
         self.activation_function = getattr(nn, activation_function_name)()
-        self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
+        self.Y_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
+        self.X_scaler = nn.BatchNorm1d(response_dimension, affine=False)
+
         self.network_type = network_type
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network 
 
@@ -44,15 +46,6 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         )
 
         self.epsilon = epsilon
-
-    def warmup_Y_scaler(self, dataloader: torch.utils.data.DataLoader, num_passes: int = 1):
-        """Run over the data (no grad) to populate BatchNorm running stats."""
-        self.Y_scaler.train()
-        with torch.no_grad():
-            for _ in range(num_passes):
-                for _, Y in dataloader:
-                    _ = self.Y_scaler(Y)
-        self.Y_scaler.eval()
 
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
@@ -77,7 +70,6 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         else:
             potential_network_scheduler = None
 
-        self.warmup_Y_scaler(dataloader)
         training_information = []
         progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
 
@@ -85,16 +77,17 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                 for X_batch, Y_batch in dataloader:
                     self.potential_network.zero_grad()
 
+                    X_scaled_batch = self.X_scaler(X_batch)
                     Y_scaled_batch = self.Y_scaler(Y_batch)
                     U_batch = torch.randn_like(Y_scaled_batch)
 
                     psi = self.estimate_psi(
-                            X_tensor=X_batch,
+                            X_tensor=X_scaled_batch,
                             U_tensor=U_batch,
                             Y_tensor=Y_scaled_batch
                     )
                     phi = self.estimate_phi(
-                            X_tensor=X_batch,
+                            X_tensor=X_scaled_batch,
                             U_tensor=U_batch,
                             Y_tensor=Y_scaled_batch
                     )
@@ -198,11 +191,14 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
+        self.X_scaler.eval()
         self.Y_scaler.eval()
+
         if self.potential_to_estimate_with_neural_network == "y":
             requires_grad_backup, y.requires_grad = y.requires_grad, True
+            X_scaled = self.X_scaler(x)
             Y_scaled = self.Y_scaler(y)
-            potential_value = self.potential_network(x, Y_scaled).sum()
+            potential_value = self.potential_network(X_scaled, Y_scaled).sum()
 
             U_tensor = torch.autograd.grad(potential_value, Y_scaled, create_graph=False)[0]
             y.requires_grad = requires_grad_backup
@@ -215,7 +211,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             U_init = torch.randn_like(y)
             U_tensor = torch.nn.Parameter(U_init.clone().contiguous())
 
-            X_tensor = x.clone()
+            X_tensor = self.X_scaler(x.clone())
             Y_tensor = self.Y_scaler(y)
 
             optimizer = torch.optim.LBFGS(
@@ -241,11 +237,14 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
+        self.X_scaler.eval()
         self.Y_scaler.eval()
 
         if self.potential_to_estimate_with_neural_network == "u":
             requires_grad_backup, u.requires_grad = u.requires_grad, True
-            potential_value = self.potential_network(x, u).sum()
+            X_scaled = self.X_scaler(x)
+
+            potential_value = self.potential_network(X_scaled, u).sum()
 
             Y_scaled = torch.autograd.grad(potential_value, u, create_graph=False)[0]
             Y_tensor = Y_scaled*torch.sqrt(self.Y_scaler.running_var) + self.Y_scaler.running_mean
@@ -262,6 +261,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
             Y_tensor = torch.nn.Parameter(Y_init.clone().contiguous())
             U_tensor = u.clone()
             X_tensor = x.clone()
+            X_scaled = self.X_scaler(X_tensor)
 
             optimizer = torch.optim.LBFGS(
                 [Y_tensor],
@@ -274,7 +274,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
 
             def slackness_closure():
                 optimizer.zero_grad()
-                potential = self.potential_network(X_tensor, Y_tensor)
+                potential = self.potential_network(X_scaled, Y_tensor)
                 objective = (potential - torch.sum(Y_tensor*U_tensor, dim=-1, keepdim=True)).sum()
                 objective.backward()
                 return objective

@@ -1,7 +1,8 @@
 from pushforward_operators.protocol import PushForwardOperator
-from infrastructure.classes import TrainParameters
 import torch
+import numpy
 
+from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr.api import check_is_fitted
 from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr import VectorQuantileRegressor
 from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr.solvers.regularized_lse import MLPRegularizedDualVQRSolver
 
@@ -72,3 +73,13 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.vector_quantile_regression.fit(X_tensor, Y_tensor)
         self.fitted = True
         return self
+    
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor):
+        check_is_fitted(self)
+
+        vqfs = self.vector_quantile_regression.vector_quantiles(x.detach().numpy(force=True))
+        pushforwards = torch.cat([vqf.evaluate(u=u.detach().numpy(force=True)) for vqf in vqfs])
+        return pushforwards
+
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor):
+        ...
