@@ -49,8 +49,8 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         hidden_dimension: int,
         number_of_hidden_layers: int,
         activation_function_name: str,
-        network_type: Literal["SCFFNN", "PISCNN"] = "SCFFNN",
-        potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
+        network_type: Literal["SCFFNN", "PISCNN"] = "PISCNN",
+        potential_to_estimate_with_neural_network: Literal["y", "u"] = "u",
     ):
         super().__init__()
         self.init_dict = {

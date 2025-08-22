@@ -161,7 +161,7 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         return self
 
     @torch.inference_mode()
-    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor, batch_size: int = 1024, k: int = 10) -> torch.Tensor:
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor, batch_size: int = 1024, k: int = 20) -> torch.Tensor:
         device, dtype = x.device, x.dtype
         for name in ["b_u", "phi", "u"]:
             setattr(self, name, getattr(self, name).to(device=device, dtype=dtype))
