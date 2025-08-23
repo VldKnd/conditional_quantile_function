@@ -1,8 +1,7 @@
 import torch
 
-def compute_gaussian_negative_log_likelihood(
-        X: torch.Tensor
-    ) -> float:
+
+def compute_gaussian_negative_log_likelihood(X: torch.Tensor) -> float:
     """
     Computes the likelihood of the model.
 

@@ -194,7 +194,7 @@ def plot_quantiles_3d(
 def plot_contour_2d(
     Qs: Sequence[Array],
     Y: Array = None,
-    alphas: Sequence[float] = (0.1,),
+    alphas: Sequence[float] = (0.1, ),
     alpha_labels: Sequence[str] = None,
     alpha_colors: Sequence[str] = None,
     ax: Axes = None,

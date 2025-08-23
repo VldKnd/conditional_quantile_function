@@ -11,6 +11,7 @@ from infrastructure.classes import TrainParameters
 
 
 class CPFlow(PushForwardOperator, nn.Module):
+
     def __init__(
         self,
         response_dimension: int,
@@ -37,8 +38,7 @@ class CPFlow(PushForwardOperator, nn.Module):
                 symm_act_first=True,
                 softplus_type="gaussian_softplus",
                 zero_softplus=True,
-            )
-            for _ in range(n_blocks)
+            ) for _ in range(n_blocks)
         ]
         layers = [None] * (2 * n_blocks + 1)
         layers[0::2] = [ActNorm(response_dimension) for _ in range(n_blocks + 1)]
@@ -48,20 +48,29 @@ class CPFlow(PushForwardOperator, nn.Module):
         ]
         self.flow = SequentialFlow(layers)
 
-    def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
+    def fit(
+        self, dataloader: torch.utils.data.DataLoader,
+        train_parameters: TrainParameters, *args, **kwargs
+    ):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
         verbose = train_parameters.verbose
 
-        convex_potential_flow_optimizer = torch.optim.Adam(self.flow.parameters(), **train_parameters.optimizer_parameters)
+        convex_potential_flow_optimizer = torch.optim.Adam(
+            self.flow.parameters(), **train_parameters.optimizer_parameters
+        )
         if train_parameters.scheduler_parameters:
-            convex_potential_flow_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(convex_potential_flow_optimizer, total_number_of_optimizer_steps, **train_parameters.scheduler_parameters)
+            convex_potential_flow_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                convex_potential_flow_optimizer, total_number_of_optimizer_steps,
+                **train_parameters.scheduler_parameters
+            )
         else:
             convex_potential_flow_scheduler = None
 
-
         accumulated_loss_function = 0
-        progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
+        progress_bar = trange(
+            1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
+        )
 
         for _ in progress_bar:
             for cond, y in dataloader:
@@ -168,8 +177,12 @@ class CPFlow(PushForwardOperator, nn.Module):
         with torch.no_grad():
             _dtype = list(self.flow.parameters())[0].dtype
             _device = list(self.flow.parameters())[0].device
-            y = torch.rand(8, self.config["response_dimension"], dtype=_dtype, device=_device)
-            x = torch.rand(8, self.config["feature_dimension"], dtype=_dtype, device=_device)
+            y = torch.rand(
+                8, self.config["response_dimension"], dtype=_dtype, device=_device
+            )
+            x = torch.rand(
+                8, self.config["feature_dimension"], dtype=_dtype, device=_device
+            )
         self.flow.forward_transform(y, context=x)
         self.flow.load_state_dict(data["state_dict"])
         self.config.update(data)

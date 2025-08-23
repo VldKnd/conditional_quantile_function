@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.classes import TrainParameters
 
+
 class LinearVectorQuantileRegression(PushForwardOperator):
     """
     Implements Linear Vector Quantile Regression using PyTorch for tensor
@@ -15,6 +16,7 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         b_u (torch.Tensor | None): The learned coefficients for the linear model.
         num_latent_points_to_generate (int): The number of latent points (m) to use.
     """
+
     def __init__(self, num_latent_points_to_generate: int = 500):
         """
         Initializes the LinearVectorQuantileRegression operator.
@@ -50,7 +52,13 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         """
         pass
 
-    def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters = TrainParameters(verbose=False), *args, **kwargs):
+    def fit(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        train_parameters: TrainParameters = TrainParameters(verbose=False),
+        *args,
+        **kwargs
+    ):
         """
         Fits the pushforward operator to the data from a DataLoader.
 
@@ -65,7 +73,9 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         self.fit_tensor(X_tensor, Y_tensor, verbose=train_parameters.verbose)
         return self
 
-    def fit_tensor(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, verbose: bool = False):
+    def fit_tensor(
+        self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, verbose: bool = False
+    ):
         """
         Fits the pushforward operator directly from tensors.
 
@@ -102,8 +112,13 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         return self
 
     def solve_linear_vector_quantile_regression_primal(
-        self, X: np.ndarray, Y: np.ndarray, U: np.ndarray,
-        nu: np.ndarray, mu: np.ndarray, verbose: bool = False
+        self,
+        X: np.ndarray,
+        Y: np.ndarray,
+        U: np.ndarray,
+        nu: np.ndarray,
+        mu: np.ndarray,
+        verbose: bool = False
     ) -> Dict:
         """
         Solves the primal form of the VQR linear program using SciPy.
@@ -146,7 +161,9 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         return result
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("Pushforward of Y|X if not implemented for LinearVectorQuantileRegression")
+        raise NotImplementedError(
+            "Pushforward of Y|X if not implemented for LinearVectorQuantileRegression"
+        )
 
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
@@ -165,17 +182,15 @@ class LinearVectorQuantileRegression(PushForwardOperator):
 
         # The number of points in U and X must be the same
         if u.shape[0] != x.shape[0]:
-            raise ValueError(f"The number of samples in U and X must be the same, but got {u.shape[0]} and {x.shape[0]}.")
-
+            raise ValueError(
+                f"The number of samples in U and X must be the same, but got {u.shape[0]} and {x.shape[0]}."
+            )
 
         phi_u_at_x = -x @ self.b_u.T  # Shape: (M, m)
 
         # Estimate the gradient for each point of interest
         pushforward_of_u = self.estimate_gradients_for_points_knn(
-            u_samples=self.u,
-            f_samples=phi_u_at_x,
-            points_of_interest=u,
-            k=10
+            u_samples=self.u, f_samples=phi_u_at_x, points_of_interest=u, k=10
         )
         return pushforward_of_u
 
@@ -207,27 +222,37 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         N, _ = u_samples.shape
 
         if u_samples.shape[1] != d:
-            raise ValueError(f"Dimension mismatch: u_samples has dim {u_samples.shape[1]} but points_of_interest has dim {d}.")
+            raise ValueError(
+                f"Dimension mismatch: u_samples has dim {u_samples.shape[1]} but points_of_interest has dim {d}."
+            )
         if f_samples.shape != (M, N):
-            raise ValueError(f"Shape mismatch: f_samples must be ({M}, {N}) but got {f_samples.shape}.")
+            raise ValueError(
+                f"Shape mismatch: f_samples must be ({M}, {N}) but got {f_samples.shape}."
+            )
         if k < d + 1:
-            raise ValueError(f"k must be at least d+1 (which is {d+1}) to fit a hyperplane in R^{d}.")
+            raise ValueError(
+                f"k must be at least d+1 (which is {d+1}) to fit a hyperplane in R^{d}."
+            )
         if k > N:
-            raise ValueError(f"k ({k}) cannot be larger than the number of samples ({N}).")
+            raise ValueError(
+                f"k ({k}) cannot be larger than the number of samples ({N})."
+            )
 
-        dists_sq = torch.cdist(points_of_interest, u_samples, p=2) # Shape: (M, N)
-        _, knn_indices = torch.topk(dists_sq, k, dim=1, largest=False) # Shape: (M, k)
-        local_u_samples = u_samples[knn_indices] # Shape: (M, k, d)
-        local_f_samples = torch.gather(f_samples, 1, knn_indices) # Shape: (M, k)
+        dists_sq = torch.cdist(points_of_interest, u_samples, p=2)  # Shape: (M, N)
+        _, knn_indices = torch.topk(dists_sq, k, dim=1, largest=False)  # Shape: (M, k)
+        local_u_samples = u_samples[knn_indices]  # Shape: (M, k, d)
+        local_f_samples = torch.gather(f_samples, 1, knn_indices)  # Shape: (M, k)
 
         ones = torch.ones(M, k, 1, device=u_samples.device, dtype=u_samples.dtype)
-        A_design = torch.cat([local_u_samples, ones], dim=2) # Shape: (M, k, d+1)
+        A_design = torch.cat([local_u_samples, ones], dim=2)  # Shape: (M, k, d+1)
 
         try:
             coeffs, _, _, _ = torch.linalg.lstsq(A_design, local_f_samples)
         except torch.linalg.LinAlgError:
             # If solving fails, return NaNs for this batch
-            return torch.full((M, d), float('nan'), device=u_samples.device, dtype=u_samples.dtype)
+            return torch.full(
+                (M, d), float('nan'), device=u_samples.device, dtype=u_samples.dtype
+            )
 
         gradient = coeffs[:, :d]
 

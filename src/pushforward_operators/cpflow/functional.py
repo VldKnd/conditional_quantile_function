@@ -50,6 +50,7 @@ def oper(array, operetor, axis=-1, keepdims=False):
 
 
 def log_sum_exp(a, axis=-1, sum_op=torch.sum):
+
     def maximum(x):
         return x.max(axis)[0]
 

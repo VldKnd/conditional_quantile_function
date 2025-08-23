@@ -2,27 +2,34 @@ import torch
 from torch import nn
 from torch import Tensor
 
+
 class PosLinear(torch.nn.Linear):
+
     def forward(self, x: Tensor) -> Tensor:
         gain = 1 / x.size(-1)
-        return nn.functional.linear(x, torch.nn.functional.softplus(self.weight), self.bias) * gain
+        return nn.functional.linear(
+            x, torch.nn.functional.softplus(self.weight), self.bias
+        ) * gain
+
 
 class PICNN(nn.Module):
-    def __init__(self,
-            feature_dimension: int,
-            response_dimension: int,
-            hidden_dimension: int,
-            number_of_hidden_layers: int,
-            activation_function_name: str,
-            output_dimension: int = 1,
-            *args, 
-            **kwargs,
-        ):
+
+    def __init__(
+        self,
+        feature_dimension: int,
+        response_dimension: int,
+        hidden_dimension: int,
+        number_of_hidden_layers: int,
+        activation_function_name: str,
+        output_dimension: int = 1,
+        *args,
+        **kwargs,
+    ):
         super().__init__()
         x_dimension = feature_dimension
         y_dimension = response_dimension
         u_dimension, z_dimension = hidden_dimension, hidden_dimension
-        
+
         # Activations:
         self.number_of_hidden_layers = number_of_hidden_layers
         self.z_activation = nn.Softplus()
@@ -36,30 +43,42 @@ class PICNN(nn.Module):
         self.first_linear_layer_u = nn.Linear(x_dimension, z_dimension, bias=False)
 
         # Iterations:
-        self.linear_layer_tilde = nn.ModuleList([
+        self.linear_layer_tilde = nn.ModuleList(
+            [
                 nn.Linear(u_dimension, u_dimension)
                 for _ in range(number_of_hidden_layers)
-        ])
-        self.linear_layer_uz = nn.ModuleList([
-            nn.Linear(u_dimension, z_dimension)
+            ]
+        )
+        self.linear_layer_uz = nn.ModuleList(
+            [
+                nn.Linear(u_dimension, z_dimension)
                 for _ in range(number_of_hidden_layers)
-        ])
-        self.linear_layer_z = nn.ModuleList([
-            PosLinear(z_dimension, z_dimension)
+            ]
+        )
+        self.linear_layer_z = nn.ModuleList(
+            [
+                PosLinear(z_dimension, z_dimension)
                 for _ in range(number_of_hidden_layers)
-        ])
-        self.linear_layer_uy = nn.ModuleList([
-            nn.Linear(u_dimension, y_dimension)
+            ]
+        )
+        self.linear_layer_uy = nn.ModuleList(
+            [
+                nn.Linear(u_dimension, y_dimension)
                 for _ in range(number_of_hidden_layers)
-        ])
-        self.linear_layer_y = nn.ModuleList([
-            nn.Linear(y_dimension, z_dimension, bias=False)
+            ]
+        )
+        self.linear_layer_y = nn.ModuleList(
+            [
+                nn.Linear(y_dimension, z_dimension, bias=False)
                 for _ in range(number_of_hidden_layers)
-        ])
-        self.linear_layer_u = nn.ModuleList([
-            nn.Linear(u_dimension, z_dimension, bias=False)
+            ]
+        )
+        self.linear_layer_u = nn.ModuleList(
+            [
+                nn.Linear(u_dimension, z_dimension, bias=False)
                 for _ in range(number_of_hidden_layers)
-        ])
+            ]
+        )
 
         # Last layer:
         self.last_linear_layer_uz = nn.Linear(u_dimension, z_dimension)
@@ -68,16 +87,11 @@ class PICNN(nn.Module):
         self.last_linear_layer_y = nn.Linear(y_dimension, output_dimension, bias=False)
         self.last_linear_layer_u = nn.Linear(u_dimension, output_dimension, bias=False)
 
-
     def forward(self, condition: torch.Tensor, tensor: torch.Tensor):
         # First layer:
-        u = self.u_activation(
-            self.first_linear_layer_tilde(condition)
-        )
+        u = self.u_activation(self.first_linear_layer_tilde(condition))
         z = self.z_activation(
-            self.first_linear_layer_y(
-                tensor * self.first_linear_layer_yu(condition)
-            ) +
+            self.first_linear_layer_y(tensor * self.first_linear_layer_yu(condition)) +
             self.first_linear_layer_u(condition)
         )
 
@@ -108,19 +122,24 @@ class PICNN(nn.Module):
 
         return output
 
+
 class PISCNN(PICNN):
     """Strongly convex variant of PICNN.
     alpha: regularization parameter
     """
+
     def __init__(self, *args, **kwargs):
         super(PISCNN, self).__init__(*args, **kwargs)
         self.log_alpha = nn.Parameter(torch.tensor(0.))
 
     def forward(self, condition: torch.Tensor, tensor: torch.Tensor):
         output = super().forward(condition, tensor)
-        return output + 0.5 * torch.exp(self.log_alpha) * torch.norm(tensor, dim=-1, keepdim=True)**2
+        return output + 0.5 * torch.exp(self.log_alpha
+                                        ) * torch.norm(tensor, dim=-1, keepdim=True)**2
+
 
 class FFNN(nn.Module):
+
     def __init__(
         self,
         feature_dimension: int,
@@ -129,7 +148,7 @@ class FFNN(nn.Module):
         number_of_hidden_layers: int,
         activation_function_name: str,
         output_dimension: int = 1,
-        *args, 
+        *args,
         **kwargs,
     ):
         super().__init__()
@@ -144,8 +163,7 @@ class FFNN(nn.Module):
 
         self.potential_network = nn.Sequential(
             nn.Linear(response_dimension + feature_dimension, hidden_dimension),
-            self.activation_function,
-            *hidden_layers,
+            self.activation_function, *hidden_layers,
             nn.Linear(hidden_dimension, output_dimension)
         )
 
@@ -154,21 +172,25 @@ class FFNN(nn.Module):
         output_tensor = self.potential_network(input_tensor)
         return output_tensor
 
+
 class SCFFNN(FFNN):
     """Feed Forward Neural Network with added norm to enforce strong convexity.
     alpha: regularization parameter
     """
+
     def __init__(self, *args, **kwargs):
         super(SCFFNN, self).__init__(*args, **kwargs)
         self.log_alpha = nn.Parameter(torch.tensor(0.))
 
     def forward(self, condition: torch.Tensor, tensor: torch.Tensor):
         output = super().forward(condition, tensor)
-        return output + 0.5 * torch.exp(self.log_alpha) * torch.norm(tensor, dim=-1, keepdim=True)**2
+        return output + 0.5 * torch.exp(self.log_alpha
+                                        ) * torch.norm(tensor, dim=-1, keepdim=True)**2
+
 
 network_type_name_to_network_type: dict[str, nn.Module] = {
-    "SCFFNN":SCFFNN,
-    "FFNN":FFNN,
-    "PICNN":PICNN,
-    "PISCNN":PISCNN
+    "SCFFNN": SCFFNN,
+    "FFNN": FFNN,
+    "PICNN": PICNN,
+    "PISCNN": PISCNN
 }

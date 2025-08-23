@@ -7,12 +7,11 @@ from torch import ones as ones_th
 
 
 class QuadraticModel(nn.Module):
+
     def __init__(self, k=2):
         super().__init__()
         self.C1 = nn.Parameter(eye(k, k, dtype=torch.float32, requires_grad=True))
-        self.C2 = nn.Parameter(
-            ones_th(k, dtype=torch.float32, requires_grad=True),
-        )
+        self.C2 = nn.Parameter(ones_th(k, dtype=torch.float32, requires_grad=True), )
         self.C3 = nn.Parameter(
             torch.tensor(array([0.0]), dtype=torch.float32, requires_grad=True)
         )

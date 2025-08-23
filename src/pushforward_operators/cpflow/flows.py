@@ -7,7 +7,6 @@ import torch
 from pushforward_operators.cpflow.distributions import log_standard_normal
 from pushforward_operators.cpflow.cpflows import DeepConvexFlow
 
-
 _scaling_min = 0.001
 
 
@@ -50,11 +49,11 @@ class ActNorm(torch.nn.Module):
 
             if self.learn_scale:
                 var = unsqueeze(
-                    torch.sum((x + unsqueeze(b)) ** 2, dim=(0, -1)) / sum_size
+                    torch.sum((x + unsqueeze(b))**2, dim=(0, -1)) / sum_size
                 )
                 logs = (
-                    torch.log(self.scale / (torch.sqrt(var) + 1e-6))
-                    / self.logscale_factor
+                    torch.log(self.scale / (torch.sqrt(var) + 1e-6)) /
+                    self.logscale_factor
                 )
                 self.logs.data.copy_(logs.data)
 
@@ -88,6 +87,7 @@ class ActNorm(torch.nn.Module):
 
 # noinspection PyUnusedLocal
 class LayerActnorm(torch.nn.Module):
+
     def __init__(self):
         super(LayerActnorm, self).__init__()
         self.flow = SequentialFlow([Unsqueeze(1), ActNorm(1), Squeeze(1)])
@@ -100,12 +100,14 @@ class LayerActnorm(torch.nn.Module):
 
 
 class ActNormNoLogdet(ActNorm):
+
     def forward(self, x):
         return super(ActNormNoLogdet, self).forward_transform(x)[0]
 
 
 # noinspection PyUnusedLocal
 class Unsqueeze(torch.nn.Module):
+
     def __init__(self, dim):
         super(Unsqueeze, self).__init__()
         self.dim = dim
@@ -119,6 +121,7 @@ class Unsqueeze(torch.nn.Module):
 
 # noinspection PyUnusedLocal
 class Squeeze(torch.nn.Module):
+
     def __init__(self, dim):
         super(Squeeze, self).__init__()
         self.dim = dim
@@ -132,6 +135,7 @@ class Squeeze(torch.nn.Module):
 
 # noinspection PyPep8Naming
 class SequentialFlow(torch.nn.Module):
+
     def __init__(self, flows):
         super(SequentialFlow, self).__init__()
         self.flows = torch.nn.ModuleList(flows)
@@ -181,6 +185,7 @@ class SequentialFlow(torch.nn.Module):
 
 
 class Reverse(nn.Module):
+
     def __init__(self, flow):
         super().__init__()
         self.flow = flow
@@ -194,6 +199,7 @@ class Reverse(nn.Module):
 
 # noinspection PyMethodMayBeStatic,PyUnusedLocal
 class Flatten(nn.Module):
+
     def __init__(self, shape):
         super().__init__()
         self.shape = shape
@@ -218,6 +224,7 @@ class Flatten(nn.Module):
 
 # noinspection PyUnusedLocal
 class SqueezeLayer(nn.Module):
+
     def __init__(self, downscale_factor):
         super(SqueezeLayer, self).__init__()
         self.downscale_factor = downscale_factor
@@ -266,6 +273,7 @@ def squeeze(x, downscale_factor=2):
 
 # noinspection PyUnusedLocal
 class InvertibleLinear(nn.Module):
+
     def __init__(self, dim):
         super(InvertibleLinear, self).__init__()
         self.dim = dim
@@ -292,6 +300,7 @@ class InvertibleLinear(nn.Module):
 
 # noinspection PyUnusedLocal,PyPep8Naming
 class Invertible1x1Conv(nn.Module):
+
     def __init__(self, dim):
         super(Invertible1x1Conv, self).__init__()
         self.dim = dim
@@ -322,9 +331,8 @@ class Invertible1x1Conv(nn.Module):
         if logdet is None:
             return y
         else:
-            return y, logdet + self._logdetgrad.expand_as(logdet) * x.shape[
-                2
-            ] * x.shape[3]
+            return y, logdet + self._logdetgrad.expand_as(logdet
+                                                          ) * x.shape[2] * x.shape[3]
 
     def reverse(self, y, **kwargs):
         return F.conv2d(y, self.weight.inverse().view(self.dim, self.dim, 1, 1))

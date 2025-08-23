@@ -4,6 +4,7 @@ from infrastructure.classes import Experiment
 from datasets import Dataset
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 
+
 def train_from_json_file(path_to_experiment_file: str) -> PushForwardOperator:
     """
     Train a model on a synthetic dataset from an experiment set in a JSON file.
@@ -17,6 +18,7 @@ def train_from_json_file(path_to_experiment_file: str) -> PushForwardOperator:
     experiment = Experiment.load_from_path_to_experiment_file(path_to_experiment_file)
     return train(experiment=experiment)
 
+
 def train(experiment: Experiment) -> PushForwardOperator:
     """
     Train a model on a synthetic dataset.
@@ -28,9 +30,16 @@ def train(experiment: Experiment) -> PushForwardOperator:
     Returns:
         PushForwardOperator: The trained model.
     """
-    dataset: Dataset = name_to_dataset_map[experiment.dataset_name](**experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters)
-    pushforward_operator = name_to_pushforward_operator_map[experiment.pushforward_operator_name](**experiment.pushforward_operator_parameters)
-    X_dataset, Y_dataset = dataset.sample_joint(n_points=experiment.dataset_number_of_points)
+    dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
+        **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
+    )
+    pushforward_operator = name_to_pushforward_operator_map[
+        experiment.pushforward_operator_name](
+            **experiment.pushforward_operator_parameters
+        )
+    X_dataset, Y_dataset = dataset.sample_joint(
+        n_points=experiment.dataset_number_of_points
+    )
     X_dataset = X_dataset.to(**experiment.tensor_parameters)
     Y_dataset = Y_dataset.to(**experiment.tensor_parameters)
     dataloader = torch.utils.data.DataLoader(
@@ -44,7 +53,9 @@ def train(experiment: Experiment) -> PushForwardOperator:
     except AttributeError:
         pass
 
-    _ = pushforward_operator.fit(dataloader, train_parameters=experiment.train_parameters)
+    _ = pushforward_operator.fit(
+        dataloader, train_parameters=experiment.train_parameters
+    )
 
     if experiment.path_to_weights is not None:
         pushforward_operator.save(experiment.path_to_weights)

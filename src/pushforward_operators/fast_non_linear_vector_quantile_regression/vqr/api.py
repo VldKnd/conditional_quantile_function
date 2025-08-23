@@ -421,6 +421,7 @@ class VectorQuantileRegressor(RegressorMixin, _Base):
 
 
 class ScalarQuantileEstimator:
+
     def __init__(
         self,
         n_levels: int = 50,

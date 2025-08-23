@@ -6,8 +6,16 @@ from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr.api im
 from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr import VectorQuantileRegressor
 from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr.solvers.regularized_lse import MLPRegularizedDualVQRSolver
 
+
 class FastNonLinearVectorQuantileRegression(PushForwardOperator):
-    def __init__(self, input_dimension:int, embedding_dimension: int = 5, hidden_dimension: int = 100, number_of_hidden_layers: int = 1):
+
+    def __init__(
+        self,
+        input_dimension: int,
+        embedding_dimension: int = 5,
+        hidden_dimension: int = 100,
+        number_of_hidden_layers: int = 1
+    ):
         self.epsilon = 1e-5
         self.input_dimension = input_dimension
         self.number_of_hidden_layers = number_of_hidden_layers
@@ -50,7 +58,9 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.fit_tensor(X_tensor=X_tensor, Y_tensor=Y_tensor, *args, **kwargs)
         return self
 
-    def fit_tensor(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, *args, **kwargs):
+    def fit_tensor(
+        self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor, *args, **kwargs
+    ):
         """Fits the pushforward operator to the data.
 
         Args:
@@ -59,9 +69,9 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
             verbose (bool): Whether to print verbose output.
         """
         vector_quantile_regression_solver = MLPRegularizedDualVQRSolver(
-            hidden_layers = (
+            hidden_layers=(
                 self.input_dimension,
-                *[self.hidden_dimension]*self.number_of_hidden_layers,
+                *[self.hidden_dimension] * self.number_of_hidden_layers,
                 self.embedding_dimension
             ),
         )
@@ -73,12 +83,16 @@ class FastNonLinearVectorQuantileRegression(PushForwardOperator):
         self.vector_quantile_regression.fit(X_tensor, Y_tensor)
         self.fitted = True
         return self
-    
+
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor):
         check_is_fitted(self)
 
-        vqfs = self.vector_quantile_regression.vector_quantiles(x.detach().numpy(force=True))
-        pushforwards = torch.cat([vqf.evaluate(u=u.detach().numpy(force=True)) for vqf in vqfs])
+        vqfs = self.vector_quantile_regression.vector_quantiles(
+            x.detach().numpy(force=True)
+        )
+        pushforwards = torch.cat(
+            [vqf.evaluate(u=u.detach().numpy(force=True)) for vqf in vqfs]
+        )
         return pushforwards
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor):

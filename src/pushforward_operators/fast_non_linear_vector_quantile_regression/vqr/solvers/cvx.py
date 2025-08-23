@@ -53,9 +53,9 @@ class CVXVQRSolver(VQRDiscreteSolver):
     def solve_vqr(self, Y: Array, X: Array) -> DiscreteCVQF:
         return self._solve(Y, X)
 
-    def _solve(
-        self, Y: Array, X: Optional[Array] = None
-    ) -> Union[DiscreteVQF, DiscreteCVQF]:
+    def _solve(self,
+               Y: Array,
+               X: Optional[Array] = None) -> Union[DiscreteVQF, DiscreteCVQF]:
         T = self.T
         N = len(Y)
         Y = np.reshape(Y, (N, -1))

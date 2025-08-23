@@ -1,9 +1,10 @@
 import torch
 
+
 def compute_hausdorff_distance(
-        A_set: torch.Tensor,
-        B_set: torch.Tensor,
-    ) -> float:
+    A_set: torch.Tensor,
+    B_set: torch.Tensor,
+) -> float:
     """
     Computes the Hausdorff distance between two sets.
 

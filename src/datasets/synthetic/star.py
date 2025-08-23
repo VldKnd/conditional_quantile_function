@@ -1,5 +1,6 @@
 import torch
 
+
 class StarDataset:
     """
     A class to transform a 2D Gaussian distribution into a swirled star shape
@@ -25,7 +26,9 @@ class StarDataset:
         """
         self.tensor_parameters = tensor_parameters
         self.seed = seed
-        self.random_number_generator = torch.Generator(device=self.tensor_parameters["device"])
+        self.random_number_generator = torch.Generator(
+            device=self.tensor_parameters["device"]
+        )
         self.random_number_generator.manual_seed(self.seed)
 
         self.n_lobes = n_lobes
@@ -50,11 +53,22 @@ class StarDataset:
 
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """Samples covariates from a standard Gaussian distribution."""
-        return torch.rand(n_points, 2, **self.tensor_parameters, generator=self.random_number_generator)* torch.tensor([2, 1], **self.tensor_parameters)
+        return torch.rand(
+            n_points,
+            2,
+            **self.tensor_parameters,
+            generator=self.random_number_generator
+        ) * torch.tensor([2, 1], **self.tensor_parameters)
 
     def sample_conditional(self, n_points: int, X: torch.Tensor) -> torch.Tensor:
         """Samples the conditional distribution of the response given the covariates."""
-        U = torch.randn(X.shape[0], n_points, 2, **self.tensor_parameters, generator=self.random_number_generator)
+        U = torch.randn(
+            X.shape[0],
+            n_points,
+            2,
+            **self.tensor_parameters,
+            generator=self.random_number_generator
+        )
         X_extended = X.unsqueeze(1).repeat(1, n_points, 1)
         radius, angle = self._to_polar(U)
         lobe_strength = X_extended[:, :, 0:1]

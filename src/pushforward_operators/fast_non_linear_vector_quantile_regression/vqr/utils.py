@@ -15,8 +15,7 @@ def get_kwargs(ignore: Sequence[str] = ()) -> dict:
     arg_names, _, _, arg_values = inspect.getargvalues(frame)
     kwargs = {
         arg_name: arg_values[arg_name]
-        for arg_name in arg_names
-        if arg_name not in ignore_set
+        for arg_name in arg_names if arg_name not in ignore_set
     }
 
     return kwargs

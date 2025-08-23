@@ -39,14 +39,12 @@ class ConvexFlow(torch.nn.Module):
         dact = self.dact(pre_act)
 
         out = (
-            torch.mm(nnF.softplus(self.w) * act, self.A.permute(1, 0))
-            + nnF.softplus(self.w0) * x
+            torch.mm(nnF.softplus(self.w) * act, self.A.permute(1, 0)) +
+            nnF.softplus(self.w0) * x
         )
         J = (
-            dact[:, None, None]
-            * self.A[:, None]
-            * self.A[None, :]
-            * nnF.softplus(self.w)
+            dact[:, None, None] * self.A[:, None] * self.A[None, :] *
+            nnF.softplus(self.w)
         )
         J = J.sum(-1) + nnF.softplus(self.w0) * torch.eye(self.dim).to(x.device)
         return out, torch.log(torch.abs(torch.det(J))) + logdet
@@ -92,8 +90,7 @@ class DeepConvexFlow(torch.nn.Module):
         self.m1, self.m2 = m1, m2
         self.stochastic_estimate_fn = (
             unbiased_logdet
-            if unbiased
-            else partial(stochastic_lanczos_quadrature, m=min(m1, dim))
+            if unbiased else partial(stochastic_lanczos_quadrature, m=min(m1, dim))
         )
         self.stochastic_grad_estimate_fn = partial(
             stochastic_logdet_gradient_estimator,
@@ -109,8 +106,8 @@ class DeepConvexFlow(torch.nn.Module):
         else:
             icnn = self.icnn(x, context)
         return (
-            nnF.softplus(self.w1) * icnn
-            + nnF.softplus(self.w0) * (x.view(n, -1) ** 2).sum(1, keepdim=True) / 2
+            nnF.softplus(self.w1) * icnn + nnF.softplus(self.w0) *
+            (x.view(n, -1)**2).sum(1, keepdim=True) / 2
         )
 
     def reverse(
@@ -198,9 +195,8 @@ class DeepConvexFlow(torch.nn.Module):
         if not self.training or (extra is not None and len(extra) > 0):
             # noinspection PyBroadException
             try:
-                v2 = torch.nn.functional.normalize(
-                    sample_rademacher(bsz, dim), dim=-1
-                ).to(f)
+                v2 = torch.nn.functional.normalize(sample_rademacher(bsz, dim),
+                                                   dim=-1).to(f)
                 est2 = self.stochastic_estimate_fn(hvp_fun, v2)
             except Exception:
                 import traceback

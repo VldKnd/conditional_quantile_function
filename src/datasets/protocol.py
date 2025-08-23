@@ -1,8 +1,12 @@
 import torch
 from typing import Union
 
+
 class Dataset:
-    def __init__(self, tensor_parameters: dict = {}, seed: int = 31337, *args, **kwargs):
+
+    def __init__(
+        self, tensor_parameters: dict = {}, seed: int = 31337, *args, **kwargs
+    ):
         ...
 
     def sample_joint(self, n_points: int) -> Union[torch.Tensor, torch.Tensor]:
@@ -44,4 +48,6 @@ class Dataset:
         """
         Push forward the conditional distribution of the covariates given the response.
         """
-        raise NotImplementedError("Pushforward of u is not implemented for this dataset.")
+        raise NotImplementedError(
+            "Pushforward of u is not implemented for this dataset."
+        )

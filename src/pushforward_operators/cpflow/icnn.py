@@ -22,9 +22,8 @@ def softplus(x):
 
 def gaussian_softplus(x):
     z = np.sqrt(np.pi / 2)
-    return (z * x * torch.erf(x / np.sqrt(2)) + torch.exp(-(x**2) / 2) + z * x) / (
-        2 * z
-    )
+    return (z * x * torch.erf(x / np.sqrt(2)) + torch.exp(-(x**2) / 2) +
+            z * x) / (2 * z)
 
 
 def gaussian_softplus2(x):
@@ -43,6 +42,7 @@ def cauchy_softplus(x):
 
 
 def activation_shifting(activation):
+
     def shifted_activation(x):
         return activation(x) - activation(torch.zeros_like(x))
 
@@ -68,6 +68,7 @@ def get_softplus(softplus_type="softplus", zero_softplus=False):
 
 
 class Softplus(nn.Module):
+
     def __init__(self, softplus_type="softplus", zero_softplus=False):
         super(Softplus, self).__init__()
         self.softplus_type = softplus_type
@@ -84,17 +85,17 @@ class SymmSoftplus(torch.nn.Module):
 
 
 class PosLinear(torch.nn.Linear):
+
     def forward(self, x: Tensor) -> Tensor:
         gain = 1 / x.size(1)
         return (
-            nn.functional.linear(
-                x, torch.nn.functional.softplus(self.weight), self.bias
-            )
-            * gain
+            nn.functional.
+            linear(x, torch.nn.functional.softplus(self.weight), self.bias) * gain
         )
 
 
 class PosLinear2(torch.nn.Linear):
+
     def forward(self, x: Tensor) -> Tensor:
         return nn.functional.linear(
             x, torch.nn.functional.softmax(self.weight, 1), self.bias
@@ -102,6 +103,7 @@ class PosLinear2(torch.nn.Linear):
 
 
 class PosConv2d(torch.nn.Conv2d):
+
     def reset_parameters(self) -> None:
         super().reset_parameters()
         # noinspection PyProtectedMember,PyAttributeOutsideInit
@@ -109,13 +111,14 @@ class PosConv2d(torch.nn.Conv2d):
 
     def forward(self, x: Tensor) -> Tensor:
         return (
-            self._conv_forward(x, torch.nn.functional.softplus(self.weight))
-            / self.fan_in
+            self._conv_forward(x, torch.nn.functional.softplus(self.weight)) /
+            self.fan_in
         )
 
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ICNN(torch.nn.Module):
+
     def __init__(self, dim=2, dimh=16, num_hidden_layers=1):
         super(ICNN, self).__init__()
 
@@ -142,6 +145,7 @@ class ICNN(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ICNN2(torch.nn.Module):
+
     def __init__(
         self,
         dim=2,
@@ -189,6 +193,7 @@ class ICNN2(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ICNN3(torch.nn.Module):
+
     def __init__(
         self,
         dim=2,
@@ -246,6 +251,7 @@ class ICNN3(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyUnusedLocal
 class LseICNN(torch.nn.Module):
+
     def __init__(self, dim=2, dimh=16, **kargs):
         super(LseICNN, self).__init__()
         self.L = torch.nn.Linear(dim, dimh)
@@ -256,6 +262,7 @@ class LseICNN(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ResICNN2(torch.nn.Module):
+
     def __init__(
         self,
         dim=2,
@@ -312,6 +319,7 @@ class ResICNN2(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class DenseICNN2(torch.nn.Module):
+
     def __init__(
         self,
         dim=2,
@@ -361,6 +369,7 @@ class DenseICNN2(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ConvICNN(torch.nn.Module):
+
     def __init__(self, dim=1, dimh=16, num_hidden_layers=2, num_pooling=0):
         in_channels = dim
         hid_channels = dimh
@@ -411,8 +420,7 @@ class ConvICNN(torch.nn.Module):
                     stride=2,
                     padding=2,
                     bias=False,
-                )
-                for _ in range(self.num_pooling)
+                ) for _ in range(self.num_pooling)
             ]
         )
         self.pooling_layers_x = nn.ModuleList(
@@ -424,8 +432,7 @@ class ConvICNN(torch.nn.Module):
                     stride=2,
                     padding=2,
                     bias=False,
-                )
-                for _ in range(self.num_pooling)
+                ) for _ in range(self.num_pooling)
             ]
         )
         for s in range(num_pooling):
@@ -475,6 +482,7 @@ class ConvICNN(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ConvICNN2(torch.nn.Module):
+
     def __init__(
         self,
         dim=1,
@@ -540,6 +548,7 @@ class ConvICNN2(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class ConvICNN3(torch.nn.Module):
+
     def __init__(
         self,
         dim=1,
@@ -667,6 +676,7 @@ class DenseNetICNN(nn.Module):
 
 # noinspection PyPep8Naming
 class _DenseLayer(torch.nn.Module):
+
     def __init__(self, num_input_features, growth_rate, bn_size=4):
         super(_DenseLayer, self).__init__()
         self.norm1 = ActNormNoLogdet(num_input_features)
@@ -701,6 +711,7 @@ class _DenseLayer(torch.nn.Module):
 
 # noinspection PyPep8Naming
 class _DenseBlock(torch.nn.Module):
+
     def __init__(self, num_layers, num_input_features, bn_size, growth_rate):
         super(_DenseBlock, self).__init__()
         layers = []
@@ -723,6 +734,7 @@ class _DenseBlock(torch.nn.Module):
 
 
 class _Transition(nn.Sequential):
+
     def __init__(self, num_input_features, num_output_features):
         super(_Transition, self).__init__()
         self.add_module("norm", ActNormNoLogdet(num_input_features))
@@ -752,6 +764,7 @@ class PICNNAbstractClass(torch.nn.Module):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class PICNN(PICNNAbstractClass):
+
     def __init__(
         self,
         dim=2,
@@ -847,6 +860,7 @@ class PICNN(PICNNAbstractClass):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class PICNN2(PICNNAbstractClass):
+
     def __init__(
         self,
         dim=2,
@@ -1101,6 +1115,7 @@ class PICNNFW(PICNNAbstractClass):
 
 # noinspection PyPep8Naming,PyTypeChecker
 class DensePICNN(PICNNAbstractClass):
+
     def __init__(
         self,
         dim=2,
@@ -1227,9 +1242,8 @@ def test_picnn():
     c = torch.randn(n, dimc)
     print(
         np.all(
-            (((picnn(x1, c) + picnn(x2, c)) / 2 - picnn((x1 + x2) / 2, c)) > 0)
-            .cpu()
-            .data.numpy()
+            (((picnn(x1, c) + picnn(x2, c)) / 2 - picnn((x1 + x2) / 2, c))
+             > 0).cpu().data.numpy()
         )
     )
 

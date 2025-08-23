@@ -1,5 +1,6 @@
 import torch
 
+
 def get_total_number_of_parameters(model: torch.nn.Module) -> int:
     """Get the total number of parameters in the model.
 

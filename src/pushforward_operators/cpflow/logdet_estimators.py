@@ -6,7 +6,6 @@ import torch
 # noinspection PyPep8Naming
 import torch.nn.functional as F
 
-
 EPS = 1e-7
 CG_ITERS_TRACER = list()
 
@@ -118,9 +117,8 @@ def lanczos_tridiagonalization(hvp_fun, m, v):
     betas = torch.stack(betas, dim=-1)
 
     T = (
-        torch.diag_embed(betas, offset=-1)
-        + torch.diag_embed(alphas, offset=0)
-        + torch.diag_embed(betas, offset=1)
+        torch.diag_embed(betas, offset=-1) + torch.diag_embed(alphas, offset=0) +
+        torch.diag_embed(betas, offset=1)
     )
     return T
 
@@ -238,4 +236,4 @@ def geometric_1mcdf(p, k, offset=0):
     else:
         k = k - offset
     """P(n >= k)"""
-    return (1 - p) ** max(k - 1, 0)
+    return (1 - p)**max(k - 1, 0)

@@ -3,6 +3,7 @@ import torch
 from typing import Tuple
 from datasets.protocol import Dataset
 
+
 class BananaDataset(Dataset):
     """
     Creating data in the form of a banana with x values distributed between 1 and 5.
@@ -33,7 +34,7 @@ class BananaDataset(Dataset):
         y = torch.concatenate(
             [
                 U[:, :, 0:1] * X_unsqueezed,
-                U[:, :, 1:2] / X_unsqueezed + (U[:, :, 0:1] ** 2 + X_unsqueezed**3),
+                U[:, :, 1:2] / X_unsqueezed + (U[:, :, 0:1]**2 + X_unsqueezed**3),
             ],
             dim=-1,
         )
@@ -48,7 +49,7 @@ class BananaDataset(Dataset):
         Y = torch.concatenate(
             [
                 U[:, 0:1] * X,
-                U[:, 1:2] / X + (U[:, 0:1] ** 2 + X**3),
+                U[:, 1:2] / X + (U[:, 0:1]**2 + X**3),
             ],
             dim=-1,
         )
@@ -61,15 +62,14 @@ class BananaDataset(Dataset):
             "The number of rows in Y and X must be the same."
         )
 
-        U_shape = y.shape[:-1] + (2,)
+        U_shape = y.shape[:-1] + (2, )
         Y_flat = x.reshape(-1, 2)
         X_flat = x.reshape(-1, 1)
 
         U = torch.concatenate(
             [
                 Y_flat[:, 0:1] / X_flat,
-                (Y_flat[:, 1:2] - ((Y_flat[:, 0:1] / X_flat) ** 2 + X_flat**3))
-                * X_flat,
+                (Y_flat[:, 1:2] - ((Y_flat[:, 0:1] / X_flat)**2 + X_flat**3)) * X_flat,
             ],
             dim=-1,
         )
@@ -83,14 +83,14 @@ class BananaDataset(Dataset):
         assert u.shape[:-1] == x.shape[:-1], (
             "The number of rows in U and X must be the same."
         )
-        Y_shape = u.shape[:-1] + (2,)
+        Y_shape = u.shape[:-1] + (2, )
 
         U_flat = u.reshape(-1, 2)
         X_flat = x.reshape(-1, 1)
         Y_flat = torch.concatenate(
             [
                 U_flat[:, 0:1] * X_flat,
-                U_flat[:, 1:2] / X_flat + (U_flat[:, 0:1] ** 2 + X_flat**3),
+                U_flat[:, 1:2] / X_flat + (U_flat[:, 0:1]**2 + X_flat**3),
             ],
             dim=1,
         )

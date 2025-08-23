@@ -2,7 +2,10 @@ from typing_extensions import Literal
 import torch
 import scipy.stats as stats
 
-def get_quantile_level_analytically(alpha: torch.Tensor, distribution: Literal["gaussian", "ball"], dimension: int) -> torch.Tensor:
+
+def get_quantile_level_analytically(
+    alpha: torch.Tensor, distribution: Literal["gaussian", "ball"], dimension: int
+) -> torch.Tensor:
     """Function finds the radius, that is corresponding to alpha-quantile of the samples.
 
     The function is based on the fact, that the distribution of the distances is symmetric around the origin.
@@ -18,11 +21,12 @@ def get_quantile_level_analytically(alpha: torch.Tensor, distribution: Literal["
     """
     if distribution == "gaussian":
         scipy_quantile = stats.chi2.ppf(alpha.cpu().detach().numpy(), df=dimension)
-        return torch.from_numpy(scipy_quantile**(1/2))
+        return torch.from_numpy(scipy_quantile**(1 / 2))
     elif distribution == "ball":
-        return alpha**(1/dimension)
+        return alpha**(1 / dimension)
     else:
         raise ValueError(f"Distribution {distribution} is not supported.")
+
 
 def get_quantile_level_numerically(samples: torch.Tensor, alpha: float) -> float:
     """Function finds the radius, that is corresponding to alpha-quantile of the samples.

@@ -114,9 +114,8 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
         if not lr_max_steps >= 0:
             raise ValueError(f"invalid {lr_max_steps=}, must be >= 0")
 
-        if (batchsize_y and not batchsize_y > 0) or (
-            batchsize_u and not batchsize_u > 0
-        ):
+        if (batchsize_y
+            and not batchsize_y > 0) or (batchsize_u and not batchsize_u > 0):
             raise ValueError(f"invalid {batchsize_y=} or {batchsize_u}, must be > 0")
 
         self._T = T
@@ -141,8 +140,7 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
         self._dtype = torch.float64 if full_precision else torch.float32
         self._device = (
             torch.device("cuda" if device_num is None else f"cuda:{device_num}")
-            if gpu and torch.cuda.is_available()
-            else torch.device("cpu")
+            if gpu and torch.cuda.is_available() else torch.device("cpu")
         )
         self._dtd = dict(dtype=self._dtype, device=self._device)
 
@@ -162,9 +160,9 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
     def solve_vqr(self, Y: Array, X: Array) -> DiscreteCVQF:
         return self._solve(Y, X)
 
-    def _solve(
-        self, Y: Array, X: Optional[Array] = None
-    ) -> Union[DiscreteVQF, DiscreteCVQF]:
+    def _solve(self,
+               Y: Array,
+               X: Optional[Array] = None) -> Union[DiscreteVQF, DiscreteCVQF]:
 
         start_time = time()
         log_level = logging.INFO if self._verbose else logging.NOTSET
@@ -231,9 +229,7 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
         optimizer = torch.optim.SGD(
             [
                 dict(params=[*net.parameters()] if k > 0 else []),
-                dict(
-                    params=[b, psi] if k > 0 else [psi],
-                ),
+                dict(params=[b, psi] if k > 0 else [psi], ),
             ],
             lr=self._lr,
             momentum=0.9,
@@ -318,7 +314,15 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
         )
 
     def _create_solution(
-        self, T, d, k, U, phi, b, net, solution_metrics: dict = None
+        self,
+        T,
+        d,
+        k,
+        U,
+        phi,
+        b,
+        net,
+        solution_metrics: dict = None
     ) -> Union[DiscreteVQF, DiscreteCVQF]:
 
         A = phi.detach().cpu().numpy()
@@ -464,9 +468,8 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
                 )
 
                 for batch_idx in range(_num_batches(num_samples, batch_size)):
-                    batch_slice = idx[
-                        (batch_size * batch_idx) : (batch_size * (batch_idx + 1))
-                    ]
+                    batch_slice = idx[(batch_size *
+                                       batch_idx):(batch_size * (batch_idx + 1))]
 
                     if batch_size == num_samples:
                         batch_slice = sorted(batch_slice)
@@ -501,7 +504,14 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
                 # Optimize
                 optimizer.zero_grad()
                 phi_batch = self._evaluate_phi(
-                    Y_batch, U_batch, psi_batch, epsilon, X_batch, b_batch, net, UY=None
+                    Y_batch,
+                    U_batch,
+                    psi_batch,
+                    epsilon,
+                    X_batch,
+                    b_batch,
+                    net,
+                    UY=None
                 )
                 constraint_loss = phi_batch.T @ mu_batch
                 objective = psi_batch.T @ nu_batch + constraint_loss
@@ -519,7 +529,14 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
                         # T^d levels, otherwise we can't create a valid solution object
                         with torch.no_grad():
                             phi_all_levels = self._evaluate_phi(
-                                Y_batch, U, psi_batch, epsilon, X_batch, b, net, UY=None
+                                Y_batch,
+                                U,
+                                psi_batch,
+                                epsilon,
+                                X_batch,
+                                b,
+                                net,
+                                UY=None
                             )
                     self._post_iter_callback(
                         solution=self._create_solution(
@@ -608,9 +625,8 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
         with torch.no_grad():
             for batch_idx in range(num_batches_us):
                 batch_slice = idx[
-                    self._inference_batch_size
-                    * batch_idx : min(self._inference_batch_size * (batch_idx + 1), Td)
-                ]
+                    self._inference_batch_size *
+                    batch_idx:min(self._inference_batch_size * (batch_idx + 1), Td)]
                 U_batch = U[batch_slice].to(self._device)
                 b_batch = b[batch_slice].to(self._device) if b is not None else None
                 phi = self._evaluate_phi(
@@ -656,7 +672,7 @@ class MLPRegularizedDualVQRSolver(RegularizedDualVQRSolver):
 
     def __init__(
         self,
-        hidden_layers: Union[str, Sequence[int]] = (32,),
+        hidden_layers: Union[str, Sequence[int]] = (32, ),
         activation: Union[str, torch.nn.Module] = "relu",
         skip: bool = True,
         batchnorm: bool = False,

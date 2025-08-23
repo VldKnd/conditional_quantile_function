@@ -4,6 +4,7 @@ from typing import Tuple
 from datasets.protocol import Dataset
 import os
 
+
 class ConvexBananaDataset(Dataset):
     """
     Creating data in the form of a banana with x values distributed between 1 and 5.
@@ -12,18 +13,23 @@ class ConvexBananaDataset(Dataset):
     Y: 2D, derived from x and random noise.
     """
 
-    def __init__(self,
-            tensor_parameters: dict,
-            seed: int = 31337,
-            path_to_parameters: str = f"{os.path.dirname(__file__)}/parameters/convex_banana.pth",
-            *args, **kwargs
-        ):
+    def __init__(
+        self,
+        tensor_parameters: dict,
+        seed: int = 31337,
+        path_to_parameters:
+        str = f"{os.path.dirname(__file__)}/parameters/convex_banana.pth",
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.tensor_parameters = tensor_parameters
         self.path_to_parameters = path_to_parameters
         self.seed = seed
-        self.quadratic_potential = ConvexQuadraticPotential.load(path_to_parameters).to(**tensor_parameters)
-        
+        self.quadratic_potential = ConvexQuadraticPotential.load(path_to_parameters).to(
+            **tensor_parameters
+        )
+
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """
         Sample the covariates from the uniform distribution between 1 and 5.
@@ -36,8 +42,9 @@ class ConvexBananaDataset(Dataset):
         Sample the conditional distribution of the response given the covariates.
         """
 
-        u = torch.randn(size=(x.shape[0], n_points, 2)).to(**self.tensor_parameters).requires_grad_(True)
-        x_unsqueezed = x.unsqueeze(1).repeat(1, n_points, *([1]*len(x.shape[1:])))
+        u = torch.randn(size=(x.shape[0], n_points, 2)).to(**self.tensor_parameters
+                                                           ).requires_grad_(True)
+        x_unsqueezed = x.unsqueeze(1).repeat(1, n_points, *([1] * len(x.shape[1:])))
         u_potential = self.quadratic_potential(x_unsqueezed, u)
         y = torch.autograd.grad(u_potential.sum(), u)[0]
         return y
@@ -47,12 +54,13 @@ class ConvexBananaDataset(Dataset):
         Sample the joint distribution of the covariates and the response.
         """
         x = self.sample_covariates(n_points=n_points)
-        u = torch.randn(size=(x.shape[0], 2)).to(**self.tensor_parameters).requires_grad_(True)
+        u = torch.randn(size=(x.shape[0], 2)).to(**self.tensor_parameters
+                                                 ).requires_grad_(True)
         u_potential = self.quadratic_potential(x, u)
         y = torch.autograd.grad(u_potential.sum(), u)[0]
 
         return x, y
-    
+
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """

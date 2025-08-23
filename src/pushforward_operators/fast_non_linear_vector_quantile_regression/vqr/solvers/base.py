@@ -11,6 +11,7 @@ TSolver = TypeVar("TSolver", bound="Solver")
 
 
 class Solver(ABC):
+
     @classmethod
     @abstractmethod
     def solver_name(cls) -> str:
