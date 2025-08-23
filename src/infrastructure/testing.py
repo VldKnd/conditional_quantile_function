@@ -3,11 +3,8 @@ from tqdm import tqdm
 from datasets import Dataset, BananaDataset, TicTacDataset, StarDataset, ConvexBananaDataset
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
-from metrics import wassertein2, compute_hausdorff_distance
+from metrics import wassertein2
 from pushforward_operators import PushForwardOperator
-from torch.distributions import multivariate_normal
-from scipy import stats
-
 
 def test_from_json_file(
     path_to_experiment_file: str,
@@ -134,64 +131,48 @@ def sample_quantile_wasserstein2_distance(
 
 def sample_inverse_quantile_l2_distance(
     pushforward_operator: PushForwardOperator,
-    X_dataset: torch.Tensor,
-    Y_dataset: torch.Tensor,
-    U_dataset: torch.Tensor,
+    dataset: Dataset,
     number_of_samples: int,
+    number_of_points_per_estimate: int,
     verbose: bool = False
 ) -> torch.Tensor:
 
     l2_progress_bar = tqdm(
-        range(X_dataset.shape[0]),
+        range(number_of_samples),
         desc="Computing Inverse Quantile l2 distances",
         disable=not verbose
     )
     l2_metrics = []
 
-    for i in l2_progress_bar:
-        metrics_per_x = []
-        for _ in range(number_of_samples):
-            Y_batch = Y_dataset[i, :, :]
-            X_batch = X_dataset[i, :, :]
-            U_batch = U_dataset[i, :, :]
-
-            U_approximation = pushforward_operator.push_y_given_x(y=Y_batch, x=X_batch)
-            l2_distance = torch.norm((U_approximation - U_batch), dim=-1)**2
-            metrics_per_x.append(l2_distance.mean())
-
-        l2_metrics.append(torch.stack(metrics_per_x))
+    for _ in l2_progress_bar:
+        X_dataset, Y_dataset, U_dataset = dataset.sample_x_y_u(n_points=number_of_points_per_estimate)
+        U_approximation = pushforward_operator.push_y_given_x(y=Y_dataset, x=X_dataset)
+        l2_distance = torch.norm((U_approximation - U_dataset), dim=-1)**2
+        l2_metrics.append(l2_distance)
 
     return torch.stack(l2_metrics)
 
 
-def sample_quantile_l2_distance(
+def sample_inverse_quantile_l2_distance(
     pushforward_operator: PushForwardOperator,
-    X_dataset: torch.Tensor,
-    Y_dataset: torch.Tensor,
-    U_dataset: torch.Tensor,
+    dataset: Dataset,
     number_of_samples: int,
+    number_of_points_per_estimate: int,
     verbose: bool = False
 ) -> torch.Tensor:
 
     l2_progress_bar = tqdm(
-        range(X_dataset.shape[0]),
-        desc="Computing Quantile l2 distances",
+        range(number_of_samples),
+        desc="Computing Inverse Quantile l2 distances",
         disable=not verbose
     )
     l2_metrics = []
 
-    for i in l2_progress_bar:
-        metrics_per_x = []
-        for _ in range(number_of_samples):
-            Y_batch = Y_dataset[i, :, :]
-            X_batch = X_dataset[i, :, :]
-            U_batch = U_dataset[i, :, :]
-
-            Y_approximation = pushforward_operator.push_u_given_x(u=U_batch, x=X_batch)
-            l2_distance = torch.norm((Y_approximation - Y_batch), dim=-1)**2
-            metrics_per_x.append(l2_distance.mean())
-
-        l2_metrics.append(torch.stack(metrics_per_x))
+    for _ in l2_progress_bar:
+        X_dataset, Y_dataset, U_dataset = dataset.sample_x_y_u(n_points=number_of_points_per_estimate)
+        U_approximation = pushforward_operator.push_y_given_x(y=Y_dataset, x=X_dataset)
+        l2_distance = torch.norm((U_approximation - U_dataset), dim=-1)**2
+        l2_metrics.append(l2_distance)
 
     return torch.stack(l2_metrics)
 
@@ -200,7 +181,6 @@ def test_on_synthetic_dataset(
     experiment: Experiment,
     exclude_wasserstein2: bool = False,
     exclude_l2_distance: bool = False,
-    exclude_quantile_similarity: bool = False,
     verbose: bool = False
 ) -> dict:
     """
@@ -209,7 +189,6 @@ def test_on_synthetic_dataset(
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
     )
-    number_of_covariates_per_dimension = 10
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
 
@@ -219,28 +198,12 @@ def test_on_synthetic_dataset(
         device=experiment.tensor_parameters["device"]
     )
     random_number_generator.manual_seed(42)
-
-    _, _Y = dataset.sample_joint(1)
-    X = dataset.meshgrid_of_covariates(number_of_covariates_per_dimension)
-
-    U_dataset = torch.randn(
-        number_of_covariates_per_dimension,
-        2000,
-        _Y.shape[-1],
-        generator=random_number_generator,
-        **experiment.tensor_parameters
-    )
-    X_dataset = X.unsqueeze(1).repeat(1, 2000, 1).to(**experiment.tensor_parameters)
-    Y_dataset = dataset.push_u_given_x(u=U_dataset, x=X_dataset)
-
     try:
         if not exclude_l2_distance:
             metrics["inverse_quantile"]["l2_distance"
                                         ] = sample_inverse_quantile_l2_distance(
                                             pushforward_operator=pushforward_operator,
-                                            X_dataset=X_dataset,
-                                            Y_dataset=Y_dataset,
-                                            U_dataset=U_dataset,
+                                            dataset=dataset,
                                             number_of_samples=1,
                                             verbose=verbose
                                         )
@@ -254,8 +217,7 @@ def test_on_synthetic_dataset(
             metrics["inverse_quantile"][
                 "wasserstein2"] = sample_inverse_quantile_wasserstein2_distance(
                     pushforward_operator=pushforward_operator,
-                    X_dataset=X_dataset,
-                    Y_dataset=Y_dataset,
+                    dataset=dataset,
                     number_of_samples=1,
                     verbose=verbose
                 )
@@ -268,9 +230,7 @@ def test_on_synthetic_dataset(
         if not exclude_l2_distance:
             metrics["quantile"]["l2_distance"] = sample_quantile_l2_distance(
                 pushforward_operator=pushforward_operator,
-                X_dataset=X_dataset,
-                Y_dataset=Y_dataset,
-                U_dataset=U_dataset,
+                dataset=dataset,
                 number_of_samples=1,
                 verbose=verbose
             )
@@ -283,8 +243,7 @@ def test_on_synthetic_dataset(
         if not exclude_wasserstein2:
             metrics["quantile"]["wasserstein2"] = sample_quantile_wasserstein2_distance(
                 pushforward_operator=pushforward_operator,
-                X_dataset=X_dataset,
-                Y_dataset=Y_dataset,
+                dataset=dataset,
                 number_of_samples=1,
                 verbose=verbose
             )

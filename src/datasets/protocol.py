@@ -1,5 +1,5 @@
 import torch
-from typing import Union
+from typing import Tuple
 
 
 class Dataset:
@@ -9,7 +9,7 @@ class Dataset:
     ):
         ...
 
-    def sample_joint(self, n_points: int) -> Union[torch.Tensor, torch.Tensor]:
+    def sample_joint(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             Returns:
             (x, y) - Union[torch.Tensor[n, k], torch.Tensor[n, p]]
@@ -44,6 +44,9 @@ class Dataset:
         """
         pass
 
+    def sample_x_y_u(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        ...
+    
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
         Push forward the conditional distribution of the covariates given the response.
