@@ -128,6 +128,7 @@ class FFNN(nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         activation_function_name: str,
+        output_dimension: int = 1,
         *args, 
         **kwargs,
     ):
@@ -145,7 +146,7 @@ class FFNN(nn.Module):
             nn.Linear(response_dimension + feature_dimension, hidden_dimension),
             self.activation_function,
             *hidden_layers,
-            nn.Linear(hidden_dimension, 1)
+            nn.Linear(hidden_dimension, output_dimension)
         )
 
     def forward(self, condition: torch.Tensor, tensor: torch.Tensor):

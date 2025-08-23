@@ -13,6 +13,7 @@ from pushforward_operators import (
     UnconstrainedAmortizedOTQuantileRegression,
     LinearVectorQuantileRegression,
     FastNonLinearVectorQuantileRegression,
+    MongeGapTransport,
 )
 
 name_to_dataset_map: dict[str, Dataset] = {
@@ -29,4 +30,5 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "linear_vector_quantile_regression": LinearVectorQuantileRegression,
     "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression, # Paragraph 2.4.4
     "unconstrained_amortized_optimal_transport_quantile_regression": UnconstrainedAmortizedOTQuantileRegression, # Amortized varient of Paragraph 2.4.4, https://arxiv.org/abs/2210.12153
+    "monge_gap_transport": MongeGapTransport,
 }
