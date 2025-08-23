@@ -23,6 +23,7 @@ dependencies = [
     "torchaudio>=2.7.1",
     "torchvision>=0.22.1",
     "tqdm>=4.67.1",
+    "taskipy>=1.14.1",
     "yapf>=0.40.2"
 ]
 
@@ -36,9 +37,3 @@ dedent_closing_brackets = true
 
 [tool.uv]
 package = true
-
-[dependency-groups]
-dev = [
-    "taskipy>=1.14.1",
-    "yapf>=0.40.2"
-]

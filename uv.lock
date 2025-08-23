@@ -1918,16 +1918,11 @@ dependencies = [
     { name = "pyqt6" },
     { name = "scikit-learn" },
     { name = "scipy" },
+    { name = "taskipy" },
     { name = "torch" },
     { name = "torchaudio" },
     { name = "torchvision" },
     { name = "tqdm" },
-    { name = "yapf" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "taskipy" },
     { name = "yapf" },
 ]
 
@@ -1947,16 +1942,11 @@ requires-dist = [
     { name = "pyqt6", specifier = ">=6.9.1" },
     { name = "scikit-learn", specifier = ">=1.7.0" },
     { name = "scipy", specifier = ">=1.16.0" },
+    { name = "taskipy", specifier = ">=1.14.1" },
     { name = "torch", specifier = ">=2.7.1" },
     { name = "torchaudio", specifier = ">=2.7.1" },
     { name = "torchvision", specifier = ">=0.22.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "yapf", specifier = ">=0.40.2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "taskipy", specifier = ">=1.14.1" },
     { name = "yapf", specifier = ">=0.40.2" },
 ]
 
