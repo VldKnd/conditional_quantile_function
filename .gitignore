@@ -1,5 +1,9 @@
+# PyCharm
+.idea
+
 # Archives
 *.tar.gz
+*.zip
 
 # Mac OS
 .DS_Store
