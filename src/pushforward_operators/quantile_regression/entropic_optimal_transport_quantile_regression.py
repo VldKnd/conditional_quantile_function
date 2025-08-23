@@ -106,6 +106,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
                     Y_scaled = self.Y_scaler(Y_batch)
                     U_batch = torch.randn_like(Y_scaled)
 
+
                     potential_network_optimizer.zero_grad()
                     psi = self.estimate_psi(X_tensor=X_scaled, Y_tensor=Y_scaled, U_tensor=U_batch)
                     phi = self.estimate_phi(X_tensor=X_scaled, Y_tensor=Y_scaled, U_tensor=U_batch)

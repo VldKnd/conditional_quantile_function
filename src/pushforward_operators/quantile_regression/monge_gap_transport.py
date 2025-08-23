@@ -1,25 +1,11 @@
 import torch.nn as nn
 import torch
+from geomloss import SamplesLoss 
 from tqdm import trange
 from typing import Literal
 from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
-import ot
-from geomloss import SamplesLoss
 from pushforward_operators.picnn import FFNN
-
-def optimal_transport_plan(ground_truth: torch.Tensor, approximation: torch.Tensor) -> torch.Tensor:
-    """
-    Computes the Wasserstein distance between two sets of points.
-
-    Args:
-        ground_truth (torch.Tensor): The ground truth points.
-        approximation (torch.Tensor): The approximation points.
-
-    Returns:
-        float: The Wasserstein distance between the two sets of points.
-    """
-    return ot.solve_sample(X_a=ground_truth, X_b=approximation).plan
 
 class MongeMapNetwork(nn.Module):
     def __init__(self,
@@ -39,11 +25,11 @@ class MongeMapNetwork(nn.Module):
             output_dimension=response_dimension
         )
 
-    def pushforward(self, tensor: torch.Tensor, condition: torch.Tensor) -> torch.Tensor:
+    def pushforward(self, condition: torch.Tensor, tensor: torch.Tensor) -> torch.Tensor:
         return tensor - self.monge_map_network(condition, tensor)
 
-    def forward(self, tensor: torch.Tensor, condition: torch.Tensor) -> torch.Tensor:
-        return self.monge_map_network(tensor, condition)
+    def forward(self,condition: torch.Tensor, tensor: torch.Tensor) -> torch.Tensor:
+        return self.monge_map_network(condition, tensor)
 
 class MongeGapTransport(PushForwardOperator, nn.Module):
     def __init__(self,
@@ -53,6 +39,8 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             number_of_hidden_layers: int,
             activation_function_name: str = "Softplus",
             potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
+            jacobian_weight: float = 1e-1,
+            monge_gap_weight: float = 1e-1 
         ):
         super().__init__()
         self.init_dict = {
@@ -61,11 +49,10 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             "hidden_dimension": hidden_dimension,
             "number_of_hidden_layers": number_of_hidden_layers,
             "activation_function_name": activation_function_name,
-            "potential_to_estimate_with_neural_network":potential_to_estimate_with_neural_network
+            "potential_to_estimate_with_neural_network": potential_to_estimate_with_neural_network,
+            "jacobian_weight": jacobian_weight,
+            "monge_gap_weight": monge_gap_weight
         }
-
-        self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
-        self.X_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network 
         self.monge_map_network = MongeMapNetwork(
             feature_dimension=feature_dimension,
@@ -74,23 +61,16 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             number_of_hidden_layers=number_of_hidden_layers,
             activation_function_name=activation_function_name
         )
-        self.sinkhorn = SamplesLoss(
-            loss="sinkhorn",   
+        self.sinkhorn_divergence = SamplesLoss(
+            loss="sinkhorn",
             p=2,
-            blur=0.05,
-            scaling=0.9,
-            debias=True
+            blur=0.05
         )
-                
-    def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
-        """Run over the data (no grad) to populate BatchNorm running stats."""
-        self.X_scaler.train(), self.Y_scaler.train()
+        self.jacobian_weight = jacobian_weight
+        self.monge_gap_weight = monge_gap_weight
 
-        with torch.no_grad():
-            for X, Y in dataloader:
-                _, _ = self.Y_scaler(Y), self.X_scaler(X)
-
-        self.X_scaler.eval(), self.Y_scaler.eval()
+        self.X_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
+        self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
     def make_progress_bar_message(self, training_information: list[dict], epoch_idx:int, last_learning_rate: float | None):
         running_mean_objective = sum([information["objective"] for information in training_information[-10:]]) / len(training_information[-10:])
@@ -104,6 +84,16 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             if last_learning_rate is not None
             else ""
         )
+
+    def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
+        """Run over the data (no grad) to populate BatchNorm running stats."""
+        self.X_scaler.train(), self.Y_scaler.train()
+
+        with torch.no_grad():
+            for X, Y in dataloader:
+                _, _ = self.Y_scaler(Y), self.X_scaler(X)
+
+        self.X_scaler.eval(), self.Y_scaler.eval()
 
     def fit(self, dataloader: torch.utils.data.DataLoader, train_parameters: TrainParameters, *args, **kwargs):
         """Fits the pushforward operator to the data.
@@ -133,36 +123,44 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
         progress_bar = trange(1, number_of_epochs_to_train+1, desc="Training", disable=not verbose)
         
         for epoch_idx in progress_bar:
+                progress_bar.set_description(f"Epoch {epoch_idx}")
                 for X_batch, Y_batch in dataloader:
                     X_scaled = self.X_scaler(X_batch)
                     Y_scaled = self.Y_scaler(Y_batch)
+
                     U_batch = torch.randn_like(Y_scaled)
 
-                    Y_pushforward = self.monge_map_network.pushforward(Y_scaled, X_scaled)
+                    if self.potential_to_estimate_with_neural_network == "y":
+                        Y_pushforward = self.monge_map_network.pushforward(X_scaled, Y_scaled)
+                        fitting_cost = self.sinkhorn_divergence(U_batch, Y_pushforward)
+                    else:
+                        U_pushforward = self.monge_map_network.pushforward(X_scaled, U_batch)
+                        fitting_cost = self.sinkhorn_divergence(U_pushforward, Y_batch)
 
-                    fitting_cost = self.sinkhorn(U_batch, Y_pushforward)
+                    sample_for_c_optimality = torch.randn_like(Y_scaled)
+                    pushforward_for_c_optimality = self.monge_map_network.pushforward(X_scaled, sample_for_c_optimality)
                     c_optimality_cost = (
-                        torch.mean(
-                            torch.norm(Y_scaled - Y_pushforward, dim=1)**2
-                        ) -  self.sinkhorn(Y_scaled, Y_pushforward)
+                        (sample_for_c_optimality - pushforward_for_c_optimality).norm(dim=1).pow(2).mean()
+                        - self.sinkhorn_divergence(sample_for_c_optimality, pushforward_for_c_optimality)
                     )
 
-                    # jvp_vector, vjp_vector = torch.randn_like(U_batch), torch.randn_like(U_batch)
+                    if self.potential_to_estimate_with_neural_network == "y":
+                        input_for_jacobian = Y_scaled
+                    else:
+                        input_for_jacobian = U_batch
 
-                    # _, monge_map_network_jvp = torch.autograd.functional.jvp(
-                    #     lambda y: self.monge_map_network(y, X_scaled),
-                    #     Y_scaled, jvp_vector, create_graph=True
-                    # )
-
-                    # _, monge_map_network_vjp = torch.autograd.functional.vjp(
-                    #     lambda y: self.monge_map_network(y, X_scaled),
-                    #     Y_scaled, vjp_vector, create_graph=True
-                    # )
-
-                    # jaccobian_cost = torch.mean(torch.norm(monge_map_network_jvp - monge_map_network_vjp, dim=1))
+                    f_single = lambda x, y: self.monge_map_network(x.unsqueeze(0), y.unsqueeze(0)).squeeze(0)
+                    jacobian_function = torch.func.jacrev(f_single, argnums=1)
+                    vectorized_jacobian_function = torch.vmap(jacobian_function)
+                    jacobian: torch.Tensor = vectorized_jacobian_function(X_scaled, input_for_jacobian)
+                    jacobian_cost = torch.mean(torch.norm(jacobian - jacobian.transpose(1, 2), dim=(1, 2)))
 
                     monge_map_network_optimizer.zero_grad()
-                    monge_map_network_objective = fitting_cost + 0.1 * c_optimality_cost
+                    monge_map_network_objective: torch.Tensor = (
+                        fitting_cost
+                        + self.jacobian_weight * jacobian_cost
+                        +  self.monge_gap_weight * c_optimality_cost
+                    )
                     monge_map_network_objective.backward()
                     torch.nn.utils.clip_grad.clip_grad_norm_(self.monge_map_network.parameters(), max_norm=10)
                     monge_map_network_optimizer.step()
@@ -171,37 +169,42 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
                         monge_map_network_scheduler.step()
 
                     if verbose: 
+                        training_information.append({ "objective": monge_map_network_objective.item() })
 
-                        training_information.append({
-                                "objective": monge_map_network_objective.item(),
-                                "epoch_index": epoch_idx
-                        })
+                        running_mean_objective = sum([info["objective"] for info in training_information[-10:]]) / len(training_information[-10:])
 
-                        last_learning_rate = (
-                            monge_map_network_scheduler.get_last_lr() 
-                            if monge_map_network_scheduler is not None
-                            else None
-                        )
-                        
-                        progress_bar_message = self.make_progress_bar_message(
-                            training_information=training_information,
-                            epoch_idx=epoch_idx,
-                            last_learning_rate=last_learning_rate
-                        )
+                        postfix_dict = {"Objective": f"{running_mean_objective:.3f}"}
+                        if monge_map_network_scheduler is not None:
+                            last_lr = monge_map_network_scheduler.get_last_lr()[0]
+                            postfix_dict["LR"] = f"{last_lr:.6f}"
 
-                        progress_bar.set_description(progress_bar_message)
+                        progress_bar.set_postfix(postfix_dict)
 
         progress_bar.close()
         return self
     
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
-        y_scaled, x_scaled = self.Y_scaler(y), self.X_scaler(x)
-        return self.monge_map_network.pushforward(y_scaled, x_scaled)
-    
+        if self.potential_to_estimate_with_neural_network == "y":
+            x_scaled = self.X_scaler(x)
+            y_scaled = self.Y_scaler(y)
+
+            return self.monge_map_network.pushforward(x_scaled, y_scaled)
+        else:
+            raise NotImplementedError("Not implemented")
+        
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
-        raise NotImplementedError("Not implemented")
+        if self.potential_to_estimate_with_neural_network == "u":
+            x_scaled = self.X_scaler(x)
+
+            y_scaled_pred = self.monge_map_network.pushforward(x_scaled, u)
+            var = self.Y_scaler.running_var.view(1, -1)
+            mean = self.Y_scaler.running_mean.view(1, -1)
+            
+            return y_scaled_pred * torch.sqrt(var + self.Y_scaler.eps) + mean
+        else:
+            raise NotImplementedError("Not implemented")
 
     def save(self, path: str):
         """Saves the pushforward operator to a file.
