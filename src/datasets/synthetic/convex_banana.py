@@ -59,16 +59,15 @@ class ConvexBananaDataset(Dataset):
         u_potential = self.quadratic_potential(x, u)
         y = torch.autograd.grad(u_potential.sum(), u)[0]
         return x, y
-    
+
     def sample_x_y_u(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.sample_covariates(n_points=n_points)
-        u = torch.randn(size=(x.shape[0], 2)).to(
-            **self.tensor_parameters
-        ).requires_grad_(True)
+        u = torch.randn(size=(x.shape[0], 2)).to(**self.tensor_parameters
+                                                 ).requires_grad_(True)
         u_potential = self.quadratic_potential(x, u)
         y = torch.autograd.grad(u_potential.sum(), u)[0]
         return x, y, u
-    
+
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
