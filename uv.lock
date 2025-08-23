@@ -338,6 +338,16 @@ wheels = [
 ]
 
 [[package]]
+name = "geomloss"
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a1/f4/f888e6a2f59da7e743b93532aa90a8b02bc7f828273263014b8e7bb3e1c1/geomloss-0.2.6.tar.gz", hash = "sha256:491c47085c5001b2cb6128ea541fd2d0a8808ae50e88a0798c7853c9d995faeb", size = 26752, upload-time = "2023-04-28T17:25:34.545Z" }
+
+[[package]]
 name = "ipykernel"
 version = "6.29.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1833,6 +1843,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cartopy" },
     { name = "cvxpy" },
+    { name = "geomloss" },
     { name = "ipykernel" },
     { name = "ipympl" },
     { name = "ipywidgets" },
@@ -1854,6 +1865,7 @@ dependencies = [
 requires-dist = [
     { name = "cartopy", specifier = ">=0.24.1" },
     { name = "cvxpy", specifier = ">=1.7.1" },
+    { name = "geomloss", specifier = ">=0.2.6" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "ipympl", specifier = ">=0.9.7" },
     { name = "ipywidgets", specifier = ">=8.1.7" },
