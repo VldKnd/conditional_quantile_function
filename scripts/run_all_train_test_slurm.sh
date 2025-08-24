@@ -74,6 +74,7 @@ function wait_for_jobs {
 for CFG in "${CONFIGS[@]}"; do
   wait_for_jobs "$MAX_JOBS"
   sbatch "${SBATCH_OPTS[@]}" "$SLURM_SCRIPT" "$CFG" "$LOG_DIR" "$MODE" "${PASS_ARGS[@]}"
+  sleep 1
 done
 
 echo "Submitted $NUM_CONFIGS configs as individual Slurm jobs (max $MAX_JOBS concurrent submissions)."
