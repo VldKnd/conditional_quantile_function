@@ -32,3 +32,32 @@ pip install -r requirements.txt
 * src/ - Folder with main code snippets used in notebooks and experiments.
 * poc/ - Notebooks with different experiments with Optimal Transport approach to quantile regression.
 
+### Commit messages:
+```
+Format: 
+* <type>(<scope>): <subject>
+* <type>: <subject> 
+```
+
+Example
+```
+feat(my_feature_name): adds new cool feature
+^--^  ^------------^   ^-------------------^
+|     |                 |
+|     |                 +-> Description in present tense
+|     |
+|     +-> Optional scope of the commit
+|
++-------> Type: chore, docs, feat, fix, refactor, style, or test.
+```
+
+More Examples:
+```
+- feat: (new feature for the user, not a new feature for build script)
+- fix(optimal_transport): (bug fix for the user, not a fix to a build script)
+- docs(conformal): (changes to the documentation)
+- style: (formatting, missing semi colons, etc; no production code change)
+- refactor(conformal): (refactoring production code, eg. renaming a variable)
+- test: (adding missing tests, refactoring tests; no production code change)
+- chore: (updating grunt tasks etc; no production code change)
+```
