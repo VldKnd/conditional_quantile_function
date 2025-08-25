@@ -1,5 +1,5 @@
 import torch
-from datasets.synthetic.utils.quadratic_potential import ConvexQuadraticPotential
+from datasets.synthetic.utils import ConvexQuadraticPotential
 from typing import Tuple
 from datasets.protocol import Dataset
 import os

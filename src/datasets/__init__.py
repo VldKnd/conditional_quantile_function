@@ -1,4 +1,4 @@
-from datasets.synthetic.other import (
+from datasets.synthetic.custom import (
     NotConditionalBananaDataset,
     BananaDataset,
     TicTacDataset,
