@@ -48,7 +48,7 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
         activation_function_name: str = "Softplus",
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
         jacobian_weight: float = 1e-1,
-        monge_gap_weight: float = 1e-1
+        c_optimality_weight: float = 1e-1
     ):
         super().__init__()
         self.init_dict = {
@@ -60,7 +60,7 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             "potential_to_estimate_with_neural_network":
             potential_to_estimate_with_neural_network,
             "jacobian_weight": jacobian_weight,
-            "monge_gap_weight": monge_gap_weight
+            "c_optimality_weight": c_optimality_weight
         }
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network
         self.monge_map_network = MongeMapNetwork(
@@ -72,10 +72,7 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
         )
         self.sinkhorn_divergence = SamplesLoss(loss="sinkhorn", p=2, blur=0.05)
         self.jacobian_weight = jacobian_weight
-        self.monge_gap_weight = monge_gap_weight
-
-        self.X_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
-        self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
+        self.c_optimality_weight = c_optimality_weight
 
     def make_progress_bar_message(
         self, training_information: list[dict], epoch_idx: int,
@@ -94,16 +91,6 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             if last_learning_rate is not None
             else ""
         )
-
-    def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
-        """Run over the data (no grad) to populate BatchNorm running stats."""
-        self.X_scaler.train(), self.Y_scaler.train()
-
-        with torch.no_grad():
-            for X, Y in dataloader:
-                _, _ = self.Y_scaler(Y), self.X_scaler(X)
-
-        self.X_scaler.eval(), self.Y_scaler.eval()
 
     def fit(
         self, dataloader: torch.utils.data.DataLoader,
@@ -132,44 +119,69 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
             monge_map_network_scheduler = None
 
         training_information = []
-        self.warmup_scalers(dataloader=dataloader)
         progress_bar = trange(
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
+        X_previous, Y_previous = next(iter(dataloader))
 
         for epoch_idx in progress_bar:
             progress_bar.set_description(f"Epoch {epoch_idx}")
             for X_batch, Y_batch in dataloader:
-                X_scaled = self.X_scaler(X_batch)
-                Y_scaled = self.Y_scaler(Y_batch)
 
-                U_batch = torch.randn_like(Y_scaled)
+                U_batch = torch.randn_like(Y_batch)
 
                 if self.potential_to_estimate_with_neural_network == "y":
-                    Y_pushforward = self.monge_map_network.pushforward(
-                        X_scaled, Y_scaled
-                    )
+                    Y_pushforward = self.monge_map_network.pushforward(X_batch, Y_batch)
                     fitting_cost = self.sinkhorn_divergence(U_batch, Y_pushforward)
                 else:
-                    U_pushforward = self.monge_map_network.pushforward(
-                        X_scaled, U_batch
-                    )
+                    U_pushforward = self.monge_map_network.pushforward(X_batch, U_batch)
                     fitting_cost = self.sinkhorn_divergence(U_pushforward, Y_batch)
 
-                sample_for_c_optimality = torch.randn_like(Y_scaled)
-                pushforward_for_c_optimality = self.monge_map_network.pushforward(
-                    X_scaled, sample_for_c_optimality
+                if self.potential_to_estimate_with_neural_network == "y":
+                    condition_sample_for_c_optimality = X_previous[:X_batch.shape[0]]
+                    tensor_sample_for_c_optimality = Y_previous[:X_batch.shape[0]]
+                    if X_batch.shape[0] == X_previous.shape[0]:
+                        X_previous, Y_previous = X_batch.clone(), Y_batch.clone()
+                else:
+                    condition_sample_for_c_optimality = X_previous[:U_batch.shape[0]]
+                    tensor_sample_for_c_optimality = torch.randn_like(U_batch)
+                    if X_batch.shape[0] == X_previous.shape[0]:
+                        X_previous = X_batch.clone()
+
+                pairwise_distances = torch.cdist(
+                    condition_sample_for_c_optimality, condition_sample_for_c_optimality
                 )
-                c_optimality_cost = (
-                    (sample_for_c_optimality -
-                     pushforward_for_c_optimality).norm(dim=1).pow(2).mean() -
-                    self.sinkhorn_divergence(
-                        sample_for_c_optimality, pushforward_for_c_optimality
-                    )
+                _, neighbor_indices = torch.topk(
+                    pairwise_distances, 10, dim=1, largest=False
                 )
 
+                condition_sample_for_c_optimality_neighbor_groups = \
+                    condition_sample_for_c_optimality[neighbor_indices]
+
+                tensor_sample_for_c_optimality_neighbor_groups = \
+                    tensor_sample_for_c_optimality[neighbor_indices]
+
+                pushed_tensor_for_c_optimality_neighbor_groups = self.monge_map_network.pushforward(
+                    condition_sample_for_c_optimality_neighbor_groups,
+                    tensor_sample_for_c_optimality_neighbor_groups
+                )
+
+                c_optimality_cost_term = (
+                    tensor_sample_for_c_optimality_neighbor_groups -
+                    pushed_tensor_for_c_optimality_neighbor_groups
+                ).norm(dim=-1).pow(2).mean(dim=1)
+
+                c_optimality_sinkhorn_term = self.sinkhorn_divergence(
+                    tensor_sample_for_c_optimality_neighbor_groups,
+                    pushed_tensor_for_c_optimality_neighbor_groups
+                )
+
+                c_optimality_cost = (
+                    c_optimality_cost_term - c_optimality_sinkhorn_term
+                ).mean()
+
                 if self.potential_to_estimate_with_neural_network == "y":
-                    input_for_jacobian = Y_scaled
+                    input_for_jacobian = Y_batch
                 else:
                     input_for_jacobian = U_batch
 
@@ -179,7 +191,7 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
                 jacobian_function = torch.func.jacrev(f_single, argnums=1)
                 vectorized_jacobian_function = torch.vmap(jacobian_function)
                 jacobian: torch.Tensor = vectorized_jacobian_function(
-                    X_scaled, input_for_jacobian
+                    X_batch, input_for_jacobian
                 )
                 jacobian_cost = torch.mean(
                     torch.norm(jacobian - jacobian.transpose(1, 2), dim=(1, 2))
@@ -188,7 +200,7 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
                 monge_map_network_optimizer.zero_grad()
                 monge_map_network_objective: torch.Tensor = (
                     fitting_cost + self.jacobian_weight * jacobian_cost +
-                    self.monge_gap_weight * c_optimality_cost
+                    self.c_optimality_weight * c_optimality_cost
                 )
                 monge_map_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(
@@ -221,23 +233,14 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
         if self.potential_to_estimate_with_neural_network == "y":
-            x_scaled = self.X_scaler(x)
-            y_scaled = self.Y_scaler(y)
-
-            return self.monge_map_network.pushforward(x_scaled, y_scaled)
+            return self.monge_map_network.pushforward(x, y)
         else:
             raise NotImplementedError("Not implemented")
 
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
         if self.potential_to_estimate_with_neural_network == "u":
-            x_scaled = self.X_scaler(x)
-
-            y_scaled_pred = self.monge_map_network.pushforward(x_scaled, u)
-            var = self.Y_scaler.running_var.view(1, -1)
-            mean = self.Y_scaler.running_mean.view(1, -1)
-
-            return y_scaled_pred * torch.sqrt(var + self.Y_scaler.eps) + mean
+            return self.monge_map_network.pushforward(x, u)
         else:
             raise NotImplementedError("Not implemented")
 

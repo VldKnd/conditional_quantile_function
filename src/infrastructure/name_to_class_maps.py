@@ -4,6 +4,7 @@ from datasets import (
     Dataset,
     ConvexBananaDataset,
     StarDataset,
+    NotConditionalBananaDataset,
 )
 from pushforward_operators import (
     PushForwardOperator,
@@ -13,7 +14,6 @@ from pushforward_operators import (
     UnconstrainedAmortizedOTQuantileRegression,
     LinearVectorQuantileRegression,
     FastNonLinearVectorQuantileRegression,
-    MongeGapTransport,
 )
 
 # yapf: disable
@@ -22,6 +22,7 @@ name_to_dataset_map: dict[str, Dataset] = {
     "tictac": TicTacDataset,
     "convex_banana": ConvexBananaDataset,
     "star": StarDataset,
+    "not_conditional_banana": NotConditionalBananaDataset,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
@@ -31,6 +32,5 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "linear_vector_quantile_regression": LinearVectorQuantileRegression,
     "unconstrained_optimal_transport_quantile_regression": UnconstrainedOTQuantileRegression,  # Paragraph 2.4.4
     "unconstrained_amortized_optimal_transport_quantile_regression": UnconstrainedAmortizedOTQuantileRegression,  # Amortized varient of Paragraph 2.4.4, https://arxiv.org/abs/2210.12153
-    "monge_gap_transport": MongeGapTransport, # Monge gap transport # https://arxiv.org/pdf/2302.04953
 }
 # yapf: enable
