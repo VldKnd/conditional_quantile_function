@@ -14,14 +14,18 @@ class Dataset:
             Returns:
             (x, y) - Union[torch.Tensor[n, k], torch.Tensor[n, p]]
         """
-        pass
+        raise NotImplementedError(
+            "Sampling of joint distribution is not implemented for this dataset."
+        )
 
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """
             Returns:
             torch.Tensor[n, k]
         """
-        pass
+        raise NotImplementedError(
+            "Sampling of covariates is not implemented for this dataset."
+        )
 
     def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
         """
@@ -30,7 +34,9 @@ class Dataset:
             Returns:
             torch.Tensor[n, k]
         """
-        pass
+        raise NotImplementedError(
+            "Sampling of covariates is not implemented for this dataset."
+        )
 
     def sample_conditional(self, n_points: int, x: torch.Tensor) -> torch.Tensor:
         """Sample conditional distribution from y|x.
@@ -42,11 +48,21 @@ class Dataset:
         Returns:
             torch.Tensor[n, p]: Conditional sample
         """
-        pass
+        raise NotImplementedError(
+            "Sampling of conditional distribution is not implemented for this dataset."
+        )
 
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        ...
+        """
+        Samples triple (x, y, u), where y = f(x, u).
+
+        Returns:
+            (x, y, u) - Union[torch.Tensor[n, k], torch.Tensor[n, p], torch.Tensor[n, q]]
+        """
+        raise NotImplementedError(
+            "Sampling of x, y, u is not implemented for this dataset."
+        )
 
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
