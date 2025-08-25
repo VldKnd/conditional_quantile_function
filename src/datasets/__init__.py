@@ -2,7 +2,6 @@ from datasets.synthetic.other import (
     NotConditionalBananaDataset,
     BananaDataset,
     TicTacDataset,
-    StarDataset,
 )
 
 from datasets.synthetic.convex import ConvexBananaDataset
@@ -13,6 +12,5 @@ __all__ = [
     "ConvexBananaDataset",
     "TicTacDataset",
     "Dataset",
-    "StarDataset",
     "NotConditionalBananaDataset",
 ]
