@@ -4,8 +4,8 @@
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-from pushforward_operators.cpflow.distributions import log_standard_normal
-from pushforward_operators.cpflow.cpflows import DeepConvexFlow
+from pushforward_operators.convex_potential_flow.distributions import log_standard_normal
+from pushforward_operators.convex_potential_flow.cpflows import DeepConvexFlow
 
 _scaling_min = 0.001
 

@@ -4,7 +4,7 @@ from pushforward_operators.neural_quantile_regression import (
     EntropicNeuralQuantileRegression,
     AmortizedNeuralQuantileRegression,
 )
-from pushforward_operators.cpflow.core_flow import CPFlow
+from pushforward_operators.convex_potential_flow.core_flow import CPFlow
 from pushforward_operators.linear_quantile_regression import LinearQuantileRegression
 from pushforward_operators.protocol import PushForwardOperator
 from pushforward_operators.mean_quantile_regression import MeanQuantileRegression

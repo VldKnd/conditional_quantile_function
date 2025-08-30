@@ -8,8 +8,8 @@ import torch.nn.init as init
 # noinspection PyPep8Naming
 import torch.nn.functional as F
 import numpy as np
-from pushforward_operators.cpflow.flows import ActNormNoLogdet
-from pushforward_operators.cpflow.functional import log_sum_exp
+from pushforward_operators.convex_potential_flow.flows import ActNormNoLogdet
+from pushforward_operators.convex_potential_flow.functional import log_sum_exp
 
 
 def symm_softplus(x, softplus_=torch.nn.functional.softplus):
