@@ -17,6 +17,7 @@ from pushforward_operators import (
     NeuralQuantileRegression,
     LinearQuantileRegression,
     FastNonLinearVectorQuantileRegression,
+    MeanQuantileRegression,
 )
 
 # yapf: disable
@@ -38,5 +39,6 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "linear_quantile_regression": LinearQuantileRegression,
     "neural_quantile_regression": NeuralQuantileRegression,
     "amortized_neural_quantile_regression": AmortizedNeuralQuantileRegression,
+    "mean_quantile_regression": MeanQuantileRegression,
 }
 # yapf: enable
