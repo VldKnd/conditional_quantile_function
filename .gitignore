@@ -8,6 +8,7 @@
 data/
 
 # Experiments
+notebooks/sandbox.ipynb
 experiments/
 experiments*/
 
