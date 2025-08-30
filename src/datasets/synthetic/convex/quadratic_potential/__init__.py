@@ -1,0 +1,3 @@
+from datasets.synthetic.convex.quadratic_potential.convex_banana import QuadraticPotentialConvexBananaDataset
+
+__all__ = ["QuadraticPotentialConvexBananaDataset"]

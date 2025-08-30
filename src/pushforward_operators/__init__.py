@@ -1,17 +1,19 @@
-from pushforward_operators.quantile_regression.entropic_optimal_transport_quantile_regression import EntropicOTQuantileRegression
 from pushforward_operators.fast_non_linear_vector_quantile_regression import FastNonLinearVectorQuantileRegression
-from pushforward_operators.quantile_regression.unconstrained_optimal_transport_quantile_regression import UnconstrainedOTQuantileRegression
-from pushforward_operators.quantile_regression.unconstrained_amortized_optimal_transport_quantile_regression import UnconstrainedAmortizedOTQuantileRegression
+from pushforward_operators.neural_quantile_regression import (
+    NeuralQuantileRegression,
+    EntropiсNeuralQuantileRegression,
+    AmortizedNeuralQuantileRegression,
+)
 from pushforward_operators.cpflow.core_flow import CPFlow
-from pushforward_operators.quantile_regression.linear_quantile_regression import LinearVectorQuantileRegression
+from pushforward_operators.linear_vector_quantile_regression import LinearQuantileRegression
 from pushforward_operators.protocol import PushForwardOperator
 
 __all__ = [
-    "EntropicOTQuantileRegression",
-    "UnconstrainedOTQuantileRegression",
-    "LinearVectorQuantileRegression",
+    "EntropiсNeuralQuantileRegression",
+    "AmortizedNeuralQuantileRegression",
+    "NeuralQuantileRegression",
+    "LinearQuantileRegression",
     "PushForwardOperator",
-    "UnconstrainedAmortizedOTQuantileRegression",
     "CPFlow",
     "FastNonLinearVectorQuantileRegression",
 ]

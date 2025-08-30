@@ -6,9 +6,9 @@ from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.classes import TrainParameters
 
 
-class LinearVectorQuantileRegression(PushForwardOperator):
+class LinearQuantileRegression(PushForwardOperator):
     """
-    Implements Linear Vector Quantile Regression using PyTorch for tensor
+    Implements Linear Quantile Regression using PyTorch for tensor
     operations and SciPy for the underlying linear program solver.
 
     Attributes:
@@ -19,13 +19,16 @@ class LinearVectorQuantileRegression(PushForwardOperator):
 
     def __init__(self, num_latent_points_to_generate: int = 500):
         """
-        Initializes the LinearVectorQuantileRegression operator.
+        Initializes the LinearQuantileRegression operator.
 
         Args:
             num_latent_points_to_generate (int): The number of points 'm' for the
                                                 reference distribution U.
         """
         super().__init__()
+        self.init_dict = {
+            'num_latent_points_to_generate': num_latent_points_to_generate
+        }
         self.u: Optional[torch.Tensor] = None
         self.b_u: Optional[torch.Tensor] = None
         self.num_latent_points_to_generate = num_latent_points_to_generate
@@ -41,15 +44,9 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         return self
 
     def train(self):
-        """
-        Sets the model to training mode.
-        """
         pass
 
     def eval(self):
-        """
-        Sets the model to evaluation mode.
-        """
         pass
 
     def fit(
@@ -59,13 +56,6 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         *args,
         **kwargs
     ):
-        """
-        Fits the pushforward operator to the data from a DataLoader.
-
-        Args:
-            dataloader (torch.utils.data.DataLoader): Data loader providing (X, Y) batches.
-            train_parameters (TrainParameters): Training parameters, e.g., {'verbose': True}.
-        """
         X_Y_tuple = [(X_batch, Y_batch) for X_batch, Y_batch in dataloader]
         X_tensor = torch.cat([X_batch for X_batch, _ in X_Y_tuple], dim=0)
         Y_tensor = torch.cat([Y_batch for _, Y_batch in X_Y_tuple], dim=0)
@@ -121,7 +111,7 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         verbose: bool = False
     ) -> Dict:
         """
-        Solves the primal form of the VQR linear program using SciPy.
+        Solves the primal form of the LQR linear program using SciPy.
         This function remains unchanged and operates on NumPy arrays.
 
         Args:
@@ -162,7 +152,7 @@ class LinearVectorQuantileRegression(PushForwardOperator):
 
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError(
-            "Pushforward of Y|X if not implemented for LinearVectorQuantileRegression"
+            "Pushforward of Y|X if not implemented for LinearQuantileRegression"
         )
 
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
@@ -249,7 +239,6 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         try:
             coeffs, _, _, _ = torch.linalg.lstsq(A_design, local_f_samples)
         except torch.linalg.LinAlgError:
-            # If solving fails, return NaNs for this batch
             return torch.full(
                 (M, d), float('nan'), device=u_samples.device, dtype=u_samples.dtype
             )
@@ -259,27 +248,34 @@ class LinearVectorQuantileRegression(PushForwardOperator):
         return gradient
 
     def save(self, path: str):
-        """
-        Saves the model's state (u and b_u tensors) to a file.
-
-        Args:
-            path (str): Path to save the model file.
-        """
         if self.u is None or self.b_u is None:
             raise RuntimeError("Cannot save a model that has not been fitted.")
 
-        state = {'u': self.u, 'b_u': self.b_u}
+        state = {
+            'init_dict': self.init_dict,
+            'state_dict': {
+                'u': self.u,
+                'b_u': self.b_u
+            },
+            'class_name': 'LinearQuantileRegression'
+        }
         torch.save(state, path)
 
     def load(self, path: str, map_location: torch.device = torch.device('cpu')):
-        """
-        Loads the model's state (u and b_u tensors) from a file.
-
-        Args:
-            path (str): Path to load the model file from.
-        """
         state = torch.load(path, map_location=map_location)
-        self.u = state['u']
-        self.b_u = state['b_u']
-        self.num_latent_points_to_generate = self.u.shape[0]
+        self.init_dict = state['init_dict']
+        self.u = state['state_dict']['u']
+        self.b_u = state['state_dict']['b_u']
+        self.num_latent_points_to_generate = state['init_dict'][
+            'num_latent_points_to_generate']
         return self
+
+    @classmethod
+    def load_class(cls, path: str, map_location: torch.device = torch.device('cpu')):
+        state = torch.load(path, map_location=map_location)
+        linear_quantile_regression = cls(**state['init_dict'])
+        linear_quantile_regression.u = state['state_dict']['u']
+        linear_quantile_regression.b_u = state['state_dict']['b_u']
+        linear_quantile_regression.num_latent_points_to_generate = state['init_dict'][
+            'num_latent_points_to_generate']
+        return linear_quantile_regression

@@ -7,7 +7,7 @@ from typing import Literal
 from pushforward_operators.picnn import network_type_name_to_network_type
 
 
-class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
+class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
     def __init__(
         self,
@@ -241,7 +241,6 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
 
     @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """Pushes y variable to the latent space given condition x"""
         X_tensor = x
         Y_scaled = self.Y_scaler(y)
 
@@ -254,7 +253,6 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
 
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """Pushes u variable to the y space given condition x"""
         X_tensor = x
 
         if self.potential_to_estimate_with_neural_network == "u":
@@ -268,16 +266,11 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         ).detach()
 
     def save(self, path: str):
-        """Saves the pushforward operator to a file.
-
-        Args:
-            path (str): Path to save the pushforward operator.
-        """
         torch.save(
             {
                 "init_dict": self.init_dict,
                 "state_dict": self.state_dict(),
-                "class_name": "UnconstrainedOTQuantileRegression"
+                "class_name": "NeuralQuantileRegression"
             }, path
         )
 
@@ -289,7 +282,7 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "UnconstrainedOTQuantileRegression":
+    ) -> "NeuralQuantileRegression":
         data = torch.load(path, map_location=map_location)
         operator = cls(**data["init_dict"])
         operator.load_state_dict(data["state_dict"])

@@ -5,7 +5,7 @@ from datasets.protocol import Dataset
 import os
 
 
-class ConvexBananaDataset(Dataset):
+class QuadraticPotentialConvexBananaDataset(Dataset):
     """
     Creating data in the form of a banana with x values distributed between 1 and 5.
 

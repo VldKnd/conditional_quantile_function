@@ -41,8 +41,7 @@ class AmortizationNetwork(nn.Module):
         return output_tensor + input_projection
 
 
-class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module):
-
+class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
     def __init__(
         self,
         feature_dimension: int,
@@ -95,8 +94,8 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         self.Y_scaler.train()
 
         with torch.no_grad():
-            for X, Y in dataloader:
-                _, _ = self.Y_scaler(Y)
+            for _, Y in dataloader:
+                _ = self.Y_scaler(Y)
 
         self.Y_scaler.eval()
 
@@ -322,7 +321,6 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         x: torch.Tensor,
         u_initial: torch.Tensor | None = None
     ) -> torch.Tensor:
-        """Pushes y variable to the latent space given condition x"""
         X_tensor = x
         Y_scaled = self.Y_scaler(y)
 
@@ -342,7 +340,6 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         x: torch.Tensor,
         y_initial: torch.Tensor | None = None
     ) -> torch.Tensor:
-        """Pushes u variable to the y space given condition x"""
         X_tensor = x
 
         if self.potential_to_estimate_with_neural_network == "u":
@@ -358,16 +355,11 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
         ).detach()
 
     def save(self, path: str):
-        """Saves the pushforward operator to a file.
-
-        Args:
-            path (str): Path to save the pushforward operator.
-        """
         torch.save(
             {
                 "init_dict": self.init_dict,
                 "state_dict": self.state_dict(),
-                "class_name": "UnconstrainedAmortizedOTQuantileRegression"
+                "class_name": "AmortizedNeuralQuantileRegression"
             }, path
         )
 
@@ -379,7 +371,7 @@ class UnconstrainedAmortizedOTQuantileRegression(PushForwardOperator, nn.Module)
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "UnconstrainedAmortizedOTQuantileRegression":
+    ) -> "AmortizedNeuralQuantileRegression":
         data = torch.load(path, map_location=map_location)
         operator = cls(**data["init_dict"])
         operator.load_state_dict(data["state_dict"])

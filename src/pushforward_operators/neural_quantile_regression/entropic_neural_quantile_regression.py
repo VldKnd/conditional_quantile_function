@@ -7,7 +7,7 @@ from pushforward_operators.protocol import PushForwardOperator
 from pushforward_operators.picnn import network_type_name_to_network_type
 
 
-class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
+class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
     def __init__(
         self,
@@ -235,16 +235,11 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
         ).detach()
 
     def save(self, path: str):
-        """Saves the pushforward operator to a file.
-
-        Args:
-            path (str): Path to save the pushforward operator.
-        """
         torch.save(
             {
                 "init_dict": self.init_dict,
                 "state_dict": self.state_dict(),
-                "class_name": "EntropicOTQuantileRegression"
+                "class_name": "EntropiсNeuralQuantileRegression"
             }, path
         )
 
@@ -256,7 +251,7 @@ class EntropicOTQuantileRegression(PushForwardOperator, nn.Module):
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "EntropicOTQuantileRegression":
+    ) -> "EntropiсNeuralQuantileRegression":
         data = torch.load(path, map_location=map_location)
         quadratic_potential = cls(**data["init_dict"])
         quadratic_potential.load_state_dict(data["state_dict"])
