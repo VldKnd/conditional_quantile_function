@@ -13,7 +13,7 @@ from datasets import (
 )
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
-from metrics import wassertein2, unexplained_variance_percentage
+from metrics import wassertein2, unexplained_variance_percentage, percentage_of_co_monotonicity_violation
 from pushforward_operators import PushForwardOperator
 
 

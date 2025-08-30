@@ -1,7 +1,7 @@
 import torch
 
 
-def unexplained_variance_percentage(
+def percentage_of_unexplained_variance(
     ground_truth: torch.Tensor, approximation: torch.Tensor
 ) -> float:
     """
@@ -18,4 +18,4 @@ if __name__ == "__main__":
     ground_truth = torch.rand(1000, 5)
     for alpha in [0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
         approximation = ground_truth * (1 - alpha) + torch.rand(1000, 5) * alpha
-        print(unexplained_variance_percentage(ground_truth, approximation))
+        print(percentage_of_unexplained_variance(ground_truth, approximation))
