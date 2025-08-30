@@ -1,6 +1,16 @@
 import torch
 from tqdm import tqdm
-from datasets import Dataset, BananaDataset, TicTacDataset, StarDataset, ConvexBananaDataset
+from datasets import (
+    BananaDataset,
+    QuadraticPotentialConvexBananaDataset,
+    TicTacDataset,
+    Dataset,
+    NotConditionalBananaDataset,
+    FNLVQR_MVN,
+    FNLVQR_Glasses,
+    FNLVQR_Star,
+    FNLVQR_Banana,
+)
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
 from metrics import wassertein2, unexplained_variance_percentage
@@ -276,7 +286,8 @@ def test(
     )
 
     if type(dataset) in {
-        BananaDataset, TicTacDataset, StarDataset, ConvexBananaDataset
+        BananaDataset, TicTacDataset, QuadraticPotentialConvexBananaDataset,
+        NotConditionalBananaDataset
     }:
         return test_on_synthetic_dataset(
             experiment, exclude_wasserstein2, exclude_unexplained_variance_percentage,

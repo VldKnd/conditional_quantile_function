@@ -42,6 +42,7 @@ class AmortizationNetwork(nn.Module):
 
 
 class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
+
     def __init__(
         self,
         feature_dimension: int,
