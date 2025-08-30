@@ -70,30 +70,6 @@ class FNLVQR_MVN(Dataset):
         return torch.rand(n_points,
                           self.number_of_features).to(**self.tensor_parameters)
 
-    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
-        """
-            Creates uniform grid of covariates.
-
-            Returns:
-            torch.Tensor[n, k]
-        """
-        return torch.linspace(0, 1, n_points_per_dimension
-                              ).repeat(self.number_of_features, 1)
-
-    def sample_conditional(self, n_points: int, x: torch.Tensor) -> torch.Tensor:
-        """Sample conditional distribution from y|x.
-
-        Args:
-            n_points (int): number of points
-            x (torch.Tensor[1, k]): covariate
-
-        Returns:
-            torch.Tensor[n, p]: Conditional sample
-        """
-        u = self.sample_latent_variables(n_points)
-        return x.matmul(self.projection_matrix
-                        ) + u.matmul(self.latent_covariance_matrix)
-
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

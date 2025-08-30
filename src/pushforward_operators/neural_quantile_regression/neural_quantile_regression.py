@@ -16,8 +16,8 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         activation_function_name: str,
-        network_type: Literal["SCFFNN", "PISCNN"] = "SCFFNN",
-        potential_to_estimate_with_neural_network: Literal["y", "u"] = "y",
+        network_type: Literal["SCFFNN", "PISCNN"] = "PISCNN",
+        potential_to_estimate_with_neural_network: Literal["y", "u"] = "u",
     ):
         super().__init__()
 
@@ -78,16 +78,18 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             else ""
         )
 
+    @torch.enable_grad()
     def gradient_inverse(
         self, condition_tensor: torch.Tensor, point_tensor: torch.Tensor
     ):
-        requires_grad_backup, point_tensor.requires_grad = point_tensor.requires_grad, True
+        point_tensor_clone = point_tensor.clone().requires_grad_(True)
+
+        potential_value = self.potential_network(condition_tensor,
+                                                 point_tensor_clone).sum()
         inverse_tensor = torch.autograd.grad(
-            self.potential_network(condition_tensor, point_tensor).sum(),
-            point_tensor,
-            create_graph=False
+            potential_value, point_tensor_clone, create_graph=False
         )[0]
-        point_tensor.requires_grad = requires_grad_backup
+
         return inverse_tensor.detach()
 
     def c_transform_inverse(
@@ -249,7 +251,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         else:
             U_tensor = self.c_transform_inverse(X_tensor, Y_scaled)
 
-        return U_tensor.requires_grad_(False).detach()
+        return U_tensor.detach()
 
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:

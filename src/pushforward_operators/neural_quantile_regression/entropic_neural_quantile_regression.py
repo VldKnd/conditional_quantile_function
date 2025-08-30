@@ -7,7 +7,7 @@ from pushforward_operators.protocol import PushForwardOperator
 from pushforward_operators.picnn import network_type_name_to_network_type
 
 
-class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
+class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
     def __init__(
         self,
@@ -18,6 +18,7 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
         epsilon: float,
         activation_function_name: str = "Softplus",
         network_type: Literal["SCFFNN", "FFNN", "PICNN", "PISCNN"] = "FFNN",
+        amount_of_samples_to_estimate_psi: int = 1024,
         *args,
         **kwargs
     ):
@@ -30,10 +31,17 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
             "epsilon": epsilon,
             "activation_function_name": activation_function_name,
             "network_type": network_type,
+            "amount_of_samples_to_estimate_psi": amount_of_samples_to_estimate_psi,
         }
 
         self.activation_function_name = activation_function_name
-        self.activation_function = getattr(nn, activation_function_name)()
+        try:
+            self.activation_function = getattr(nn, activation_function_name)()
+        except AttributeError:
+            raise ValueError(
+                f"Invalid activation function name: {activation_function_name}. "
+                f"Must be a valid PyTorch activation function."
+            )
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
         self.network_type = network_type
 
@@ -46,6 +54,7 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
         )
 
         self.epsilon = epsilon
+        self.amount_of_samples_to_estimate_psi = amount_of_samples_to_estimate_psi
 
     def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
         """Run over the data (no grad) to populate BatchNorm running stats."""
@@ -61,19 +70,17 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
         self, training_information: list[dict], epoch_idx: int,
         last_learning_rate: float | None
     ):
-        running_mean_objective = sum(
-            [information["objective"] for information in training_information[-10:]]
-        ) / len(training_information[-10:])
+        last_10_training_information = training_information[-10:]
+        last_10_objectives = [
+            information["objective"] for information in last_10_training_information
+        ]
+        running_mean_objective = sum(last_10_objectives) / len(last_10_objectives)
 
-        return  (
-            f"Epoch: {epoch_idx}, "
-            f"Objective: {running_mean_objective:.3f}"
-        ) + \
-        (
-            f", LR: {last_learning_rate[0]:.6f}"
-            if last_learning_rate is not None
-            else ""
-        )
+        message = f"Epoch: {epoch_idx}, Objective: {running_mean_objective:.3f}"
+        if last_learning_rate is not None:
+            message += f", LR: {last_learning_rate[0]:.6f}"
+
+        return message
 
     def fit(
         self, dataloader: torch.utils.data.DataLoader,
@@ -103,6 +110,7 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         training_information = []
         self.warmup_scalers(dataloader=dataloader)
+
         progress_bar = trange(
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
@@ -111,15 +119,11 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
             for X_batch, Y_batch in dataloader:
 
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = torch.randn_like(Y_scaled)
+                U_batch = torch.randn_like(Y_batch).to(Y_scaled)
 
                 potential_network_optimizer.zero_grad()
-                psi = self.estimate_psi(
-                    X_tensor=X_batch, Y_tensor=Y_scaled, U_tensor=U_batch
-                )
-                phi = self.estimate_phi(
-                    X_tensor=X_batch, Y_tensor=Y_scaled, U_tensor=U_batch
-                )
+                psi = self.estimate_psi(X_tensor=X_batch, Y_tensor=Y_scaled)
+                phi = self.estimate_phi(X_tensor=X_batch, U_tensor=U_batch)
                 potential_network_objective = torch.mean(phi) + torch.mean(psi)
                 potential_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(
@@ -155,18 +159,18 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
         progress_bar.close()
         return self
 
-    def estimate_psi(
-        self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor
-    ):
+    def estimate_psi(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor):
         """Estimates psi, either with Neural Network or entropic dual.
 
         Args:
             X_tensor (torch.Tensor): Input tensor.
-            U_tensor (torch.Tensor): Random variable to be pushed forward.
             Y_tensor (torch.Tensor): Output tensor.
         """
         n, _ = X_tensor.shape
-        m, _ = U_tensor.shape
+        m = self.amount_of_samples_to_estimate_psi
+        U_tensor = torch.randn(
+            self.amount_of_samples_to_estimate_psi, *Y_tensor.shape[1:]
+        ).to(Y_tensor)
         U_expanded_for_X = U_tensor.unsqueeze(0).expand(n, -1, -1)
         X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, m, -1)
 
@@ -174,7 +178,7 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
                                             U_expanded_for_X).squeeze(-1)
         cost_matrix = Y_tensor @ U_tensor.T
 
-        slackness = cost_matrix - phi_values  # m x n
+        slackness = cost_matrix - phi_values
         max_slackness, _ = torch.max(slackness, dim=-1, keepdim=True)
         slackness_stable = (slackness - max_slackness) / self.epsilon
         log_mean_exp = torch.logsumexp(slackness_stable, dim=-1, keepdim=True) \
@@ -182,13 +186,11 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         log_mean_exp += max_slackness / self.epsilon
 
-        phi_estimate = self.epsilon * log_mean_exp
+        psi_estimate = self.epsilon * log_mean_exp
 
-        return phi_estimate
+        return psi_estimate
 
-    def estimate_phi(
-        self, X_tensor: torch.Tensor, U_tensor: torch.Tensor, Y_tensor: torch.Tensor
-    ):
+    def estimate_phi(self, X_tensor: torch.Tensor, U_tensor: torch.Tensor):
         """Estimates phi, either with Neural Network or entropic dual.
 
         Args:
@@ -213,11 +215,8 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
         """Pushes y variable to the latent space given condition x"""
         X_tensor = x
         Y_scaled = self.Y_scaler(y).requires_grad_(True)
-        U_tensor = torch.randn(1024, *Y_scaled.shape[1:]).to(Y_scaled)
 
-        psi_potential = self.estimate_psi(
-            X_tensor=X_tensor, U_tensor=U_tensor, Y_tensor=Y_scaled
-        )
+        psi_potential = self.estimate_psi(X_tensor=X_tensor, Y_tensor=Y_scaled)
         Y_pushforward = torch.autograd.grad(
             psi_potential.sum(), Y_scaled, create_graph=False
         )[0]
@@ -226,8 +225,10 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
-        X_tensor = x
-        Y_tensor = self.gradient_inverse(X_tensor, u)
+        X_tensor, U_tensor = x, u
+        Y_tensor = self.gradient_inverse(
+            condition_tensor=X_tensor, point_tensor=U_tensor
+        )
 
         return (
             Y_tensor * torch.sqrt(self.Y_scaler.running_var) +
@@ -239,7 +240,7 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
             {
                 "init_dict": self.init_dict,
                 "state_dict": self.state_dict(),
-                "class_name": "EntropiсNeuralQuantileRegression"
+                "class_name": "EntropicNeuralQuantileRegression"
             }, path
         )
 
@@ -251,7 +252,7 @@ class EntropiсNeuralQuantileRegression(PushForwardOperator, nn.Module):
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "EntropiсNeuralQuantileRegression":
+    ) -> "EntropicNeuralQuantileRegression":
         data = torch.load(path, map_location=map_location)
         quadratic_potential = cls(**data["init_dict"])
         quadratic_potential.load_state_dict(data["state_dict"])

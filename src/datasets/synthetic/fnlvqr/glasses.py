@@ -36,35 +36,6 @@ class FNLVQR_Glasses(Dataset):
         x = torch.rand(n_points, 1)
         return x.to(**self.tensor_parameters)
 
-    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
-        """
-            Creates uniform grid of covariates.
-
-            Returns:
-            torch.Tensor[n, k]
-        """
-        raise NotImplementedError("Not implemented")
-
-    def sample_conditional(self, n_points: int, x: torch.Tensor) -> torch.Tensor:
-        """Sample conditional distribution from y|x.
-
-        Args:
-            n_points (int): number of points
-            x (torch.Tensor[1, k]): covariate
-
-        Returns:
-            torch.Tensor[n, p]: Conditional sample
-        """
-        u = self.sample_latent_variables(n_points)
-
-        z1 = 3 * torch.pi * x
-        z2 = torch.pi * (1 + 3 * x)
-        y1 = 5 * torch.sin(z1) + 2.5 + u[:, 0:1]
-        y2 = 5 * torch.sin(z2) + 2.5 - u[:, 0:1]
-        y = u[:, 1:2] * y1 + (1 - u[:, 1:2]) * y2
-
-        return y
-
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

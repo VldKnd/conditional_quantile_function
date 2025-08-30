@@ -24,22 +24,6 @@ class BananaDataset(Dataset):
         x = torch.rand(size=(n_points, 1)) * 2 + 0.5
         return x.to(**self.tensor_parameters)
 
-    def sample_conditional(self, n_points: int, X: torch.Tensor) -> torch.Tensor:
-        """
-        Sample the conditional distribution of the response given the covariates.
-        """
-
-        U = torch.randn(size=(X.shape[0], n_points, 2)).to(**self.tensor_parameters)
-        X_unsqueezed = X.unsqueeze(1)
-        y = torch.concatenate(
-            [
-                U[:, :, 0:1] * X_unsqueezed,
-                U[:, :, 1:2] / X_unsqueezed + (U[:, :, 0:1]**2 + X_unsqueezed**3),
-            ],
-            dim=-1,
-        )
-        return y
-
     def sample_joint(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Sample the joint distribution of the covariates and the response.
@@ -95,10 +79,3 @@ class BananaDataset(Dataset):
             dim=1,
         )
         return Y_flat.reshape(Y_shape)
-
-    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
-        """
-        Create a meshgrid of covariates.
-        """
-        x = torch.linspace(0.5, 2.5, n_points_per_dimension)
-        return x.unsqueeze(1)

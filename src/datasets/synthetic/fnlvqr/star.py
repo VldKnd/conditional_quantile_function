@@ -60,17 +60,6 @@ class FNLVQR_Star(Dataset):
 
         return transformed_points
 
-    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
-        """
-            Creates uniform grid of covariates.
-
-            Returns:
-            torch.Tensor[n, k]
-        """
-        return torch.linspace(
-            0, 2 * torch.pi / self.number_of_star_angles, n_points_per_dimension
-        )
-
     def rotate_points(self, points: torch.Tensor, angle: float) -> torch.Tensor:
         """
         Rotates 2D points around the origin.
@@ -84,20 +73,6 @@ class FNLVQR_Star(Dataset):
         x_rotated = x * cos_angle - y * sin_angle
         y_rotated = x * sin_angle + y * cos_angle
         return torch.stack((x_rotated, y_rotated), axis=1).reshape(points_shape)
-
-    def sample_conditional(self, n_points: int, x: torch.Tensor) -> torch.Tensor:
-        """Sample conditional distribution from y|x.
-
-        Args:
-            n_points (int): number of points
-            x (torch.Tensor[1, k]): covariate
-
-        Returns:
-            torch.Tensor[n, p]: Conditional sample
-        """
-        u = self.sample_latent_variables(n_points)
-        star_points = self.transform_to_star(u)
-        return self.rotate_points(star_points, x)
 
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

@@ -27,31 +27,6 @@ class Dataset:
             "Sampling of covariates is not implemented for this dataset."
         )
 
-    def meshgrid_of_covariates(self, n_points_per_dimension: int) -> torch.Tensor:
-        """
-            Creates uniform grid of covariates.
-
-            Returns:
-            torch.Tensor[n, k]
-        """
-        raise NotImplementedError(
-            "Sampling of covariates is not implemented for this dataset."
-        )
-
-    def sample_conditional(self, n_points: int, x: torch.Tensor) -> torch.Tensor:
-        """Sample conditional distribution from y|x.
-
-        Args:
-            n_points (int): number of points
-            x (torch.Tensor[1, k]): covariate
-
-        Returns:
-            torch.Tensor[n, p]: Conditional sample
-        """
-        raise NotImplementedError(
-            "Sampling of conditional distribution is not implemented for this dataset."
-        )
-
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

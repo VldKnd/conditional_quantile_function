@@ -63,9 +63,6 @@ class TicTacDataset(Dataset):
     def sample_covariates(self, n_points):
         return super().sample_covariates(n_points)
 
-    def sample_conditional(self, n_points, x):
-        return super().sample_conditional(n_points, x)
-
     def sample_joint(self, n_points):
         mean = self.mean
 

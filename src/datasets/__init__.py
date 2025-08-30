@@ -9,7 +9,14 @@ from datasets.synthetic.fnlvqr import (
     FNLVQR_Star,
     FNLVQR_Banana,
 )
-from datasets.synthetic.convex.quadratic_potential import QuadraticPotentialConvexBananaDataset
+from datasets.synthetic.convex.picnn import (
+    PICNN_FNLVQR_Banana,
+    PICNN_FNLVQR_Glasses,
+    PICNN_FNLVQR_Star,
+)
+from datasets.synthetic.convex.quadratic_potential import (
+    QuadraticPotentialConvexBananaDataset,
+)
 from datasets.protocol import Dataset
 
 __all__ = [
@@ -22,4 +29,7 @@ __all__ = [
     "FNLVQR_Glasses",
     "FNLVQR_Star",
     "FNLVQR_Banana",
+    "PICNN_FNLVQR_Banana",
+    "PICNN_FNLVQR_Glasses",
+    "PICNN_FNLVQR_Star",
 ]
