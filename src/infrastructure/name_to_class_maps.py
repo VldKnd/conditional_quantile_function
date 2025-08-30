@@ -3,7 +3,7 @@ from datasets import (
     TicTacDataset,
     Dataset,
     ConvexBananaDataset,
-    StarDataset,
+    FNLVQR_MVN,
     NotConditionalBananaDataset,
 )
 from pushforward_operators import (
@@ -21,8 +21,8 @@ name_to_dataset_map: dict[str, Dataset] = {
     "banana": BananaDataset,
     "tictac": TicTacDataset,
     "convex_banana": ConvexBananaDataset,
-    "star": StarDataset,
     "not_conditional_banana": NotConditionalBananaDataset,
+    "fnlvqr_mvn": FNLVQR_MVN,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {

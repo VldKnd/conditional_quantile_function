@@ -5,7 +5,7 @@ from tqdm import trange
 from typing import Literal
 from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
-from pushforward_operators.picnn import FFNN
+from pushforward_operators.picnn import PICNN
 
 
 class MongeMapNetwork(nn.Module):
@@ -19,7 +19,7 @@ class MongeMapNetwork(nn.Module):
         activation_function_name: str = "Softplus",
     ):
         super().__init__()
-        self.monge_map_network = FFNN(
+        self.monge_map_network = PICNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
@@ -138,49 +138,6 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
                     fitting_cost = self.sinkhorn_divergence(U_pushforward, Y_batch)
 
                 if self.potential_to_estimate_with_neural_network == "y":
-                    condition_sample_for_c_optimality = X_previous[:X_batch.shape[0]]
-                    tensor_sample_for_c_optimality = Y_previous[:X_batch.shape[0]]
-                    if X_batch.shape[0] == X_previous.shape[0]:
-                        X_previous, Y_previous = X_batch.clone(), Y_batch.clone()
-                else:
-                    condition_sample_for_c_optimality = X_previous[:U_batch.shape[0]]
-                    tensor_sample_for_c_optimality = torch.randn_like(U_batch)
-                    if X_batch.shape[0] == X_previous.shape[0]:
-                        X_previous = X_batch.clone()
-
-                pairwise_distances = torch.cdist(
-                    condition_sample_for_c_optimality, condition_sample_for_c_optimality
-                )
-                _, neighbor_indices = torch.topk(
-                    pairwise_distances, 10, dim=1, largest=False
-                )
-
-                condition_sample_for_c_optimality_neighbor_groups = \
-                    condition_sample_for_c_optimality[neighbor_indices]
-
-                tensor_sample_for_c_optimality_neighbor_groups = \
-                    tensor_sample_for_c_optimality[neighbor_indices]
-
-                pushed_tensor_for_c_optimality_neighbor_groups = self.monge_map_network.pushforward(
-                    condition_sample_for_c_optimality_neighbor_groups,
-                    tensor_sample_for_c_optimality_neighbor_groups
-                )
-
-                c_optimality_cost_term = (
-                    tensor_sample_for_c_optimality_neighbor_groups -
-                    pushed_tensor_for_c_optimality_neighbor_groups
-                ).norm(dim=-1).pow(2).mean(dim=1)
-
-                c_optimality_sinkhorn_term = self.sinkhorn_divergence(
-                    tensor_sample_for_c_optimality_neighbor_groups,
-                    pushed_tensor_for_c_optimality_neighbor_groups
-                )
-
-                c_optimality_cost = (
-                    c_optimality_cost_term - c_optimality_sinkhorn_term
-                ).mean()
-
-                if self.potential_to_estimate_with_neural_network == "y":
                     input_for_jacobian = Y_batch
                 else:
                     input_for_jacobian = U_batch
@@ -199,8 +156,7 @@ class MongeGapTransport(PushForwardOperator, nn.Module):
 
                 monge_map_network_optimizer.zero_grad()
                 monge_map_network_objective: torch.Tensor = (
-                    fitting_cost + self.jacobian_weight * jacobian_cost +
-                    self.c_optimality_weight * c_optimality_cost
+                    fitting_cost + self.jacobian_weight * jacobian_cost
                 )
                 monge_map_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(

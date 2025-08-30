@@ -49,17 +49,16 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         )
 
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
-        self.X_scaler = nn.BatchNorm1d(feature_dimension, affine=False)
 
     def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
         """Run over the data (no grad) to populate BatchNorm running stats."""
-        self.X_scaler.train(), self.Y_scaler.train()
+        self.Y_scaler.train()
 
         with torch.no_grad():
-            for X, Y in dataloader:
-                _, _ = self.Y_scaler(Y), self.X_scaler(X)
+            for _, Y in dataloader:
+                _ = self.Y_scaler(Y)
 
-        self.X_scaler.eval(), self.Y_scaler.eval()
+        self.Y_scaler.eval()
 
     def make_progress_bar_message(
         self, training_information: list[dict], epoch_idx: int,
@@ -151,23 +150,22 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
         for epoch_idx in progress_bar:
             for X_batch, Y_batch in dataloader:
 
-                X_scaled = self.X_scaler(X_batch)
                 Y_scaled = self.Y_scaler(Y_batch)
                 U_batch = torch.randn_like(Y_batch)
 
                 if self.potential_to_estimate_with_neural_network == "y":
-                    inverse_tensor = self.c_transform_inverse(X_scaled, U_batch)
+                    inverse_tensor = self.c_transform_inverse(X_batch, U_batch)
                     Y_batch_for_phi, U_batch_for_psi = inverse_tensor, None
                 else:
-                    inverse_tensor = self.c_transform_inverse(X_scaled, Y_scaled)
+                    inverse_tensor = self.c_transform_inverse(X_batch, Y_scaled)
                     Y_batch_for_phi, U_batch_for_psi = None, inverse_tensor
 
                 potential_network_optimizer.zero_grad()
                 psi = self.estimate_psi(
-                    X_tensor=X_scaled, Y_tensor=Y_scaled, U_tensor=U_batch_for_psi
+                    X_tensor=X_batch, Y_tensor=Y_scaled, U_tensor=U_batch_for_psi
                 )
                 phi = self.estimate_phi(
-                    X_tensor=X_scaled, U_tensor=U_batch, Y_tensor=Y_batch_for_phi
+                    X_tensor=X_batch, U_tensor=U_batch, Y_tensor=Y_batch_for_phi
                 )
                 potential_network_objective = torch.mean(phi) + torch.mean(psi)
                 potential_network_objective.backward()
@@ -244,25 +242,25 @@ class UnconstrainedOTQuantileRegression(PushForwardOperator, nn.Module):
     @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes y variable to the latent space given condition x"""
-        X_scaled = self.X_scaler(x)
+        X_tensor = x
         Y_scaled = self.Y_scaler(y)
 
         if self.potential_to_estimate_with_neural_network == "y":
-            U_tensor = self.gradient_inverse(X_scaled, Y_scaled)
+            U_tensor = self.gradient_inverse(X_tensor, Y_scaled)
         else:
-            U_tensor = self.c_transform_inverse(X_scaled, Y_scaled)
+            U_tensor = self.c_transform_inverse(X_tensor, Y_scaled)
 
         return U_tensor.requires_grad_(False).detach()
 
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
-        X_scaled = self.X_scaler(x)
+        X_tensor = x
 
         if self.potential_to_estimate_with_neural_network == "u":
-            Y_tensor = self.gradient_inverse(X_scaled, u)
+            Y_tensor = self.gradient_inverse(X_tensor, u)
         else:
-            Y_tensor = self.c_transform_inverse(X_scaled, u)
+            Y_tensor = self.c_transform_inverse(X_tensor, u)
 
         return (
             Y_tensor.requires_grad_(False) * torch.sqrt(self.Y_scaler.running_var) +

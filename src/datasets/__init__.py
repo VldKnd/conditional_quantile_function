@@ -3,7 +3,9 @@ from datasets.synthetic.custom import (
     BananaDataset,
     TicTacDataset,
 )
-
+from datasets.synthetic.fnlvqr import (
+    FNLVQR_MVN,
+)
 from datasets.synthetic.convex import ConvexBananaDataset
 from datasets.protocol import Dataset
 
@@ -13,4 +15,5 @@ __all__ = [
     "TicTacDataset",
     "Dataset",
     "NotConditionalBananaDataset",
+    "FNLVQR_MVN",
 ]

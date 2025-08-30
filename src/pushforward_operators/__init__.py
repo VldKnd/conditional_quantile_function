@@ -12,7 +12,6 @@ __all__ = [
     "LinearVectorQuantileRegression",
     "PushForwardOperator",
     "UnconstrainedAmortizedOTQuantileRegression",
-    "EpsilonAugmentedEntropicOTQuantileRegression",
     "CPFlow",
     "FastNonLinearVectorQuantileRegression",
 ]
