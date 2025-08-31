@@ -1,5 +1,12 @@
+# Large graphs
+*.pdf
+
+# PyCharm files
+.idea/
+
 # Archives
 *.tar.gz
+*.zip
 
 # Mac OS
 .DS_Store
