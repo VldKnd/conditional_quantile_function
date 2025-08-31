@@ -8,6 +8,9 @@ from datasets import (
     FNLVQR_Star,
     FNLVQR_Banana,
     NotConditionalBananaDataset,
+    PICNN_FNLVQR_Banana,
+    PICNN_FNLVQR_Glasses,
+    PICNN_FNLVQR_Star,
 )
 from pushforward_operators import (
     PushForwardOperator,
@@ -30,6 +33,9 @@ name_to_dataset_map: dict[str, Dataset] = {
     "fnlvqr_glasses": FNLVQR_Glasses,
     "fnlvqr_star": FNLVQR_Star,
     "fnlvqr_banana": FNLVQR_Banana,
+    "picnn_fnlvqr_banana": PICNN_FNLVQR_Banana,
+    "picnn_fnlvqr_glasses": PICNN_FNLVQR_Glasses,
+    "picnn_fnlvqr_star": PICNN_FNLVQR_Star,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
