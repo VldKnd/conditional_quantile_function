@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=8G
-#SBATCH --time=12:00:00
+#SBATCH --time=23:00:00
 
 CONFIG_LIST_FILE="$1"
 LOG_DIR="$2"
