@@ -1,6 +1,16 @@
 import torch
 from torch import nn
 from torch import Tensor
+import numpy as np
+
+class GaussianSoftplus(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x: Tensor) -> Tensor:
+        z = torch.sqrt(torch.tensor(torch.pi) / 2)
+        return (z * x * torch.erf(x / 2**(1/2)) + torch.exp(-(x**2) / 2) +
+                z * x) / (2 * z)
 
 
 class PosLinear(torch.nn.Linear):
@@ -20,7 +30,6 @@ class PICNN(nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        activation_function_name: str,
         output_dimension: int = 1,
         *args,
         **kwargs,
@@ -32,9 +41,9 @@ class PICNN(nn.Module):
 
         # Activations:
         self.number_of_hidden_layers = number_of_hidden_layers
-        self.z_activation = nn.Softplus()
-        self.u_activation = getattr(nn, activation_function_name)()
-        self.positive_activation = nn.Softplus()
+        self.z_activation = GaussianSoftplus()
+        self.u_activation = nn.ELU()
+        self.positive_activation = nn.ReLU()
 
         # First layer
         self.first_linear_layer_tilde = nn.Linear(x_dimension, u_dimension)
@@ -146,15 +155,12 @@ class FFNN(nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        activation_function_name: str,
         output_dimension: int = 1,
         *args,
         **kwargs,
     ):
         super().__init__()
-        self.log_alpha = nn.Parameter(torch.tensor(0.))
-        self.activation_function_name = activation_function_name
-        self.activation_function = getattr(nn, activation_function_name)()
+        self.activation_function = nn.Softplus()
 
         hidden_layers = []
         for _ in range(number_of_hidden_layers):

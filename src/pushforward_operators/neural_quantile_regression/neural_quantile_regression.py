@@ -15,7 +15,6 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        activation_function_name: str,
         network_type: Literal["SCFFNN", "PISCNN"] = "PISCNN",
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "u",
     ):
@@ -30,8 +29,6 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             hidden_dimension,
             "number_of_hidden_layers":
             number_of_hidden_layers,
-            "activation_function_name":
-            activation_function_name,
             "network_type":
             network_type,
             "potential_to_estimate_with_neural_network":
@@ -44,7 +41,6 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
             number_of_hidden_layers=number_of_hidden_layers,
-            activation_function_name=activation_function_name,
             output_dimension=1
         )
 
