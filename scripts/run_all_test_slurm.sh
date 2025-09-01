@@ -72,7 +72,7 @@ done
 echo "Temporary configs list saved to $CONFIG_LIST_FILE "
 
 # -------- Slurm job script --------
-SLURM_SCRIPT="./slurm/test.sbatch.sh"
+SLURM_SCRIPT="./scripts/slurm/test.sbatch.sh"
 echo "Using Slurm sbatch script $SLURM_SCRIPT"
 
 # -------- Submit job array --------
