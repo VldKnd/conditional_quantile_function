@@ -17,7 +17,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         number_of_hidden_layers: int,
         epsilon: float,
         activation_function_name: str = "Softplus",
-        network_type: Literal["SCFFNN", "FFNN", "PICNN", "PISCNN"] = "FFNN",
+        network_type: Literal["SCFFNN", "FFNN", "PICNN", "PISCNN"] = "PICNN",
         amount_of_samples_to_estimate_psi: int = 1024,
         *args,
         **kwargs
@@ -225,7 +225,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """Pushes u variable to the y space given condition x"""
-        X_tensor, U_tensor = x, u
+        X_tensor, U_tensor = x, u.clone().requires_grad_(True)
         Y_tensor = self.gradient_inverse(
             condition_tensor=X_tensor, point_tensor=U_tensor
         )

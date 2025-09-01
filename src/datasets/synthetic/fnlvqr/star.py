@@ -15,7 +15,7 @@ class FNLVQR_Star(Dataset):
         super().__init__(*args, **kwargs)
         self.tensor_parameters = tensor_parameters
         self.amplitude = amplitude
-        self.number_of_star_angles = 5
+        self.number_of_star_angles = 3
         self.kwargs = kwargs
         self.args = args
 
