@@ -104,9 +104,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         def slackness_closure():
             optimizer.zero_grad()
-            cost_matrix = torch.sum(
-                point_tensor * inverse_tensor, dim=-1, keepdims=True
-            )
+            cost_matrix = torch.sum(point_tensor * inverse_tensor, dim=-1, keepdim=True)
             potential = self.potential_network(condition_tensor, inverse_tensor)
             slackness = (potential - cost_matrix).sum()
             slackness.backward()
