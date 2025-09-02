@@ -33,7 +33,18 @@ class PICNN_BaseDataset(Dataset):
         """
         Push forward the conditional distribution of the covariates given the response.
         """
-        return self.model.push_u_given_x(u, x)
+        batch_size = 256
+
+        for i in range(0, u.shape[0], batch_size):
+            u_batch = u[i:i + batch_size]
+            x_batch = x[i:i + batch_size]
+            y_batch = self.model.push_u_given_x(u_batch, x_batch)
+            if i == 0:
+                y_batch_all = y_batch
+            else:
+                y_batch_all = torch.cat([y_batch_all, y_batch], dim=0)
+
+        return y_batch_all
 
     def sample_joint(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """

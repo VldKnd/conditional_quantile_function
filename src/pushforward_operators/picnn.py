@@ -3,13 +3,15 @@ from torch import nn
 from torch import Tensor
 import numpy as np
 
+
 class GaussianSoftplus(nn.Module):
+
     def __init__(self):
         super().__init__()
 
     def forward(self, x: Tensor) -> Tensor:
         z = torch.sqrt(torch.tensor(torch.pi) / 2)
-        return (z * x * torch.erf(x / 2**(1/2)) + torch.exp(-(x**2) / 2) +
+        return (z * x * torch.erf(x / 2**(1 / 2)) + torch.exp(-(x**2) / 2) +
                 z * x) / (2 * z)
 
 
