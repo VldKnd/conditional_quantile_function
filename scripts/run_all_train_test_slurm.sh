@@ -9,10 +9,20 @@ MAX_JOBS=64
 
 mkdir -p "$LOG_DIR"
 
-MODE="${1:-both}"
-shift || true
-
+# ---- Parse MODE and ROOT_DIR ----
+MODE="both"
 ROOT_DIR="experiments"
+
+if [[ $# -gt 0 && ( "$1" == "train" || "$1" == "test" || "$1" == "both" ) ]]; then
+  MODE="$1"
+  shift
+fi
+
+if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+  ROOT_DIR="$1"
+  shift
+fi
+
 PASS_ARGS=()
 ACCOUNT="${SLURM_ACCOUNT:-}"
 PARTITION="${SLURM_PARTITION:-}"
@@ -67,14 +77,16 @@ echo "Using Slurm sbatch script $SLURM_SCRIPT"
 function wait_for_jobs {
   local max_jobs=$1
   while (( $(squeue -h -t pending,running -r | wc -l) >= max_jobs )); do
-    sleep 3m
+    sleep 2m
   done
 }
 
 for CFG in "${CONFIGS[@]}"; do
   wait_for_jobs "$MAX_JOBS"
-  sbatch "${SBATCH_OPTS[@]}" "$SLURM_SCRIPT" "$CFG" "$LOG_DIR" "$MODE" "${PASS_ARGS[@]}"
-  sleep 1
+  set -x
+  sbatch "${SBATCH_OPTS[@]}" "$SLURM_SCRIPT" "$CFG" "$LOG_DIR" "$MODE" "${PASS_ARGS[@]+${doublequote}PASS_ARGS[@]${doublequote}}"
+  set +x
+  sleep 5
 done
 
 echo "Submitted $NUM_CONFIGS configs as individual Slurm jobs (max $MAX_JOBS concurrent submissions)."
