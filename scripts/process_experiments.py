@@ -45,6 +45,8 @@ def find_and_process_configs(root_directory):
 
     for item in root_path.iterdir():
         if item.is_dir():
+            find_and_process_configs(item)
+            
             config_file = item / 'config.json'
 
             if config_file.is_file():

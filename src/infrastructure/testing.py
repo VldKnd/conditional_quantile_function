@@ -110,7 +110,6 @@ def test_on_synthetic_dataset(
     quantile_metrics = {
         "wasserstein2": [],
         "unexplained_variance_percentage": [],
-        "monotonicity_violations": [],
         "sliced_wasserstein2": [],
         "kde_kl_divergence": [],
         "kde_l1_divergence": []
@@ -118,7 +117,6 @@ def test_on_synthetic_dataset(
     inverse_quantile_metrics = {
         "wasserstein2": [],
         "unexplained_variance_percentage": [],
-        "monotonicity_violations": [],
         "sliced_wasserstein2": [],
         "kde_kl_divergence": [],
         "kde_l1_divergence": []
@@ -192,7 +190,6 @@ def test(
     experiment: Experiment,
     exclude_wasserstein2: bool = False,
     exclude_unexplained_variance_percentage: bool = False,
-    exclude_monotonicity_violations: bool = False,
     exclude_sliced_wasserstein2: bool = False,
     exclude_kde_kl_divergence: bool = False,
     exclude_kde_l1_divergence: bool = False,
@@ -209,7 +206,7 @@ def test(
     }:
         return test_on_synthetic_dataset(
             experiment, exclude_wasserstein2, exclude_unexplained_variance_percentage,
-            exclude_monotonicity_violations, exclude_sliced_wasserstein2,
+            exclude_sliced_wasserstein2,
             exclude_kde_kl_divergence, exclude_kde_l1_divergence, verbose
         )
     else:
@@ -224,12 +221,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_to_experiment_file", type=str, required=True)
     parser.add_argument("--verbose", type=bool, required=False, default=True)
-    parser.add_argument(
-        "--exclude-monotonicity-violations",
-        action="store_true",
-        required=False,
-        default=False
-    )
     parser.add_argument(
         "--exclude-sliced-wasserstein2",
         action="store_true",
@@ -263,6 +254,6 @@ if __name__ == "__main__":
     test_from_json_file(
         args.path_to_experiment_file, args.verbose, args.exclude_wasserstein2,
         args.exclude_unexplained_variance_percentage,
-        args.exclude_monotonicity_violations, args.exclude_sliced_wasserstein2,
+        args.exclude_sliced_wasserstein2,
         args.exclude_kde_kl_divergence, args.exclude_kde_l1_divergence
     )
