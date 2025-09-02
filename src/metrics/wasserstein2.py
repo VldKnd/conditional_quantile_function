@@ -18,8 +18,6 @@ def wassertein2(ground_truth: torch.Tensor, approximation: torch.Tensor):
 
 
 if __name__ == "__main__":
-    statistics = {"10": [], "100": [], "1000": [], "10000": []}
-
     distances = []
     pbar = tqdm(range(10000))
 
