@@ -3,7 +3,7 @@ import torch
 
 def percentage_of_unexplained_variance(
     ground_truth: torch.Tensor, approximation: torch.Tensor
-) -> float:
+) -> torch.Tensor:
     """
     Computes the unexplained variance percentage between two sets of points.
     """
@@ -11,7 +11,7 @@ def percentage_of_unexplained_variance(
         ground_truth.sub(approximation).norm(dim=-1).pow(2).mean() /
         ground_truth.mean(dim=-1, keepdim=True).sub(ground_truth).norm(dim=-1
                                                                        ).pow(2).mean()
-    ).item() * 100
+    ) * 100
 
 
 if __name__ == "__main__":

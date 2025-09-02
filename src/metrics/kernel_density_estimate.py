@@ -87,9 +87,10 @@ if __name__ == "__main__":
                 )
             ]
         )
-        pbar.set_description(
-            f"Mean L1: {distances_l1.mean():.3f}, "
-            f"Std: {distances_l1.std():.3f}, "
-            f"Mean KL: {distances_kl.mean():.3f}, "
-            f"Std: {distances_kl.std():.3f}"
-        )
+        if i >= 5:
+            pbar.set_description(
+                f"Mean L1: {distances_l1.mean():.3f}, "
+                f"Std: {distances_l1.std():.3f}, "
+                f"Mean KL: {distances_kl.mean():.3f}, "
+                f"Std: {distances_kl.std():.3f}"
+            )

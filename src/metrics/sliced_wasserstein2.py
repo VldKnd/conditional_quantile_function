@@ -14,7 +14,7 @@ def sliced_wasserstein2(
         approximation (torch.Tensor): The approximation points.
 
     Returns:
-        float: The Sliced Wasserstein distance between the two sets of points.
+        torch.Tensor: The Sliced Wasserstein distance between the two sets of points.
     """
     return ot.sliced_wasserstein_distance(
         X_s=ground_truth, X_t=approximation, n_projections=1000
@@ -34,5 +34,5 @@ if __name__ == "__main__":
                          0.5) * switch + (torch.rand(10000, 5) - 0.5) * (1 - switch)
         distances.append(sliced_wasserstein2(ground_truth, approximation))
         pbar.set_description(
-            f"Mean: {torch.tensor(distances).mean()}, Std: {torch.tensor(distances).std()}"
+            f"Mean: {torch.stack(distances).mean()}, Std: {torch.stack(distances).std()}"
         )
