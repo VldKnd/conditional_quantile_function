@@ -139,7 +139,7 @@ class PISCNN(PICNN):
 
     def __init__(self, *args, **kwargs):
         super(PISCNN, self).__init__(*args, **kwargs)
-        self.log_alpha = nn.Parameter(torch.log(torch.tensor(1e-2)))
+        self.log_alpha = nn.Parameter(torch.log(torch.tensor(1e-1)))
 
     def forward(self, condition: torch.Tensor, tensor: torch.Tensor):
         output = super().forward(condition, tensor)
