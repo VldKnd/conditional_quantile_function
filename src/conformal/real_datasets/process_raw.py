@@ -22,6 +22,7 @@ def load_rf1() -> tuple[np.ndarray, np.ndarray]:
         path=_RAW_DATASETS,
         processor=rf1_processor
     )
+    #print(f"{file_name=}")
     with np.load(file_name) as npzf:
         X, Y = npzf["X"], npzf["Y"]
     return X, Y
@@ -47,13 +48,24 @@ def rf1_processor(fname, action, pooch):
     pooch.retrieve in place of the original file path.
     '''
     full_path = os.path.join(_PROCESSED_DATASETS, "rf1.npz")
-    if action in ("update", "download"):
+    #print(f"{full_path=}")
+    if action in ("update", "download") or not os.path.isfile(full_path):
         df = arff.loadarff(fname)
         df = pd.DataFrame(df[0])
         X, Y = df.iloc[:, :-8].values, df.iloc[:, -8:].values
         from sklearn.impute import SimpleImputer
-        imputer = SimpleImputer(missing_values=np.nan, strategy='mean')
+        imputer = SimpleImputer(missing_values=np.nan, strategy='median')
         X = imputer.fit_transform(X)
+
+        # Remove outliers
+        for i, j in zip(
+            [4830, 4836, 4842, 4848, 4854, 4866, 4878, 4890],
+            [1, 9, 17, 25, 33, 41, 49, 57]
+        ):
+            X[i, j] = np.median(X[:, j])
+        
+        Y[4782, 1] = np.median(Y[:, 1])
+
         np.savez(full_path, X=X, Y=Y)
 
     return full_path
@@ -63,9 +75,7 @@ loaders = {
     "rf1": load_rf1,
 }
 
-
 datasets = tuple(loaders.keys())
-
 
 if __name__ == "__main__":
     X, Y = load_rf1()
