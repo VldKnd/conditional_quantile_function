@@ -26,6 +26,9 @@ dependencies = [
     "taskipy>=1.14.1",
     "yapf>=0.40.2",
     "pooch>=1.8.2",
+    "tqdm-pathos>=0.4",
+    "statsmodels>=0.14.5",
+    "seaborn>=0.13.2",
 ]
 
 [tool.taskipy.tasks]
