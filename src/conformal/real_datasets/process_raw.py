@@ -27,6 +27,12 @@ loaders: dict[str, Callable[[], tuple[np.ndarray, np.ndarray]]] = {}
 
 
 def download_with_pooch(name: str, url: str, known_hash: str):
+    """
+    Parameterazed decorator to convert initial dataset preprocessing function
+    to a loading function and polulate the registry.
+    Each dataset will be downloaded and stored locally as a raw and 
+    a preprocessed NumPy .npz archive with X and Y.
+    """
 
     def _decorator(processor):
 
@@ -47,52 +53,64 @@ def download_with_pooch(name: str, url: str, known_hash: str):
     return _decorator
 
 
+def make_pooch_precessor(file_name_processed: str):
+    full_path = os.path.join(_PROCESSED_DATASETS, file_name_processed)
+
+    def _decorator(func):
+
+        @functools.wraps(func)
+        def wrapper(fname, action, pooch):
+            '''
+            Processes the downloaded file and returns a new file name.
+
+            The function **must** take as arguments (in order):
+
+            fname : str
+                The full path of the file in the local data storage
+            action : str
+                Either: "download" (file doesn't exist and will be downloaded),
+                "update" (file is outdated and will be downloaded), or "fetch"
+                (file exists and is updated so no download is necessary).
+            pooch : pooch.Pooch
+                The instance of the Pooch class that is calling this function.
+
+            The return value can be anything but is usually a full path to a file
+            (or list of files). This is what will be returned by Pooch.fetch and
+            pooch.retrieve in place of the original file path.
+            '''
+            if action in ("update", "download") or not os.path.isfile(full_path):
+                X, Y = func(fname)
+                np.savez(full_path, X=X, Y=Y)
+            return full_path
+
+        return wrapper
+
+    return _decorator
+
+
 @download_with_pooch(
     name="rf1",
     url="https://www.openml.org/data/download/21230440/file173039e7713b.arff",
     known_hash="994f9e334811e040d2002e46d3ce06504e5d441249bf65448f53d6ea24b33cf0"
 )
-def rf1_processor(fname, action, pooch):
-    '''
-    Processes the downloaded file and returns a new file name.
+@make_pooch_precessor(file_name_processed="rf1.npz")
+def rf1_processor(fname):
+    data, meta = arff.loadarff(fname)
+    df = pd.DataFrame(data)
+    X, Y = df.iloc[:, :-8].values, df.iloc[:, -8:].values
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
 
-    The function **must** take as arguments (in order):
+    # Remove outliers
+    for i, j in zip(
+        [4830, 4836, 4842, 4848, 4854, 4866, 4878, 4890],
+        [1, 9, 17, 25, 33, 41, 49, 57]
+    ):
+        X[i, j] = np.median(X[:, j])
+    Y[4782, 1] = np.median(Y[:, 1])
 
-    fname : str
-        The full path of the file in the local data storage
-    action : str
-        Either: "download" (file doesn't exist and will be downloaded),
-        "update" (file is outdated and will be downloaded), or "fetch"
-        (file exists and is updated so no download is necessary).
-    pooch : pooch.Pooch
-        The instance of the Pooch class that is calling this function.
-
-    The return value can be anything but is usually a full path to a file
-    (or list of files). This is what will be returned by Pooch.fetch and
-    pooch.retrieve in place of the original file path.
-    '''
-    full_path = os.path.join(_PROCESSED_DATASETS, "rf1.npz")
-    #print(f"{full_path=}")
-    if action in ("update", "download") or not os.path.isfile(full_path):
-        data, meta = arff.loadarff(fname)
-        df = pd.DataFrame(data)
-        X, Y = df.iloc[:, :-8].values, df.iloc[:, -8:].values
-        from sklearn.impute import SimpleImputer
-        imputer = SimpleImputer(missing_values=np.nan, strategy='median')
-        X = imputer.fit_transform(X)
-
-        # Remove outliers
-        for i, j in zip(
-            [4830, 4836, 4842, 4848, 4854, 4866, 4878, 4890],
-            [1, 9, 17, 25, 33, 41, 49, 57]
-        ):
-            X[i, j] = np.median(X[:, j])
-
-        Y[4782, 1] = np.median(Y[:, 1])
-
-        np.savez(full_path, X=X, Y=Y)
-
-    return full_path
+    return X, Y
 
 
 @download_with_pooch(
@@ -100,19 +118,16 @@ def rf1_processor(fname, action, pooch):
     url="https://www.openml.org/data/download/21230442/file1730122322aa.arff",
     known_hash="4def7af4a1da3e20b719513d6d7e581f8b743c3d5094f7def925d53ba8a86268"
 )
-def scm1d_processor(fname, action, pooch):
-    full_path = os.path.join(_PROCESSED_DATASETS, "scm1d.npz")
-    #print(f"{full_path=}")
-    if action in ("update", "download") or not os.path.isfile(full_path):
-        data, meta = arff.loadarff(fname)
-        df = pd.DataFrame(data)
-        X, Y = df.iloc[:, :-16].values, df.iloc[:, -16:].values
-        from sklearn.impute import SimpleImputer
-        imputer = SimpleImputer(missing_values=np.nan, strategy='median')
-        X = imputer.fit_transform(X)
-        np.savez(full_path, X=X, Y=Y)
+@make_pooch_precessor(file_name_processed="scm1d.npz")
+def scm1d_processor(fname):
+    data, meta = arff.loadarff(fname)
+    df = pd.DataFrame(data)
+    X, Y = df.iloc[:, :-16].values, df.iloc[:, -16:].values
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
 
-    return full_path
+    return X, Y
 
 
 if __name__ == "__main__":
