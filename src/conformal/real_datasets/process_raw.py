@@ -1,3 +1,6 @@
+from collections.abc import Callable
+import functools
+
 import os
 import numpy as np
 from scipy.io import arff
@@ -14,24 +17,41 @@ _PROCESSED_DATASETS = "./data/processed/"
 
 __all__ = ["loaders", "datasets"]
 
-
 os.makedirs(_RAW_DATASETS, exist_ok=True)
 os.makedirs(_PROCESSED_DATASETS, exist_ok=True)
 
-
-def load_rf1() -> tuple[np.ndarray, np.ndarray]:
-    file_name = pooch.retrieve(
-        url="https://www.openml.org/data/download/21230440/file173039e7713b.arff",
-        known_hash="994f9e334811e040d2002e46d3ce06504e5d441249bf65448f53d6ea24b33cf0",
-        path=_RAW_DATASETS,
-        processor=rf1_processor
-    )
-    #print(f"{file_name=}")
-    with np.load(file_name) as npzf:
-        X, Y = npzf["X"], npzf["Y"]
-    return X, Y
+# Names of all available datasets
+datasets: list[str] = []
+# Map from dataset name to the function that loads the dataset as a pair of NumPy arrays
+loaders: dict[str, Callable[[], tuple[np.ndarray, np.ndarray]]] = {}
 
 
+def download_with_pooch(name: str, url: str, known_hash: str):
+
+    def _decorator(processor):
+
+        @functools.wraps(processor)
+        def wrapper() -> tuple[np.ndarray, np.ndarray]:
+            file_name = pooch.retrieve(
+                url=url, known_hash=known_hash, path=_RAW_DATASETS, processor=processor
+            )
+            #print(f"{file_name=}")
+            with np.load(file_name) as npzf:
+                X, Y = npzf["X"], npzf["Y"]
+            return X, Y
+
+        datasets.append(name)
+        loaders[name] = wrapper
+        return wrapper
+
+    return _decorator
+
+
+@download_with_pooch(
+    name="rf1",
+    url="https://www.openml.org/data/download/21230440/file173039e7713b.arff",
+    known_hash="994f9e334811e040d2002e46d3ce06504e5d441249bf65448f53d6ea24b33cf0"
+)
 def rf1_processor(fname, action, pooch):
     '''
     Processes the downloaded file and returns a new file name.
@@ -54,8 +74,8 @@ def rf1_processor(fname, action, pooch):
     full_path = os.path.join(_PROCESSED_DATASETS, "rf1.npz")
     #print(f"{full_path=}")
     if action in ("update", "download") or not os.path.isfile(full_path):
-        df = arff.loadarff(fname)
-        df = pd.DataFrame(df[0])
+        data, meta = arff.loadarff(fname)
+        df = pd.DataFrame(data)
         X, Y = df.iloc[:, :-8].values, df.iloc[:, -8:].values
         from sklearn.impute import SimpleImputer
         imputer = SimpleImputer(missing_values=np.nan, strategy='median')
@@ -67,7 +87,7 @@ def rf1_processor(fname, action, pooch):
             [1, 9, 17, 25, 33, 41, 49, 57]
         ):
             X[i, j] = np.median(X[:, j])
-        
+
         Y[4782, 1] = np.median(Y[:, 1])
 
         np.savez(full_path, X=X, Y=Y)
@@ -75,12 +95,28 @@ def rf1_processor(fname, action, pooch):
     return full_path
 
 
-loaders = {
-    "rf1": load_rf1,
-}
+@download_with_pooch(
+    name="scm1d",
+    url="https://www.openml.org/data/download/21230442/file1730122322aa.arff",
+    known_hash="4def7af4a1da3e20b719513d6d7e581f8b743c3d5094f7def925d53ba8a86268"
+)
+def scm1d_processor(fname, action, pooch):
+    full_path = os.path.join(_PROCESSED_DATASETS, "scm1d.npz")
+    #print(f"{full_path=}")
+    if action in ("update", "download") or not os.path.isfile(full_path):
+        data, meta = arff.loadarff(fname)
+        df = pd.DataFrame(data)
+        X, Y = df.iloc[:, :-16].values, df.iloc[:, -16:].values
+        from sklearn.impute import SimpleImputer
+        imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+        X = imputer.fit_transform(X)
+        np.savez(full_path, X=X, Y=Y)
 
-datasets = tuple(loaders.keys())
+    return full_path
+
 
 if __name__ == "__main__":
-    X, Y = load_rf1()
-    print(f"{X.shape=}, {Y.shape=}")
+    for name, loader in loaders.items():
+        X, Y = loader()
+        print(f"{name=}, {X.shape=}, {Y.shape=}")
+    print("Pass!")
