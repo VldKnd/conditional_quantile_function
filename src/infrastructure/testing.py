@@ -253,6 +253,6 @@ if __name__ == "__main__":
 
     test_from_json_file(
         args.path_to_experiment_file, args.verbose, args.exclude_wasserstein2,
-        args.exclude_unexplained_variance_percentage, args.exclude_sliced_wasserstein2,
+        args.exclude_unexplained_variance, args.exclude_sliced_wasserstein2,
         args.exclude_kde_kl_divergence, args.exclude_kde_l1_divergence
     )
