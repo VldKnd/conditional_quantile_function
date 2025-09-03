@@ -2,7 +2,7 @@
 #SBATCH --job-name=train_test_cqf
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=8G
+#SBATCH --mem=16G
 #SBATCH --time=23:00:00
 
 CFG="$1"
