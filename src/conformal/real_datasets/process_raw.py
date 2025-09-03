@@ -15,6 +15,10 @@ _PROCESSED_DATASETS = "./data/processed/"
 __all__ = ["loaders", "datasets"]
 
 
+os.makedirs(_RAW_DATASETS, exist_ok=True)
+os.makedirs(_PROCESSED_DATASETS, exist_ok=True)
+
+
 def load_rf1() -> tuple[np.ndarray, np.ndarray]:
     file_name = pooch.retrieve(
         url="https://www.openml.org/data/download/21230440/file173039e7713b.arff",
