@@ -18,6 +18,7 @@ class CPFlow(PushForwardOperator, nn.Module):
         feature_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
+        softplus_type: str = "Softplus",
         n_blocks: int = 4,
     ):
         super().__init__()
@@ -26,8 +27,14 @@ class CPFlow(PushForwardOperator, nn.Module):
             feature_dimension=feature_dimension,
             hidden_dimension=hidden_dimension,
             number_of_hidden_layers=number_of_hidden_layers,
+            softplus_type=softplus_type,
             n_blocks=n_blocks,
         )
+
+        softplus_type = {
+            "Softplus": "softplus",
+            "GaussianSoftplus": "gaussian_softplus",
+        }[softplus_type]
 
         icnns = [
             PICNN(
@@ -36,7 +43,7 @@ class CPFlow(PushForwardOperator, nn.Module):
                 dimc=feature_dimension,
                 num_hidden_layers=number_of_hidden_layers,
                 symm_act_first=True,
-                softplus_type="gaussian_softplus",
+                softplus_type=softplus_type,
                 zero_softplus=True,
             ) for _ in range(n_blocks)
         ]

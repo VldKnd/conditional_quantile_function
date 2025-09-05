@@ -181,9 +181,9 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
                 T_max=total_number_of_optimizer_steps,
                 **train_parameters.scheduler_parameters
             )
-            amortization_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer=potential_network_optimizer,
-                T_max=total_number_of_optimizer_steps,
+            amortization_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer=amortization_network_optimizer,
+                T_0=total_number_of_optimizer_steps // 100,
                 **train_parameters.scheduler_parameters
             )
         else:

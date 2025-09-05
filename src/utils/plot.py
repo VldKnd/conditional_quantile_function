@@ -14,12 +14,13 @@ from utils.quantile import get_quantile_level_analytically
 
 def plot_quantile_levels_from_dataset(
     model: PushForwardOperator, dataset: Dataset, conditional_value: torch.Tensor,
-    number_of_quantile_levels: int, tensor_parameters: dict
+    number_of_quantile_levels: int, tensor_parameters: dict,
+    latent_distribution_name: str
 ):
 
     quantile_levels = torch.linspace(0.05, 0.95, number_of_quantile_levels)
     radii = get_quantile_level_analytically(
-        quantile_levels, distribution="gaussian", dimension=2
+        quantile_levels, distribution=latent_distribution_name, dimension=2
     )
 
     X_batch = conditional_value.repeat(1000, 1).to(**tensor_parameters)

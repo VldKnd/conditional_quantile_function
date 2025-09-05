@@ -4,7 +4,8 @@ import scipy.stats as stats
 
 
 def get_quantile_level_analytically(
-    alpha: torch.Tensor, distribution: Literal["gaussian", "ball"], dimension: int
+    alpha: torch.Tensor, distribution: Literal["gaussian", "uniform_ball"],
+    dimension: int
 ) -> torch.Tensor:
     """Function finds the radius, that is corresponding to alpha-quantile of the samples.
 
@@ -22,7 +23,7 @@ def get_quantile_level_analytically(
     if distribution == "gaussian":
         scipy_quantile = stats.chi2.ppf(alpha.cpu().detach().numpy(), df=dimension)
         return torch.from_numpy(scipy_quantile**(1 / 2))
-    elif distribution == "ball":
+    elif distribution == "uniform_ball":
         return alpha**(1 / dimension)
     else:
         raise ValueError(f"Distribution {distribution} is not supported.")

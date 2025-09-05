@@ -64,4 +64,4 @@ def uniform_centered_like(tensor: torch.Tensor):
 def uniform_ball_like(tensor: torch.Tensor):
     point = torch.randn(*tensor.shape[:-1], tensor.shape[-1] + 2)
     point_normalized = point / point.norm(dim=-1, keepdim=True)
-    return point_normalized
+    return point_normalized[..., :-2]

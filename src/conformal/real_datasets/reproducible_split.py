@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-
 from conformal.real_datasets.process_raw import loaders
 
 
@@ -41,21 +40,21 @@ class DatasetSplit:
         self.n_train, self.n_features = self.X_train_raw.shape
         self.n_cal = self.X_cal_raw.shape[0]
         self.n_test, self.n_outputs = self.Y_test_raw.shape
-        
+
         self.X_scaler = StandardScaler().fit(self.X_train_raw)
         self.Y_scaler = StandardScaler().fit(self.Y_train_raw)
-        
+
         self.X_train, self.X_cal, self.X_test = \
-            map(self.X_scaler.transform, (self.X_train_raw, 
-                                          self.X_cal_raw, 
+            map(self.X_scaler.transform, (self.X_train_raw,
+                                          self.X_cal_raw,
                                           self.X_test_raw))
         self.Y_train, self.Y_cal, self.Y_test = \
-            map(self.Y_scaler.transform, (self.Y_train_raw, 
-                                          self.Y_cal_raw, 
+            map(self.Y_scaler.transform, (self.Y_train_raw,
+                                          self.Y_cal_raw,
                                           self.Y_test_raw))
 
 
-def get_dataset_split(name: str, seed:int, n_train=2000, n_cal=2000, n_test=2000):
+def get_dataset_split(name: str, seed: int, n_train=2000, n_cal=2000, n_test=2000):
     load_func = loaders.get(name, None)
     if load_func is not None:
         X, Y = load_func()
@@ -74,10 +73,15 @@ def get_dataset_split(name: str, seed:int, n_train=2000, n_cal=2000, n_test=2000
         idx_train = idx[train_start:train_end]
         idx_cal = idx[cal_start:cal_end]
         idx_test = idx[test_start:test_end]
-        
-        return DatasetSplit(X_train_raw=X[idx_train], Y_train_raw=Y[idx_train],
-                            X_cal_raw=X[idx_cal], Y_cal_raw=Y[idx_cal],
-                            X_test_raw=X[idx_test], Y_test_raw=Y[idx_test])
+
+        return DatasetSplit(
+            X_train_raw=X[idx_train],
+            Y_train_raw=Y[idx_train],
+            X_cal_raw=X[idx_cal],
+            Y_cal_raw=Y[idx_cal],
+            X_test_raw=X[idx_test],
+            Y_test_raw=Y[idx_test]
+        )
     else:
         raise Exception(f"Unknown dataset: {name}.")
 

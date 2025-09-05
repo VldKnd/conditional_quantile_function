@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-
 # Worst-slab coverage, as introduced in:
 # 1. Knowing what You Know: valid and validated confidence sets in multiclass and multilabel prediction
 #    M. Cauchois, S. Gupta, J. Duchi - Journal of machine learning research, 2021
@@ -12,6 +11,7 @@ from sklearn.model_selection import train_test_split
 # Code adapted from:
 # 1. https://github.com/msesia/chr/blob/master/chr/coverage.py
 # 2. https://github.com/Vekteur/multi-output-conformal-regression/blob/master/moc/metrics/conditional_coverage_metrics.py
+
 
 def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
 
@@ -26,8 +26,7 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
         cover_min = cover.mean()
         for ai in np.arange(0, ai_max):
             bi_min = np.minimum(ai + int(np.round(delta * n)), n)
-            coverage = np.cumsum(cover_ordered[ai:n]) / np.arange(
-                1, n - ai + 1)
+            coverage = np.cumsum(cover_ordered[ai:n]) / np.arange(1, n - ai + 1)
             coverage[np.arange(0, bi_min - ai)] = 1
             bi_star = ai + np.argmin(coverage)
             cover_star = coverage[bi_star - ai]
@@ -64,7 +63,8 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
         # Calculate coverage for all pairs
         denominator = bi_mesh - ai_mesh + 1
         numerator = cumsum_cover[bi_mesh] - np.where(
-            ai_mesh > 0, cumsum_cover[ai_mesh - 1], 0)
+            ai_mesh > 0, cumsum_cover[ai_mesh - 1], 0
+        )
 
         coverage = np.full_like(denominator, np.inf, dtype=float)
         valid_mask = (bi_mesh >= ai_mesh) & (denominator > 0)
@@ -75,8 +75,7 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
 
         # Find the minimum coverage and corresponding indices
         min_coverage = np.min(coverage)
-        ai_best, bi_best = np.unravel_index(np.argmin(coverage),
-                                            coverage.shape)
+        ai_best, bi_best = np.unravel_index(np.argmin(coverage), coverage.shape)
 
         return min_coverage, z_sorted[ai_best], z_sorted[bi_best]
 
@@ -101,7 +100,8 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
     if n_cpus < 2:
         for m in range(M):
             wsc_list[m], a_list[m], b_list[m] = wsc_v_fully_vectorized(
-                V[m], reprs, coverages, delta)
+                V[m], reprs, coverages, delta
+            )
     else:
         import tqdm_pathos
         res = tqdm_pathos.map(
@@ -123,13 +123,9 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
     return wsc_star, v_star, a_star, b_star
 
 
-def wsc_unbiased(reprs,
-                 coverages,
-                 delta,
-                 M=1000,
-                 test_size=0.75,
-                 random_state=0,
-                 n_cpus=1):
+def wsc_unbiased(
+    reprs, coverages, delta, M=1000, test_size=0.75, random_state=0, n_cpus=1
+):
 
     def wsc_vab(reprs, cover, v, a, b):
         n = len(reprs)
@@ -143,17 +139,18 @@ def wsc_unbiased(reprs,
         reprs_test,
         coverages_train,
         coverages_test,
-    ) = train_test_split(reprs,
-                         coverages,
-                         test_size=test_size,
-                         random_state=random_state)
+    ) = train_test_split(
+        reprs, coverages, test_size=test_size, random_state=random_state
+    )
     # Find adversarial parameters
-    wsc_star, v_star, a_star, b_star = wsc(reprs_train,
-                                           coverages_train,
-                                           delta=delta,
-                                           M=M,
-                                           random_state=random_state,
-                                           n_cpus=n_cpus)
+    wsc_star, v_star, a_star, b_star = wsc(
+        reprs_train,
+        coverages_train,
+        delta=delta,
+        M=M,
+        random_state=random_state,
+        n_cpus=n_cpus
+    )
     # print(wsc_star, v_star, a_star, b_star)
     # Estimate coverage
     coverage = wsc_vab(reprs_test, coverages_test, v_star, a_star, b_star)
