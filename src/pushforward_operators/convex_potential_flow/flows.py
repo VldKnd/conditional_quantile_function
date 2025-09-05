@@ -16,9 +16,9 @@ class ActNorm(torch.nn.Module):
 
     def __init__(self, num_features, logscale_factor=1.0, scale=1.0, learn_scale=True):
         super(ActNorm, self).__init__()
-        self.initialized = False
         self.num_features = num_features
 
+        self.register_buffer("initialized", torch.tensor(False))
         self.register_parameter(
             "b", nn.Parameter(torch.zeros(1, num_features, 1), requires_grad=True)
         )
@@ -36,7 +36,7 @@ class ActNorm(torch.nn.Module):
         x = x.view(input_shape[0], input_shape[1], -1)
 
         if not self.initialized:
-            self.initialized = True
+            self.initialized = ~self.initialized
 
             # noinspection PyShadowingNames
             def unsqueeze(x):

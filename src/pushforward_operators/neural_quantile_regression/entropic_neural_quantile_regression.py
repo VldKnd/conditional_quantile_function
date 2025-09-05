@@ -17,8 +17,6 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         epsilon: float,
-        softplus_type: str = "Softplus",
-        latent_distribution_name: str = "normal",
         amount_of_samples_to_estimate_psi: int = 1024,
         *args,
         **kwargs
@@ -29,22 +27,17 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             "response_dimension": response_dimension,
             "hidden_dimension": hidden_dimension,
             "number_of_hidden_layers": number_of_hidden_layers,
-            "epsilon": epsilon,
-            "softplus_type": softplus_type,
-            "latent_distribution_name": latent_distribution_name,
             "amount_of_samples_to_estimate_psi": amount_of_samples_to_estimate_psi,
+            "epsilon": epsilon,
         }
 
-        self.latent_distribution_name = latent_distribution_name
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
         self.potential_network = PICNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
-            number_of_hidden_layers=number_of_hidden_layers,
-            softplus_type=softplus_type,
-            output_dimension=1
+            number_of_hidden_layers=number_of_hidden_layers
         )
 
         self.epsilon = epsilon
@@ -113,9 +106,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             for X_batch, Y_batch in dataloader:
 
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = sample_distribution_like(
-                    Y_batch, self.latent_distribution_name
-                )
+                U_batch = sample_distribution_like(Y_batch, "normal")
 
                 potential_network_optimizer.zero_grad()
                 psi = self.estimate_psi(X_tensor=X_batch, Y_tensor=Y_scaled)

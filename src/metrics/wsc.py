@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 # 2. https://github.com/Vekteur/multi-output-conformal-regression/blob/master/moc/metrics/conditional_coverage_metrics.py
 
 
-def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
+def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1, verbose=False):
 
     def wsc_v(reprs, cover, delta, v):
         n = len(cover)
@@ -111,7 +111,7 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
             coverages,
             delta,
             n_cpus=n_cpus,
-            #tqdm_kwargs={"disable": not verbose}
+            tqdm_kwargs={"disable": not verbose}
         )
         wsc_list, a_list, b_list = zip(*res)
 
@@ -124,7 +124,14 @@ def wsc(reprs, coverages, delta, M=1000, random_state=42, n_cpus=1):
 
 
 def wsc_unbiased(
-    reprs, coverages, delta, M=1000, test_size=0.75, random_state=0, n_cpus=1
+    reprs,
+    coverages,
+    delta,
+    M=1000,
+    test_size=0.75,
+    random_state=0,
+    n_cpus=1,
+    verbose=False
 ):
 
     def wsc_vab(reprs, cover, v, a, b):
@@ -149,7 +156,8 @@ def wsc_unbiased(
         delta=delta,
         M=M,
         random_state=random_state,
-        n_cpus=n_cpus
+        n_cpus=n_cpus,
+        verbose=verbose
     )
     # print(wsc_star, v_star, a_star, b_star)
     # Estimate coverage

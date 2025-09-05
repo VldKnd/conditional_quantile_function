@@ -46,31 +46,28 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        softplus_type: str = "Softplus",
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "u",
-        latent_distribution_name: str = "normal",
     ):
         super().__init__()
         self.init_dict = {
-            "feature_dimension": feature_dimension,
-            "response_dimension": response_dimension,
-            "hidden_dimension": hidden_dimension,
-            "number_of_hidden_layers": number_of_hidden_layers,
-            "softplus_type": softplus_type,
+            "feature_dimension":
+            feature_dimension,
+            "response_dimension":
+            response_dimension,
+            "hidden_dimension":
+            hidden_dimension,
+            "number_of_hidden_layers":
+            number_of_hidden_layers,
             "potential_to_estimate_with_neural_network":
             potential_to_estimate_with_neural_network,
-            "latent_distribution_name": latent_distribution_name,
         }
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network
-        self.latent_distribution_name = latent_distribution_name
 
         self.potential_network = PISCNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
-            number_of_hidden_layers=number_of_hidden_layers,
-            softplus_type=softplus_type,
-            output_dimension=1
+            number_of_hidden_layers=number_of_hidden_layers
         )
 
         self.amortization_network = AmortizationNetwork(
@@ -199,9 +196,7 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         for epoch_idx in progress_bar:
             for X_batch, Y_batch in dataloader:
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = sample_distribution_like(
-                    Y_batch, self.latent_distribution_name
-                )
+                U_batch = sample_distribution_like(Y_batch, "normal")
 
                 if self.potential_to_estimate_with_neural_network == "y":
                     amortized_tensor = self.amortization_network(X_batch, U_batch)

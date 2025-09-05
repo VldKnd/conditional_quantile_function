@@ -16,8 +16,6 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        softplus_type: str = "Softplus",
-        latent_distribution_name: str = "normal",
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "u",
     ):
         super().__init__()
@@ -31,23 +29,16 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             hidden_dimension,
             "number_of_hidden_layers":
             number_of_hidden_layers,
-            "softplus_type":
-            softplus_type,
-            "latent_distribution_name":
-            latent_distribution_name,
             "potential_to_estimate_with_neural_network":
             potential_to_estimate_with_neural_network
         }
 
-        self.latent_distribution_name = latent_distribution_name
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network
         self.potential_network = PISCNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
             number_of_hidden_layers=number_of_hidden_layers,
-            softplus_type=softplus_type,
-            output_dimension=1
         )
 
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
@@ -153,9 +144,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             for X_batch, Y_batch in dataloader:
 
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = sample_distribution_like(
-                    Y_batch, self.latent_distribution_name
-                )
+                U_batch = sample_distribution_like(Y_batch, "normal")
 
                 if self.potential_to_estimate_with_neural_network == "y":
                     inverse_tensor = self.c_transform_inverse(X_batch, U_batch)

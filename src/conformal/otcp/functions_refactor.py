@@ -58,7 +58,7 @@ def MultivQuantileTresholdRefactor(
     # Solve OT
     mu = sample_grid_refactor(data_calib, seed=seed, positive=positive)
     psi, psi_star = learn_psi(mu, data_calib)
-    
+
     # QUANTILE TRESHOLDS
     n = len(data_valid)
     Ranks_data_valid = RankFuncRefactor(data_valid, mu, psi)
