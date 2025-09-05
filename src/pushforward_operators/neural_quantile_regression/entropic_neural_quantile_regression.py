@@ -156,14 +156,16 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         n, _ = X_tensor.shape
         m = self.amount_of_samples_to_estimate_psi
         U_tensor = sample_distribution(
-            (self.amount_of_samples_to_estimate_psi, *Y_tensor.shape[1:]),
-            self.latent_distribution_name
+            (self.amount_of_samples_to_estimate_psi, *Y_tensor.shape[1:]), "normal"
         ).to(Y_tensor)
         U_expanded_for_X = U_tensor.unsqueeze(0).expand(n, -1, -1)
         X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, m, -1)
 
-        phi_values = self.potential_network(X_expanded_for_U,
-                                            U_expanded_for_X).squeeze(-1)
+        phi_values = self.potential_network(
+            X_expanded_for_U.reshape(-1, X_expanded_for_U.shape[-1]),
+            U_expanded_for_X.reshape(-1, U_expanded_for_X.shape[-1])
+        ).reshape(n, m, -1).squeeze(-1)
+
         cost_matrix = Y_tensor @ U_tensor.T
 
         slackness = (cost_matrix - phi_values) / self.epsilon
