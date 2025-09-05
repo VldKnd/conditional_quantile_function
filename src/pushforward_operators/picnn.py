@@ -4,15 +4,25 @@ from torch import Tensor
 import numpy as np
 
 
-class GaussianSoftplus(nn.Module):
+def gaussian_softplus(x):
+    z = np.sqrt(np.pi / 2)
+    return (z * x * torch.erf(x / np.sqrt(2)) + torch.exp(-(x**2) / 2) +
+            z * x) / (2 * z)
 
-    def __init__(self):
+
+class CustomizedSoftplus(nn.Module):
+
+    def __init__(self, softplus_type: str = "Softplus"):
         super().__init__()
+        if softplus_type == "Softplus":
+            self.softplus_function = torch.nn.functional.softplus
+        elif softplus_type == "GaussianSoftplus":
+            self.softplus_function = gaussian_softplus
+        else:
+            raise ValueError(f"Invalid softplus type: {softplus_type}")
 
     def forward(self, x: Tensor) -> Tensor:
-        z = torch.sqrt(torch.tensor(torch.pi) / 2)
-        return (z * x * torch.erf(x / 2**(1 / 2)) + torch.exp(-(x**2) / 2) +
-                z * x) / (2 * z)
+        return self.softplus_function(x)
 
 
 class PosLinear(torch.nn.Linear):
@@ -33,6 +43,7 @@ class PICNN(nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         output_dimension: int = 1,
+        softplus_type: str = "Softplus",
         *args,
         **kwargs,
     ):
@@ -43,8 +54,8 @@ class PICNN(nn.Module):
 
         # Activations:
         self.number_of_hidden_layers = number_of_hidden_layers
-        self.z_activation = GaussianSoftplus()
-        self.u_activation = nn.ELU()
+        self.z_activation = CustomizedSoftplus(softplus_type=softplus_type)
+        self.u_activation = nn.ReLU()
         self.positive_activation = nn.ReLU()
 
         # First layer
@@ -91,7 +102,6 @@ class PICNN(nn.Module):
             ]
         )
 
-        # Last layer:
         self.last_linear_layer_uz = nn.Linear(u_dimension, z_dimension)
         self.last_linear_layer_z = PosLinear(z_dimension, output_dimension)
         self.last_linear_layer_uy = nn.Linear(u_dimension, y_dimension)

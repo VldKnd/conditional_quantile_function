@@ -85,7 +85,7 @@ class DiscreteVQFBase(VQFBase):
         """
         T, d = self._T, self._d
         U = _decode_quantile_grid(T, d, self._U)
-        U = np.stack(U, axis=0)  # Stack into shape (d,T,T,...,T)
+        U = np.stack(U, axis=0)
         assert U.shape == tuple([d, *[T] * d])
         return U
 
@@ -281,7 +281,6 @@ class DiscreteCVQF(CVQF, DiscreteVQFBase):
         :return: A d-dimensional vector quantile of shape (d,).
         """
         if x is None:
-            # This is only supported to conform to VQF.evaluate(u).
             warnings.warn(f"Evaluating DiscreteCVQF with X=None not recommended")
             x = np.zeros(shape=(1, self._k_in))
 
@@ -300,7 +299,7 @@ class DiscreteCVQF(CVQF, DiscreteVQFBase):
         x = x.reshape(1, -1)
         check_array(x, ensure_2d=True, allow_nd=False)
 
-        z = x  # z represents the transformed x
+        z = x
         if self._X_transform is not None:
             _, k_in = x.shape
             if k_in != self._k_in:

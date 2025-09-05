@@ -1,10 +1,11 @@
 import torch.nn as nn
 import torch
 from tqdm import trange
-from typing import Literal
 from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
-from pushforward_operators.picnn import network_type_name_to_network_type
+from pushforward_operators.picnn import PICNN
+from utils.distribution import sample_distribution_like
+from utils.distribution import sample_distribution
 
 
 class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
@@ -16,8 +17,8 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         hidden_dimension: int,
         number_of_hidden_layers: int,
         epsilon: float,
-        activation_function_name: str = "Softplus",
-        network_type: Literal["SCFFNN", "FFNN", "PICNN", "PISCNN"] = "PICNN",
+        softplus_type: str = "Softplus",
+        latent_distribution_name: str = "normal",
         amount_of_samples_to_estimate_psi: int = 1024,
         *args,
         **kwargs
@@ -29,28 +30,21 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             "hidden_dimension": hidden_dimension,
             "number_of_hidden_layers": number_of_hidden_layers,
             "epsilon": epsilon,
-            "activation_function_name": activation_function_name,
-            "network_type": network_type,
+            "softplus_type": softplus_type,
+            "latent_distribution_name": latent_distribution_name,
             "amount_of_samples_to_estimate_psi": amount_of_samples_to_estimate_psi,
         }
 
-        self.activation_function_name = activation_function_name
-        try:
-            self.activation_function = getattr(nn, activation_function_name)()
-        except AttributeError:
-            raise ValueError(
-                f"Invalid activation function name: {activation_function_name}. "
-                f"Must be a valid PyTorch activation function."
-            )
+        self.latent_distribution_name = latent_distribution_name
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
-        self.network_type = network_type
 
-        self.potential_network = network_type_name_to_network_type[network_type](
+        self.potential_network = PICNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
             number_of_hidden_layers=number_of_hidden_layers,
-            activation_function_name=activation_function_name
+            softplus_type=softplus_type,
+            output_dimension=1
         )
 
         self.epsilon = epsilon
@@ -119,7 +113,9 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             for X_batch, Y_batch in dataloader:
 
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = torch.randn_like(Y_batch).to(Y_scaled)
+                U_batch = sample_distribution_like(
+                    Y_batch, self.latent_distribution_name
+                )
 
                 potential_network_optimizer.zero_grad()
                 psi = self.estimate_psi(X_tensor=X_batch, Y_tensor=Y_scaled)
@@ -168,8 +164,9 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         """
         n, _ = X_tensor.shape
         m = self.amount_of_samples_to_estimate_psi
-        U_tensor = torch.randn(
-            self.amount_of_samples_to_estimate_psi, *Y_tensor.shape[1:]
+        U_tensor = sample_distribution(
+            (self.amount_of_samples_to_estimate_psi, *Y_tensor.shape[1:]),
+            self.latent_distribution_name
         ).to(Y_tensor)
         U_expanded_for_X = U_tensor.unsqueeze(0).expand(n, -1, -1)
         X_expanded_for_U = X_tensor.unsqueeze(1).expand(-1, m, -1)
@@ -178,13 +175,9 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
                                             U_expanded_for_X).squeeze(-1)
         cost_matrix = Y_tensor @ U_tensor.T
 
-        slackness = cost_matrix - phi_values
-        max_slackness, _ = torch.max(slackness, dim=-1, keepdim=True)
-        slackness_stable = (slackness - max_slackness) / self.epsilon
-        log_mean_exp = torch.logsumexp(slackness_stable, dim=-1, keepdim=True) \
+        slackness = (cost_matrix - phi_values) / self.epsilon
+        log_mean_exp = torch.logsumexp(slackness, dim=-1, keepdim=True) \
                 - torch.log(torch.tensor(m, device=slackness.device, dtype=slackness.dtype))
-
-        log_mean_exp += max_slackness / self.epsilon
 
         psi_estimate = self.epsilon * log_mean_exp
 
@@ -254,6 +247,6 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         cls, path: str, map_location: torch.device = torch.device('cpu')
     ) -> "EntropicNeuralQuantileRegression":
         data = torch.load(path, map_location=map_location)
-        quadratic_potential = cls(**data["init_dict"])
-        quadratic_potential.load_state_dict(data["state_dict"])
-        return quadratic_potential
+        entropic_neural_quantile_regression = cls(**data["init_dict"])
+        entropic_neural_quantile_regression.load_state_dict(data["state_dict"])
+        return entropic_neural_quantile_regression

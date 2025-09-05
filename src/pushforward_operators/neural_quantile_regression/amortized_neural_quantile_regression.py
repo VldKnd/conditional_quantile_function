@@ -3,9 +3,10 @@ from infrastructure.classes import TrainParameters
 import torch
 import torch.nn as nn
 from typing import Literal
-from pushforward_operators.picnn import network_type_name_to_network_type
+from pushforward_operators.picnn import PISCNN
 
 from tqdm import trange
+from utils.distribution import sample_distribution_like
 
 
 class AmortizationNetwork(nn.Module):
@@ -16,9 +17,6 @@ class AmortizationNetwork(nn.Module):
     ):
         super().__init__()
         self.activation_function = nn.ReLU()
-        self.feature_expansion_layer = nn.Linear(
-            feature_dimension, response_dimension * 2
-        )
 
         hidden_layers = []
         for _ in range(number_of_hidden_layers):
@@ -26,7 +24,7 @@ class AmortizationNetwork(nn.Module):
             hidden_layers.append(self.activation_function)
 
         self.amortization_network = nn.Sequential(
-            nn.Linear(3 * response_dimension, hidden_dimension),
+            nn.Linear(feature_dimension + response_dimension, hidden_dimension),
             self.activation_function, *hidden_layers,
             nn.Linear(hidden_dimension, response_dimension)
         )
@@ -34,7 +32,7 @@ class AmortizationNetwork(nn.Module):
         self.identity_projection = nn.Linear(response_dimension, response_dimension)
 
     def forward(self, X: torch.Tensor, U: torch.Tensor):
-        input_tensor = torch.cat([self.feature_expansion_layer(X), U], dim=-1)
+        input_tensor = torch.cat([X, U], dim=-1)
         output_tensor = self.amortization_network(input_tensor)
         input_projection = self.identity_projection(U)
         return output_tensor + input_projection
@@ -48,31 +46,31 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        network_type: Literal["SCFFNN", "PISCNN"] = "PISCNN",
+        softplus_type: str = "Softplus",
         potential_to_estimate_with_neural_network: Literal["y", "u"] = "u",
+        latent_distribution_name: str = "normal",
     ):
         super().__init__()
         self.init_dict = {
-            "feature_dimension":
-            feature_dimension,
-            "response_dimension":
-            response_dimension,
-            "hidden_dimension":
-            hidden_dimension,
-            "number_of_hidden_layers":
-            number_of_hidden_layers,
-            "network_type":
-            network_type,
+            "feature_dimension": feature_dimension,
+            "response_dimension": response_dimension,
+            "hidden_dimension": hidden_dimension,
+            "number_of_hidden_layers": number_of_hidden_layers,
+            "softplus_type": softplus_type,
             "potential_to_estimate_with_neural_network":
-            potential_to_estimate_with_neural_network
+            potential_to_estimate_with_neural_network,
+            "latent_distribution_name": latent_distribution_name,
         }
         self.potential_to_estimate_with_neural_network = potential_to_estimate_with_neural_network
+        self.latent_distribution_name = latent_distribution_name
 
-        self.potential_network = network_type_name_to_network_type[network_type](
+        self.potential_network = PISCNN(
             feature_dimension=feature_dimension,
             response_dimension=response_dimension,
             hidden_dimension=hidden_dimension,
             number_of_hidden_layers=number_of_hidden_layers,
+            softplus_type=softplus_type,
+            output_dimension=1
         )
 
         self.amortization_network = AmortizationNetwork(
@@ -201,7 +199,9 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         for epoch_idx in progress_bar:
             for X_batch, Y_batch in dataloader:
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = torch.randn_like(Y_batch)
+                U_batch = sample_distribution_like(
+                    Y_batch, self.latent_distribution_name
+                )
 
                 if self.potential_to_estimate_with_neural_network == "y":
                     amortized_tensor = self.amortization_network(X_batch, U_batch)

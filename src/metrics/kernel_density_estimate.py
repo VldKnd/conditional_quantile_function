@@ -35,8 +35,7 @@ def kernel_density_estimate_kl_divergence(
     """
     ground_truth_log_density = log_kde_gaussian(sample, ground_truth)
     approximation_log_density = log_kde_gaussian(sample, approximation)
-    return ground_truth_log_density.exp(
-    ).mul(ground_truth_log_density - approximation_log_density).mean()
+    return (ground_truth_log_density - approximation_log_density).mean()
 
 
 def kernel_density_estimate_l1_divergence(
