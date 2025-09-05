@@ -26,6 +26,9 @@ class PICNN(nn.Module):
         )
 
     def forward(self, condition: torch.Tensor, tensor: torch.Tensor):
+        assert condition.ndim == tensor.ndim
+        if tensor.ndim == 1:
+            tensor, condition = tensor.unsqueeze(0), condition.unsqueeze(0)
         return self.picnn(tensor, condition)
 
 
