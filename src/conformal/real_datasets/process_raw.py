@@ -26,7 +26,7 @@ datasets: list[str] = []
 loaders: dict[str, Callable[[], tuple[np.ndarray, np.ndarray]]] = {}
 
 
-def download_with_pooch(name: str, url: str, known_hash: str):
+def download_with_pooch(name: str, url: str, known_hash: str | None):
     """
     Parameterazed decorator to convert initial dataset preprocessing function
     to a loading function and polulate the registry.
@@ -130,8 +130,27 @@ def scm1d_processor(fname):
     return X, Y
 
 
+@download_with_pooch(
+    name="scm20d",
+    url="https://www.openml.org/data/download/21230443/file1730492b4408.arff",
+    known_hash="2261a94bff5cfb617dbd2e7fd2c17d15d45135103a081917d1358c2ad13a4bd2"
+)
+@make_pooch_precessor(file_name_processed="scm20d.npz")
+def scm20d_processor(fname):
+    data, meta = arff.loadarff(fname)
+    df = pd.DataFrame(data)
+    X, Y = df.iloc[:, :-16].values, df.iloc[:, -16:].values
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
+
+    return X, Y
+
+
 if __name__ == "__main__":
     for name, loader in loaders.items():
         X, Y = loader()
         print(f"{name=}, {X.shape=}, {Y.shape=}")
+        del X
+        del Y
     print("Pass!")
