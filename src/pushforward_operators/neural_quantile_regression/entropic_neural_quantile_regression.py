@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import time
 from tqdm import trange
 from infrastructure.classes import TrainParameters
 from pushforward_operators.protocol import PushForwardOperator
@@ -29,6 +30,9 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             "number_of_hidden_layers": number_of_hidden_layers,
             "amount_of_samples_to_estimate_psi": amount_of_samples_to_estimate_psi,
             "epsilon": epsilon,
+        }
+        self.model_information_dict = {
+            "class_name": "EntropicNeuralQuantileRegression",
         }
 
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
@@ -102,6 +106,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
 
+        training_time_start = time.perf_counter()
         for epoch_idx in progress_bar:
             for X_batch, Y_batch in dataloader:
 
@@ -144,6 +149,14 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
                     progress_bar.set_description(progress_bar_message)
 
         progress_bar.close()
+
+        elapsed_training_time = time.perf_counter() - training_time_start
+        training_time_per_epoch = elapsed_training_time / number_of_epochs_to_train
+        self.model_information_dict["training_time"] = elapsed_training_time
+        self.model_information_dict["time_per_epoch"] = training_time_per_epoch
+        self.model_information_dict["number_of_epochs_to_train"
+                                    ] = number_of_epochs_to_train
+        self.model_information_dict["training_batch_size"] = dataloader.batch_size
         return self
 
     def estimate_psi(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor):
@@ -226,7 +239,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             {
                 "init_dict": self.init_dict,
                 "state_dict": self.state_dict(),
-                "class_name": "EntropicNeuralQuantileRegression"
+                "model_information_dict": self.model_information_dict,
             }, path
         )
 
@@ -242,4 +255,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         data = torch.load(path, map_location=map_location)
         entropic_neural_quantile_regression = cls(**data["init_dict"])
         entropic_neural_quantile_regression.load_state_dict(data["state_dict"])
+        entropic_neural_quantile_regression.model_information_dict = data.get(
+            "model_information_dict", {}
+        )
         return entropic_neural_quantile_regression

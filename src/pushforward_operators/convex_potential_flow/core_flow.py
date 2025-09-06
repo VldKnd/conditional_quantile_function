@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from tqdm import trange
 import gc
+import time
 
 from pushforward_operators.convex_potential_flow.flows import SequentialFlow, ActNorm
 from pushforward_operators.convex_potential_flow.cpflows import DeepConvexFlow
@@ -18,24 +19,19 @@ class CPFlow(PushForwardOperator, nn.Module):
         feature_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        softplus_type: str = "Softplus",
         n_blocks: int = 4,
     ):
         super().__init__()
-        self.config = dict(
+        self.init_dict = dict(
             response_dimension=response_dimension,
             feature_dimension=feature_dimension,
             hidden_dimension=hidden_dimension,
             number_of_hidden_layers=number_of_hidden_layers,
-            softplus_type=softplus_type,
             n_blocks=n_blocks,
         )
-
-        softplus_type = {
-            "Softplus": "softplus",
-            "GaussianSoftplus": "gaussian_softplus",
-        }[softplus_type]
-
+        self.model_information_dict = {
+            "class_name": "CPFlow",
+        }
         icnns = [
             PICNN(
                 dim=response_dimension,
@@ -43,7 +39,7 @@ class CPFlow(PushForwardOperator, nn.Module):
                 dimc=feature_dimension,
                 num_hidden_layers=number_of_hidden_layers,
                 symm_act_first=True,
-                softplus_type=softplus_type,
+                softplus_type="softplus",
                 zero_softplus=True,
             ) for _ in range(n_blocks)
         ]
@@ -79,6 +75,8 @@ class CPFlow(PushForwardOperator, nn.Module):
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
 
+        training_time_start = time.perf_counter()
+
         for _ in progress_bar:
             for cond, y in dataloader:
                 loss = -self.flow.logp(y, context=cond).mean()
@@ -113,6 +111,14 @@ class CPFlow(PushForwardOperator, nn.Module):
 
         progress_bar.close()
         self.is_fitted_ = True
+
+        elapsed_training_time = time.perf_counter() - training_time_start
+        training_time_per_epoch = elapsed_training_time / number_of_epochs_to_train
+        self.model_information_dict["training_time"] = elapsed_training_time
+        self.model_information_dict["time_per_epoch"] = training_time_per_epoch
+        self.model_information_dict["number_of_epochs_to_train"
+                                    ] = number_of_epochs_to_train
+        self.model_information_dict["training_batch_size"] = dataloader.batch_size
         return self
 
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
@@ -146,7 +152,7 @@ class CPFlow(PushForwardOperator, nn.Module):
     def sample_y_given_x(self, n_samples: int, X: torch.Tensor) -> torch.Tensor:
         u = torch.randn(
             n_samples,
-            self.config["response_dimension"],
+            self.init_dict["response_dimension"],
             device=X.device,
             dtype=torch.float32,
         )
@@ -168,8 +174,9 @@ class CPFlow(PushForwardOperator, nn.Module):
         """
         torch.save(
             {
+                "init_dict": self.init_dict,
                 "state_dict": self.flow.state_dict(),
-                **self.config,
+                "model_information_dict": self.model_information_dict,
             },
             path,
         )
@@ -185,13 +192,43 @@ class CPFlow(PushForwardOperator, nn.Module):
             _dtype = list(self.flow.parameters())[0].dtype
             _device = list(self.flow.parameters())[0].device
             y = torch.rand(
-                8, self.config["response_dimension"], dtype=_dtype, device=_device
+                8, self.init_dict["response_dimension"], dtype=_dtype, device=_device
             )
             x = torch.rand(
-                8, self.config["feature_dimension"], dtype=_dtype, device=_device
+                8, self.init_dict["feature_dimension"], dtype=_dtype, device=_device
             )
         self.flow.forward_transform(y, context=x)
         self.flow.load_state_dict(data["state_dict"])
-        self.config.update(data)
+        self.model_information_dict = data.get("model_information_dict", {})
+        self.init_dict.update(data)
         self.is_fitted_ = True
         return self
+
+    @classmethod
+    def load_class(
+        cls, path: str, map_location: torch.device = torch.device('cpu')
+    ) -> "CPFlow":
+        data = torch.load(path, map_location=map_location)
+        convex_potential_flow = cls(**data["init_dict"])
+        with torch.no_grad():
+            _dtype = list(convex_potential_flow.flow.parameters())[0].dtype
+            _device = list(convex_potential_flow.flow.parameters())[0].device
+            y = torch.rand(
+                8,
+                convex_potential_flow.init_dict["response_dimension"],
+                dtype=_dtype,
+                device=_device
+            )
+            x = torch.rand(
+                8,
+                convex_potential_flow.init_dict["feature_dimension"],
+                dtype=_dtype,
+                device=_device
+            )
+        convex_potential_flow.flow.forward_transform(y, context=x)
+        convex_potential_flow.flow.load_state_dict(data["state_dict"])
+        convex_potential_flow.model_information_dict = data.get(
+            "model_information_dict", {}
+        )
+        convex_potential_flow.is_fitted_ = True
+        return convex_potential_flow

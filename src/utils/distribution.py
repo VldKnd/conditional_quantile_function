@@ -16,7 +16,13 @@ def sample_distribution(shape: tuple, distribution_name: str):
         return sample_exponential(shape) - 1
     else:
         raise ValueError(
-            f"Distribution {distribution_name} not supported. Supported distributions: uniform_centered, uniform, uniform_ball, normal, exponential, exponential-centered."
+            f"Distribution {distribution_name} not supported."
+            " Supported distributions are:", "uniform_centered"
+            ", uniform"
+            ", uniform_ball"
+            ", normal"
+            ", exponential"
+            ", exponential-centered"
         )
 
 
@@ -49,7 +55,13 @@ def sample_distribution_like(tensor: torch.Tensor, distribution_name: str):
         return exponential_like(tensor) - 1
     else:
         raise ValueError(
-            f"Distribution {distribution_name} not supported. Supported distributions: uniform_centered, uniform, uniform_ball, normal, exponential, exponential-centered."
+            f"Distribution {distribution_name} not supported."
+            " Supported distributions are:", "uniform_centered"
+            ", uniform"
+            ", uniform_ball"
+            ", normal"
+            ", exponential"
+            ", exponential-centered"
         )
 
 
