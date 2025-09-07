@@ -1,16 +1,7 @@
 from datasets import (
-    BananaDataset,
-    TicTacDataset,
-    Dataset,
-    QuadraticPotentialConvexBananaDataset,
-    FNLVQR_MVN,
-    FNLVQR_Glasses,
-    FNLVQR_Star,
-    FNLVQR_Banana,
-    NotConditionalBananaDataset,
-    PICNN_FNLVQR_Banana,
-    PICNN_FNLVQR_Glasses,
-    PICNN_FNLVQR_Star,
+    BananaDataset, TicTacDataset, Dataset, QuadraticPotentialConvexBananaDataset,
+    FNLVQR_MVN, FNLVQR_Glasses, FNLVQR_Star, FNLVQR_Banana, NotConditionalBananaDataset,
+    PICNN_FNLVQR_Banana, PICNN_FNLVQR_Glasses, PICNN_FNLVQR_Star, FunnelDistribution
 )
 from pushforward_operators import (
     PushForwardOperator,
@@ -27,6 +18,7 @@ from pushforward_operators import (
 name_to_dataset_map: dict[str, Dataset] = {
     "banana": BananaDataset,
     "tictac": TicTacDataset,
+    "funnel":FunnelDistribution,
     "quadratic_potential_convex_banana": QuadraticPotentialConvexBananaDataset,
     "not_conditional_banana": NotConditionalBananaDataset,
     "fnlvqr_mvn": FNLVQR_MVN,

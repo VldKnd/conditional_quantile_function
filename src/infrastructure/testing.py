@@ -1,15 +1,21 @@
 import torch
 from tqdm import tqdm
 from datasets import (
+    # Prototype
+    Dataset,
+    # Synthetic datasets with pushforward operator
     BananaDataset,
     QuadraticPotentialConvexBananaDataset,
-    TicTacDataset,
-    Dataset,
     NotConditionalBananaDataset,
     FNLVQR_MVN,
     PICNN_FNLVQR_Glasses,
     PICNN_FNLVQR_Star,
     PICNN_FNLVQR_Banana,
+    #  Datasets that have only sample_joint implemented
+    FNLVQR_Banana,
+    FNLVQR_Star,
+    FNLVQR_Glasses,
+    FunnelDistribution,
 )
 from infrastructure.classes import Experiment
 from infrastructure.name_to_class_maps import name_to_dataset_map, name_to_pushforward_operator_map
@@ -78,7 +84,7 @@ def load_pushforward_operator_from_experiment(
     return pushforward_operator
 
 
-def test_on_synthetic_dataset(
+def test_on_dataset_with_defined_pushforward_operator(
     experiment: Experiment,
     exclude_wasserstein2: bool = False,
     exclude_unexplained_variance_percentage: bool = False,
@@ -127,7 +133,7 @@ def test_on_synthetic_dataset(
     )
     random_number_generator.manual_seed(42)
 
-    for i in tqdm(range(100), desc="Running tests", disable=not verbose):
+    for i in tqdm(range(1), desc="Running tests", disable=not verbose):
         X_tensor, Y_tensor, U_tensor = dataset.sample_x_y_u(n_points=1000)
         Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
         U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -186,6 +192,109 @@ def test_on_synthetic_dataset(
     return metrics
 
 
+def test_on_dataset_with_defined_sample_joint(
+    experiment: Experiment,
+    exclude_wasserstein2: bool = False,
+    exclude_sliced_wasserstein2: bool = False,
+    exclude_kde_kl_divergence: bool = False,
+    exclude_kde_l1_divergence: bool = False,
+    verbose: bool = False
+) -> dict:
+    """
+    Test a model on a synthetic dataset.
+
+    Args:
+        experiment (Experiment): The experiment to test.
+        exclude_wasserstein2 (bool): Whether to exclude the Wasserstein-2 distance.
+        exclude_unexplained_variance_percentage (bool): Whether to exclude the unexplained variance percentage.
+        exclude_sliced_wasserstein2 (bool): Whether to exclude the sliced Wasserstein-2 distance.
+        exclude_kde_kl_divergence (bool): Whether to exclude the KDE KL divergence.
+        exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
+        verbose (bool): Whether to print verbose output.
+    """
+    dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
+        **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
+    )
+    pushforward_operator = load_pushforward_operator_from_experiment(experiment)
+    pushforward_operator.to(**experiment.tensor_parameters)
+
+    metrics = {"quantile": {}, "inverse_quantile": {}}
+
+    quantile_metrics = {
+        "wasserstein2": [],
+        "unexplained_variance_percentage": [],
+        "sliced_wasserstein2": [],
+        "kde_kl_divergence": [],
+        "kde_l1_divergence": []
+    }
+    inverse_quantile_metrics = {
+        "wasserstein2": [],
+        "unexplained_variance_percentage": [],
+        "sliced_wasserstein2": [],
+        "kde_kl_divergence": [],
+        "kde_l1_divergence": []
+    }
+
+    random_number_generator = torch.Generator(
+        device=experiment.tensor_parameters["device"]
+    )
+    random_number_generator.manual_seed(42)
+
+    for i in tqdm(range(1), desc="Running tests", disable=not verbose):
+        X_tensor, Y_tensor = dataset.sample_joint(n_points=1000)
+        U_tensor = torch.randn_like(Y_tensor)
+
+        Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
+        U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
+
+        if not exclude_wasserstein2:
+            quantile_metrics["wasserstein2"].append(
+                wassertein2(Y_tensor, Y_approximation)
+            )
+            inverse_quantile_metrics["wasserstein2"].append(
+                wassertein2(U_tensor, U_approximation)
+            )
+        if not exclude_sliced_wasserstein2:
+            quantile_metrics["sliced_wasserstein2"].append(
+                sliced_wasserstein2(Y_tensor, Y_approximation)
+            )
+            inverse_quantile_metrics["sliced_wasserstein2"].append(
+                sliced_wasserstein2(U_tensor, U_approximation)
+            )
+
+        if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
+            _, Y_sample = dataset.sample_joint(n_points=1000)
+            U_sample = torch.randn_like(Y_sample)
+
+            if not exclude_kde_kl_divergence:
+                quantile_metrics["kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(
+                        Y_tensor, Y_approximation, Y_sample
+                    )
+                )
+                inverse_quantile_metrics["kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(
+                        U_tensor, U_approximation, U_sample
+                    )
+                )
+            if not exclude_kde_l1_divergence:
+                quantile_metrics["kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        Y_tensor, Y_approximation, Y_sample
+                    )
+                )
+                inverse_quantile_metrics["kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        U_tensor, U_approximation, U_sample
+                    )
+                )
+
+    metrics["quantile"] = quantile_metrics
+    metrics["inverse_quantile"] = inverse_quantile_metrics
+
+    return metrics
+
+
 def test(
     experiment: Experiment,
     exclude_wasserstein2: bool = False,
@@ -200,14 +309,21 @@ def test(
     )
 
     if type(dataset) in {
-        BananaDataset, TicTacDataset, QuadraticPotentialConvexBananaDataset,
+        BananaDataset, QuadraticPotentialConvexBananaDataset,
         NotConditionalBananaDataset, FNLVQR_MVN, PICNN_FNLVQR_Glasses,
         PICNN_FNLVQR_Star, PICNN_FNLVQR_Banana
     }:
-        return test_on_synthetic_dataset(
+        return test_on_dataset_with_defined_pushforward_operator(
             experiment, exclude_wasserstein2, exclude_unexplained_variance_percentage,
             exclude_sliced_wasserstein2, exclude_kde_kl_divergence,
             exclude_kde_l1_divergence, verbose
+        )
+    elif type(dataset) in {
+        FNLVQR_Banana, FNLVQR_Star, FNLVQR_Glasses, FunnelDistribution
+    }:
+        return test_on_dataset_with_defined_sample_joint(
+            experiment, exclude_wasserstein2, exclude_sliced_wasserstein2,
+            exclude_kde_kl_divergence, exclude_kde_l1_divergence, verbose
         )
     else:
         raise NotImplementedError(

@@ -12,13 +12,13 @@ def process_config(file_path: str):
     """
     print(f"--- Processing: {file_path} ---")
     file_folder_path = os.path.dirname(file_path)
-    # try:
-    #     print(f"Training: {file_path}")
-    #     train_from_json_file(file_path)
-    # except Exception as exception:
-    #     with open(f"{file_folder_path}/train_error.log", "w") as error_file:
-    #         error_file.write(str(exception))
-    #     print(f"Error: Could not train the model for {file_path}. Error logged in {file_folder_path}/train_error.log")
+    try:
+        print(f"Training: {file_path}")
+        train_from_json_file(file_path)
+    except Exception as exception:
+        with open(f"{file_folder_path}/train_error.log", "w") as error_file:
+            error_file.write(str(exception))
+        print(f"Error: Could not train the model for {file_path}. Error logged in {file_folder_path}/train_error.log")
 
     try:
         print(f"Testing: {file_path}")
