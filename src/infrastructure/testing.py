@@ -105,6 +105,9 @@ def test_on_dataset_with_defined_pushforward_operator(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
+
+    number_of_test_samples = 100
+
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
     )
@@ -133,7 +136,9 @@ def test_on_dataset_with_defined_pushforward_operator(
     )
     random_number_generator.manual_seed(42)
 
-    for i in tqdm(range(1), desc="Running tests", disable=not verbose):
+    for i in tqdm(
+        range(number_of_test_samples), desc="Running tests", disable=not verbose
+    ):
         X_tensor, Y_tensor, U_tensor = dataset.sample_x_y_u(n_points=1000)
         Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
         U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -212,6 +217,8 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
+    number_of_test_samples = 100
+
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
     )
@@ -240,7 +247,9 @@ def test_on_dataset_with_defined_sample_joint(
     )
     random_number_generator.manual_seed(42)
 
-    for i in tqdm(range(1), desc="Running tests", disable=not verbose):
+    for i in tqdm(
+        range(number_of_test_samples), desc="Running tests", disable=not verbose
+    ):
         X_tensor, Y_tensor = dataset.sample_joint(n_points=1000)
         U_tensor = torch.randn_like(Y_tensor)
 
