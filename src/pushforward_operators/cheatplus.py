@@ -9,7 +9,7 @@ class CheatPlusFunction(Function):
     # Note that forward, setup_context, and backward are @staticmethods
     @staticmethod
     def forward(input: torch.Tensor, beta=1.0, threshold=20.0) -> torch.Tensor:
-        output = F.softplus(input, beta=beta, threshold=threshold) + F.softplus(-input, beta=beta, threshold=threshold)
+        output = F.softplus(input, beta=beta, threshold=threshold)
         return output
 
     @staticmethod
@@ -43,8 +43,11 @@ class CheatPlusFunction(Function):
         # not an error.
         if ctx.needs_input_grad[0]:
             grad_input = input.clone()
-            mask = (input * beta > threshold) | (-input * beta < -threshold)
-            grad_input[mask] = grad_output[mask]
+            mask_high = input * beta > threshold
+            mask_low = input * beta < -threshold
+            mask = mask_high | mask_low
+            grad_input[mask_high] = grad_output[mask_high]
+            grad_input[mask_low] = -grad_output[mask_low]
             grad_input[~mask] = grad_output[~mask] * torch.tanh(input[~mask] / 2)
 
         return grad_input, None, None
