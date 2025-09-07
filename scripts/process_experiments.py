@@ -1,4 +1,5 @@
 import json
+from ntpath import isfile
 from pathlib import Path
 from infrastructure.training import train_from_json_file
 from infrastructure.testing import test_from_json_file
@@ -56,6 +57,14 @@ def find_and_process_configs(root_directory):
                     print(f"Error: Could not parse JSON from '{config_file}'")
                 except Exception as e:
                     print(f"An unexpected error occurred with {config_file}: {e}")
+        elif item.is_file() and item.name == "config.json":
+            try:
+                process_config(item)
+            except json.JSONDecodeError:
+                print(f"Error: Could not parse JSON from '{config_file}'")
+            except Exception as e:
+                print(f"An unexpected error occurred with {config_file}: {e}")
+            
 
 if __name__ == "__main__":
     import argparse
