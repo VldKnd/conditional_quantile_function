@@ -217,7 +217,8 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 100
+    number_of_test_samples = 1000
+    number_of_generated_points = 2000
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
@@ -247,57 +248,113 @@ def test_on_dataset_with_defined_sample_joint(
     )
     random_number_generator.manual_seed(42)
 
-    for i in tqdm(
-        range(number_of_test_samples), desc="Running tests", disable=not verbose
+    # Joint and Marginal
+    for _ in tqdm(
+        range(number_of_test_samples),
+        desc="Running Marginal and Joint Tests",
+        disable=not verbose
     ):
-        X_tensor, Y_tensor = dataset.sample_joint(n_points=1000)
+        X_tensor, Y_tensor = dataset.sample_joint(n_points=number_of_generated_points)
         U_tensor = torch.randn_like(Y_tensor)
 
         Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
         U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
 
+        YX_tensor = torch.cat([Y_tensor, X_tensor], dim=1)
+        YX_approximation = torch.cat([Y_approximation, X_tensor], dim=1)
+
+        UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
+        UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
+
         if not exclude_wasserstein2:
-            quantile_metrics["wasserstein2"].append(
+            quantile_metrics["Y_wasserstein2"].append(
                 wassertein2(Y_tensor, Y_approximation)
             )
-            inverse_quantile_metrics["wasserstein2"].append(
+            inverse_quantile_metrics["U_wasserstein2"].append(
                 wassertein2(U_tensor, U_approximation)
             )
+
+            quantile_metrics["YX_wasserstein2"].append(
+                wassertein2(YX_tensor, YX_approximation)
+            )
+            inverse_quantile_metrics["UX_wasserstein2"].append(
+                wassertein2(UX_tensor, UX_approximation)
+            )
+
         if not exclude_sliced_wasserstein2:
-            quantile_metrics["sliced_wasserstein2"].append(
+            quantile_metrics["Y_sliced_wasserstein2"].append(
                 sliced_wasserstein2(Y_tensor, Y_approximation)
             )
-            inverse_quantile_metrics["sliced_wasserstein2"].append(
+            inverse_quantile_metrics["U_sliced_wasserstein2"].append(
                 sliced_wasserstein2(U_tensor, U_approximation)
             )
 
+            quantile_metrics["YX_sliced_wasserstein2"].append(
+                sliced_wasserstein2(YX_tensor, YX_approximation)
+            )
+            inverse_quantile_metrics["UX_sliced_wasserstein2"].append(
+                sliced_wasserstein2(UX_tensor, UX_approximation)
+            )
+
         if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-            _, Y_sample = dataset.sample_joint(n_points=1000)
+            X_sample, Y_sample = dataset.sample_joint(
+                n_points=number_of_generated_points
+            )
             U_sample = torch.randn_like(Y_sample)
+            YX_sample = torch.cat([Y_sample, X_sample], dim=1)
+            UX_sample = torch.cat([U_sample, X_sample], dim=1)
 
             if not exclude_kde_kl_divergence:
-                quantile_metrics["kde_kl_divergence"].append(
+                quantile_metrics["Y_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         Y_tensor, Y_approximation, Y_sample
                     )
                 )
-                inverse_quantile_metrics["kde_kl_divergence"].append(
+                inverse_quantile_metrics["U_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-            if not exclude_kde_l1_divergence:
-                quantile_metrics["kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                inverse_quantile_metrics["kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
                         U_tensor, U_approximation, U_sample
                     )
                 )
 
+                quantile_metrics["YX_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(
+                        YX_tensor, YX_approximation, YX_sample
+                    )
+                )
+                inverse_quantile_metrics["UX_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(
+                        UX_tensor, UX_approximation, UX_sample
+                    )
+                )
+
+            if not exclude_kde_l1_divergence:
+                quantile_metrics["Y_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        Y_tensor, Y_approximation, Y_sample
+                    )
+                )
+                inverse_quantile_metrics["U_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        U_tensor, U_approximation, U_sample
+                    )
+                )
+                quantile_metrics["YX_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        YX_tensor, YX_approximation, YX_sample
+                    )
+                )
+                inverse_quantile_metrics["UX_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        UX_tensor, UX_approximation, UX_sample
+                    )
+                )
+
+    for _ in tqdm(
+        range(number_of_test_samples),
+        desc="Running Conditional Tests",
+        disable=not verbose
+    ):
+        ...
     metrics["quantile"] = quantile_metrics
     metrics["inverse_quantile"] = inverse_quantile_metrics
 

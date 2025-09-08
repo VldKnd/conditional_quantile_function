@@ -9,6 +9,16 @@ class Dataset:
     ):
         ...
 
+    def sample_conditional(self,
+                           X_tensor: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+            Returns:
+            (x, y) - Union[torch.Tensor[n, k], torch.Tensor[n, p]]
+        """
+        raise NotImplementedError(
+            "Sampling of covariates is not implemented for this dataset."
+        )
+
     def sample_joint(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             Returns:

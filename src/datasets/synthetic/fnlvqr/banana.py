@@ -1,3 +1,4 @@
+from re import X
 from datasets.protocol import Dataset
 import torch
 from typing import Tuple
@@ -37,6 +38,24 @@ class FNLVQR_Banana(Dataset):
         """
         x = torch.rand(n_points, 1) * 2.4 + 0.8
         return x.to(**self.tensor_parameters)
+
+    def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        input_shape = x.shape
+
+        x_flat = x.flatten(0, -2)
+        n_points = x_flat.shape[0]
+        u = self.sample_latent_variables(n_points)
+
+        z, phi, r, beta = u[:, 0:1], u[:, 1:2], u[:, 2:3], u[:, 3:4]
+
+        y0 = 0.5 * (-torch.cos(z) + 1) + r * torch.sin(phi) + torch.sin(x_flat)
+        y1 = z / (beta * x_flat) + r * torch.cos(phi)
+
+        y = torch.cat([y0, y1], dim=-1)
+
+        return x_flat.reshape(input_shape[:-1],
+                              -1), y.reshape(input_shape[:-1],
+                                             -1), u.reshape(input_shape[:-1], -1)
 
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

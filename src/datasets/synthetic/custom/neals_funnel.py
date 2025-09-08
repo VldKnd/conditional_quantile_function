@@ -1,4 +1,5 @@
 import torch
+from typing import Tuple
 
 
 class FunnelDistribution:
@@ -32,6 +33,23 @@ class FunnelDistribution:
         condition = torch.randn(n_points, self.conditional_dimension) * self.sigma
         condition = condition.to(**self.tensor_parameters)
         return condition
+
+    def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        input_shape = x.shape
+
+        x_flat = x.flatten(0, -2)
+        n_points = x_flat.shape[0]
+
+        standard_deviation = torch.exp(x_flat / 2.).unsqueeze(-1)
+        target = torch.randn(
+            n_points, self.conditional_dimension, self.target_dimension
+        )
+        target = target.to(**self.tensor_parameters)
+        target = target * standard_deviation
+        target = target.flatten(start_dim=1)
+
+        return x_flat.reshape(input_shape[:-1],
+                              -1), target.reshape(input_shape[:-1], -1)
 
     def sample_joint(self, n_points: int):
         """
