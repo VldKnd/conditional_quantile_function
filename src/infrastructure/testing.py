@@ -354,9 +354,66 @@ def test_on_dataset_with_defined_sample_joint(
         desc="Running Conditional Tests",
         disable=not verbose
     ):
-        ...
-    metrics["quantile"] = quantile_metrics
-    metrics["inverse_quantile"] = inverse_quantile_metrics
+        X_tensor = dataset.sample_covariates(1).repeat(1, number_of_generated_points)
+        X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
+        U_tensor = torch.randn_like(Y_tensor)
+
+        Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
+        U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
+
+        YX_tensor = torch.cat([Y_tensor, X_tensor], dim=1)
+        YX_approximation = torch.cat([Y_approximation, X_tensor], dim=1)
+
+        UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
+        UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
+
+        if not exclude_wasserstein2:
+            quantile_metrics["Y|X_wasserstein2"].append(
+                wassertein2(Y_tensor, Y_approximation)
+            )
+            inverse_quantile_metrics["U|X_wasserstein2"].append(
+                wassertein2(U_tensor, U_approximation)
+            )
+
+        if not exclude_sliced_wasserstein2:
+            quantile_metrics["Y|X_sliced_wasserstein2"].append(
+                sliced_wasserstein2(Y_tensor, Y_approximation)
+            )
+            inverse_quantile_metrics["U|X_sliced_wasserstein2"].append(
+                sliced_wasserstein2(U_tensor, U_approximation)
+            )
+
+        if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
+            X_sample, Y_sample = dataset.sample_joint(
+                n_points=number_of_generated_points
+            )
+            U_sample = torch.randn_like(Y_sample)
+            YX_sample = torch.cat([Y_sample, X_sample], dim=1)
+            UX_sample = torch.cat([U_sample, X_sample], dim=1)
+
+            if not exclude_kde_kl_divergence:
+                quantile_metrics["Y|X_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(
+                        Y_tensor, Y_approximation, Y_sample
+                    )
+                )
+                inverse_quantile_metrics["U|X_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(
+                        U_tensor, U_approximation, U_sample
+                    )
+                )
+
+            if not exclude_kde_l1_divergence:
+                quantile_metrics["Y|X_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        Y_tensor, Y_approximation, Y_sample
+                    )
+                )
+                inverse_quantile_metrics["U|X_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(
+                        U_tensor, U_approximation, U_sample
+                    )
+                )
 
     return metrics
 

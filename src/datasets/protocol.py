@@ -9,8 +9,7 @@ class Dataset:
     ):
         ...
 
-    def sample_conditional(self,
-                           X_tensor: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             Returns:
             (x, y) - Union[torch.Tensor[n, k], torch.Tensor[n, p]]
