@@ -217,7 +217,7 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 2
+    number_of_test_samples = 1000
     number_of_generated_points = 2000
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
