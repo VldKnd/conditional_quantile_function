@@ -90,8 +90,7 @@ class FNLVQR_Star(Dataset):
         return x, y, u
 
     def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        input_shape = x.shape
-
+        input_shape = list(x.shape)
         x_flat = x.flatten(0, -2)
         n_points = x_flat.shape[0]
 
@@ -106,9 +105,8 @@ class FNLVQR_Star(Dataset):
         y2 = 5 * torch.sin(z2) + 2.5 - u[:, 0:1]
         y = u[:, 1:2] * y1 + (1 - u[:, 1:2]) * y2
 
-        return x_flat.reshape(input_shape[:-1],
-                              -1), y.reshape(input_shape[:-1],
-                                             -1), u.reshape(input_shape[:-1], -1)
+        return x_flat.reshape(input_shape[:-1] +
+                              [-1]), y.reshape(input_shape[:-1] + [-1])
 
     def sample_joint(self, n_points: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """

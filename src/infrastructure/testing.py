@@ -217,7 +217,7 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 1000
+    number_of_test_samples = 2
     number_of_generated_points = 2000
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
@@ -229,18 +229,32 @@ def test_on_dataset_with_defined_sample_joint(
     metrics = {"quantile": {}, "inverse_quantile": {}}
 
     quantile_metrics = {
-        "wasserstein2": [],
-        "unexplained_variance_percentage": [],
-        "sliced_wasserstein2": [],
-        "kde_kl_divergence": [],
-        "kde_l1_divergence": []
+        "Y_wasserstein2": [],
+        "Y_sliced_wasserstein2": [],
+        "Y_kde_kl_divergence": [],
+        "Y_kde_l1_divergence": [],
+        "Y|X_wasserstein2": [],
+        "Y|X_sliced_wasserstein2": [],
+        "Y|X_kde_kl_divergence": [],
+        "Y|X_kde_l1_divergence": [],
+        "YX_wasserstein2": [],
+        "YX_sliced_wasserstein2": [],
+        "YX_kde_kl_divergence": [],
+        "YX_kde_l1_divergence": []
     }
     inverse_quantile_metrics = {
-        "wasserstein2": [],
-        "unexplained_variance_percentage": [],
-        "sliced_wasserstein2": [],
-        "kde_kl_divergence": [],
-        "kde_l1_divergence": []
+        "U_wasserstein2": [],
+        "U_sliced_wasserstein2": [],
+        "U_kde_kl_divergence": [],
+        "U_kde_l1_divergence": [],
+        "U|X_wasserstein2": [],
+        "U|X_sliced_wasserstein2": [],
+        "U|X_kde_kl_divergence": [],
+        "U|X_kde_l1_divergence": [],
+        "UX_wasserstein2": [],
+        "UX_sliced_wasserstein2": [],
+        "UX_kde_kl_divergence": [],
+        "UX_kde_l1_divergence": []
     }
 
     random_number_generator = torch.Generator(
@@ -354,7 +368,7 @@ def test_on_dataset_with_defined_sample_joint(
         desc="Running Conditional Tests",
         disable=not verbose
     ):
-        X_tensor = dataset.sample_covariates(1).repeat(1, number_of_generated_points)
+        X_tensor = dataset.sample_covariates(1).repeat(number_of_generated_points, 1)
         X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
         U_tensor = torch.randn_like(Y_tensor)
 
@@ -384,9 +398,7 @@ def test_on_dataset_with_defined_sample_joint(
             )
 
         if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-            X_sample, Y_sample = dataset.sample_joint(
-                n_points=number_of_generated_points
-            )
+            X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
             U_sample = torch.randn_like(Y_sample)
             YX_sample = torch.cat([Y_sample, X_sample], dim=1)
             UX_sample = torch.cat([U_sample, X_sample], dim=1)

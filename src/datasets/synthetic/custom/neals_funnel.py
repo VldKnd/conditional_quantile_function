@@ -35,8 +35,7 @@ class FunnelDistribution:
         return condition
 
     def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        input_shape = x.shape
-
+        input_shape = list(x.shape)
         x_flat = x.flatten(0, -2)
         n_points = x_flat.shape[0]
 

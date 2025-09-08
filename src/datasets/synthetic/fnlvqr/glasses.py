@@ -37,10 +37,10 @@ class FNLVQR_Glasses(Dataset):
         return x.to(**self.tensor_parameters)
 
     def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        input_shape = x.shape
-
+        input_shape = list(x.shape)
         x_flat = x.flatten(0, -2)
         n_points = x_flat.shape[0]
+
         u = self.sample_latent_variables(n_points)
 
         z1 = 3 * torch.pi * x_flat
@@ -49,9 +49,8 @@ class FNLVQR_Glasses(Dataset):
         y2 = 5 * torch.sin(z2) + 2.5 - u[:, 0:1]
         y = u[:, 1:2] * y1 + (1 - u[:, 1:2]) * y2
 
-        return x_flat.reshape(input_shape[:-1],
-                              -1), y.reshape(input_shape[:-1],
-                                             -1), u.reshape(input_shape[:-1], -1)
+        return x_flat.reshape(input_shape[:-1] +
+                              [-1]), y.reshape(input_shape[:-1] + [-1])
 
     def sample_x_y_u(self,
                      n_points: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
