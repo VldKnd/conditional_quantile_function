@@ -217,7 +217,7 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 1000
+    number_of_test_samples = 500
     number_of_generated_points = 2000
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
@@ -226,9 +226,7 @@ def test_on_dataset_with_defined_sample_joint(
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
 
-    metrics = {"quantile": {}, "inverse_quantile": {}}
-
-    quantile_metrics = {
+    metrics = {
         "Y_wasserstein2": [],
         "Y_sliced_wasserstein2": [],
         "Y_kde_kl_divergence": [],
@@ -240,9 +238,7 @@ def test_on_dataset_with_defined_sample_joint(
         "YX_wasserstein2": [],
         "YX_sliced_wasserstein2": [],
         "YX_kde_kl_divergence": [],
-        "YX_kde_l1_divergence": []
-    }
-    inverse_quantile_metrics = {
+        "YX_kde_l1_divergence": [],
         "U_wasserstein2": [],
         "U_sliced_wasserstein2": [],
         "U_kde_kl_divergence": [],
@@ -281,32 +277,24 @@ def test_on_dataset_with_defined_sample_joint(
         UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
 
         if not exclude_wasserstein2:
-            quantile_metrics["Y_wasserstein2"].append(
-                wassertein2(Y_tensor, Y_approximation)
-            )
-            inverse_quantile_metrics["U_wasserstein2"].append(
-                wassertein2(U_tensor, U_approximation)
-            )
+            metrics["Y_wasserstein2"].append(wassertein2(Y_tensor, Y_approximation))
+            metrics["U_wasserstein2"].append(wassertein2(U_tensor, U_approximation))
 
-            quantile_metrics["YX_wasserstein2"].append(
-                wassertein2(YX_tensor, YX_approximation)
-            )
-            inverse_quantile_metrics["UX_wasserstein2"].append(
-                wassertein2(UX_tensor, UX_approximation)
-            )
+            metrics["YX_wasserstein2"].append(wassertein2(YX_tensor, YX_approximation))
+            metrics["UX_wasserstein2"].append(wassertein2(UX_tensor, UX_approximation))
 
         if not exclude_sliced_wasserstein2:
-            quantile_metrics["Y_sliced_wasserstein2"].append(
+            metrics["Y_sliced_wasserstein2"].append(
                 sliced_wasserstein2(Y_tensor, Y_approximation)
             )
-            inverse_quantile_metrics["U_sliced_wasserstein2"].append(
+            metrics["U_sliced_wasserstein2"].append(
                 sliced_wasserstein2(U_tensor, U_approximation)
             )
 
-            quantile_metrics["YX_sliced_wasserstein2"].append(
+            metrics["YX_sliced_wasserstein2"].append(
                 sliced_wasserstein2(YX_tensor, YX_approximation)
             )
-            inverse_quantile_metrics["UX_sliced_wasserstein2"].append(
+            metrics["UX_sliced_wasserstein2"].append(
                 sliced_wasserstein2(UX_tensor, UX_approximation)
             )
 
@@ -319,45 +307,45 @@ def test_on_dataset_with_defined_sample_joint(
             UX_sample = torch.cat([U_sample, X_sample], dim=1)
 
             if not exclude_kde_kl_divergence:
-                quantile_metrics["Y_kde_kl_divergence"].append(
+                metrics["Y_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         Y_tensor, Y_approximation, Y_sample
                     )
                 )
-                inverse_quantile_metrics["U_kde_kl_divergence"].append(
+                metrics["U_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         U_tensor, U_approximation, U_sample
                     )
                 )
 
-                quantile_metrics["YX_kde_kl_divergence"].append(
+                metrics["YX_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         YX_tensor, YX_approximation, YX_sample
                     )
                 )
-                inverse_quantile_metrics["UX_kde_kl_divergence"].append(
+                metrics["UX_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         UX_tensor, UX_approximation, UX_sample
                     )
                 )
 
             if not exclude_kde_l1_divergence:
-                quantile_metrics["Y_kde_l1_divergence"].append(
+                metrics["Y_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         Y_tensor, Y_approximation, Y_sample
                     )
                 )
-                inverse_quantile_metrics["U_kde_l1_divergence"].append(
+                metrics["U_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         U_tensor, U_approximation, U_sample
                     )
                 )
-                quantile_metrics["YX_kde_l1_divergence"].append(
+                metrics["YX_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         YX_tensor, YX_approximation, YX_sample
                     )
                 )
-                inverse_quantile_metrics["UX_kde_l1_divergence"].append(
+                metrics["UX_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         UX_tensor, UX_approximation, UX_sample
                     )
@@ -382,18 +370,14 @@ def test_on_dataset_with_defined_sample_joint(
         UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
 
         if not exclude_wasserstein2:
-            quantile_metrics["Y|X_wasserstein2"].append(
-                wassertein2(Y_tensor, Y_approximation)
-            )
-            inverse_quantile_metrics["U|X_wasserstein2"].append(
-                wassertein2(U_tensor, U_approximation)
-            )
+            metrics["Y|X_wasserstein2"].append(wassertein2(Y_tensor, Y_approximation))
+            metrics["U|X_wasserstein2"].append(wassertein2(U_tensor, U_approximation))
 
         if not exclude_sliced_wasserstein2:
-            quantile_metrics["Y|X_sliced_wasserstein2"].append(
+            metrics["Y|X_sliced_wasserstein2"].append(
                 sliced_wasserstein2(Y_tensor, Y_approximation)
             )
-            inverse_quantile_metrics["U|X_sliced_wasserstein2"].append(
+            metrics["U|X_sliced_wasserstein2"].append(
                 sliced_wasserstein2(U_tensor, U_approximation)
             )
 
@@ -404,24 +388,24 @@ def test_on_dataset_with_defined_sample_joint(
             UX_sample = torch.cat([U_sample, X_sample], dim=1)
 
             if not exclude_kde_kl_divergence:
-                quantile_metrics["Y|X_kde_kl_divergence"].append(
+                metrics["Y|X_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         Y_tensor, Y_approximation, Y_sample
                     )
                 )
-                inverse_quantile_metrics["U|X_kde_kl_divergence"].append(
+                metrics["U|X_kde_kl_divergence"].append(
                     kernel_density_estimate_kl_divergence(
                         U_tensor, U_approximation, U_sample
                     )
                 )
 
             if not exclude_kde_l1_divergence:
-                quantile_metrics["Y|X_kde_l1_divergence"].append(
+                metrics["Y|X_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         Y_tensor, Y_approximation, Y_sample
                     )
                 )
-                inverse_quantile_metrics["U|X_kde_l1_divergence"].append(
+                metrics["U|X_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         U_tensor, U_approximation, U_sample
                     )

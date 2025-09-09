@@ -47,8 +47,8 @@ class FunnelDistribution:
         target = target * standard_deviation
         target = target.flatten(start_dim=1)
 
-        return x_flat.reshape(input_shape[:-1],
-                              -1), target.reshape(input_shape[:-1], -1)
+        return x_flat.reshape(input_shape[:-1] +
+                              [-1]), target.reshape(input_shape[:-1] + [-1])
 
     def sample_joint(self, n_points: int):
         """
