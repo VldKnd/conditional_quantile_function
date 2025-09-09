@@ -147,6 +147,48 @@ def scm20d_processor(fname):
     return X, Y
 
 
+@download_with_pooch(
+    name="bio",
+    url="https://api.openml.org/data/download/22111827/file22f167620a212.arff",
+    known_hash="2b1ff847f0eafa74cd582f789273bdca9c43decf8c46910d6e2a2f51ffddb9fc"
+)
+@make_pooch_precessor(file_name_processed="bio.npz")
+def bio_processor(fname):
+    data, meta = arff.loadarff(fname)
+    df = pd.DataFrame(data)
+    data_values = df.values
+    is_feature = np.ones(data_values.shape[1], dtype=bool)
+    is_feature[0] = False
+    is_feature[7] = False
+    X, Y = data_values[:, is_feature], data_values[:, ~is_feature]
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
+
+    return X, Y
+
+
+@download_with_pooch(
+    name="blog",
+    url="https://archive.ics.uci.edu/static/public/304/blogfeedback.zip",
+    known_hash="1ba74e5ad920f7cd037502b2968581cc695146a226a73eff52fe8ad875ed4bcf"
+)
+@make_pooch_precessor(file_name_processed="blog.npz")
+def blog_processor(fname):
+    fname_extracted = pooch.Unzip(members=["blogData_train.csv"])(fname, "download", pooch=None)[0]
+    df = pd.read_csv(fname_extracted)
+    data_values = df.values
+    is_feature = np.ones(data_values.shape[1], dtype=bool)
+    is_feature[-1] = False
+    is_feature[60] = False
+    X, Y = data_values[:, is_feature], data_values[:, ~is_feature]
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
+
+    return X, Y
+
+
 if __name__ == "__main__":
     for name, loader in loaders.items():
         X, Y = loader()
