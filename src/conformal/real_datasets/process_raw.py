@@ -114,6 +114,31 @@ def rf1_processor(fname):
 
 
 @download_with_pooch(
+    name="rf2",
+    url="https://www.openml.org/data/download/21230441/file17307ff5552.arff",
+    known_hash="b2d841515a70bbfdd212bd8bd6d138280caa4b7fc2ab16d0e3f28cb6fc2b7145"
+)
+@make_pooch_precessor(file_name_processed="rf2.npz")
+def rf2_processor(fname):
+    data, meta = arff.loadarff(fname)
+    df = pd.DataFrame(data)
+    X, Y = df.iloc[:, :-8].values, df.iloc[:, -8:].values
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
+
+    # Remove outliers
+    for i, j in zip(
+        [4830, 4836, 4842, 4848, 4854, 4866, 4878, 4890],
+        [1, 9, 17, 25, 33, 41, 49, 57]
+    ):
+        X[i, j] = np.median(X[:, j])
+    Y[4782, 1] = np.median(Y[:, 1])
+
+    return X, Y
+
+
+@download_with_pooch(
     name="scm1d",
     url="https://www.openml.org/data/download/21230442/file1730122322aa.arff",
     known_hash="4def7af4a1da3e20b719513d6d7e581f8b743c3d5094f7def925d53ba8a86268"
@@ -140,6 +165,23 @@ def scm20d_processor(fname):
     data, meta = arff.loadarff(fname)
     df = pd.DataFrame(data)
     X, Y = df.iloc[:, :-16].values, df.iloc[:, -16:].values
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
+    X = imputer.fit_transform(X)
+
+    return X, Y
+
+
+@download_with_pooch(
+    name="sgemm",
+    url="https://www.openml.org/data/download/22101726/data.arff",
+    known_hash="a9368120f990c92e03b47410263f28d4306d56b6cb7d2487f120a4d5e88fdb71"
+)
+@make_pooch_precessor(file_name_processed="sgemm.npz")
+def sgemm_processor(fname):
+    data, meta = arff.loadarff(fname)
+    df = pd.DataFrame(data)
+    X, Y = df.iloc[:, :-4].values, df.iloc[:, -4:].values
     from sklearn.impute import SimpleImputer
     imputer = SimpleImputer(missing_values=np.nan, strategy='median')
     X = imputer.fit_transform(X)
