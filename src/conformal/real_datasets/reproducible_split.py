@@ -54,13 +54,17 @@ class DatasetSplit:
                                           self.Y_test_raw))
 
 
-def get_dataset_split(name: str, seed: int, n_train=2000, n_cal=2000, n_test=2000):
+def get_dataset_split(name: str, seed: int, n_train=None, n_cal=2000, n_test=2000):
     load_func = loaders.get(name, None)
     if load_func is not None:
         X, Y = load_func()
         n_total = X.shape[0]
 
         # TODO: add logic to set only some of the sizes?
+        if n_train is None:
+            assert n_cal is not None and n_test is not None
+            n_train = n_total - n_cal - n_test
+        
         train_start, train_end = 0, n_train
         cal_start, cal_end = n_train, n_train + n_cal
         test_start, test_end = n_train + n_cal, n_train + n_cal + n_test
