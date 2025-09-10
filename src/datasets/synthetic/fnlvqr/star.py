@@ -97,13 +97,6 @@ class FNLVQR_Star(Dataset):
         u = self.sample_latent_variables(n_points)
         star_points = self.transform_to_star(u)
         y = self.rotate_points(star_points, x_flat)
-        u = self.sample_latent_variables(n_points)
-
-        z1 = 3 * torch.pi * x_flat
-        z2 = torch.pi * (1 + 3 * x_flat)
-        y1 = 5 * torch.sin(z1) + 2.5 + u[:, 0:1]
-        y2 = 5 * torch.sin(z2) + 2.5 - u[:, 0:1]
-        y = u[:, 1:2] * y1 + (1 - u[:, 1:2]) * y2
 
         return x_flat.reshape(input_shape[:-1] +
                               [-1]), y.reshape(input_shape[:-1] + [-1])
