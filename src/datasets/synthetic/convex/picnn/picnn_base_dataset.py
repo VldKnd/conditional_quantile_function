@@ -68,3 +68,13 @@ class PICNN_BaseDataset(Dataset):
         u = self.sample_latent_variables(n_points=n_points)
         y = self.push_u_given_x(u, x)
         return x, y, u
+
+    def sample_conditional(self, x: torch.Tensor) -> torch.Tensor:
+        input_shape = list(x.shape)
+        x_flat = x.flatten(0, -2)
+        n_points = x_flat.shape[0]
+        u_flat = self.sample_latent_variables(n_points)
+        y_flat = self.push_u_given_x(u_flat, x_flat)
+
+        return x_flat.reshape(input_shape[:-1] +
+                              [-1]), y_flat.reshape(input_shape[:-1] + [-1])
