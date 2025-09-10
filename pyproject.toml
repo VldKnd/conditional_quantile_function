@@ -29,6 +29,7 @@ dependencies = [
     "tqdm-pathos>=0.4",
     "statsmodels>=0.14.5",
     "seaborn>=0.13.2",
+    "pyarrow>=21.0.0",
 ]
 
 [tool.taskipy.tasks]
