@@ -84,12 +84,13 @@ def load_pushforward_operator_from_experiment(
     return pushforward_operator
 
 
-def test_on_dataset_with_defined_sample_joint(
+def test_on_dataset_with_defined_pushforward_operator(
     experiment: Experiment,
     exclude_wasserstein2: bool = False,
     exclude_sliced_wasserstein2: bool = False,
     exclude_kde_kl_divergence: bool = False,
     exclude_kde_l1_divergence: bool = False,
+    exclude_unexplained_variance_percentage: bool = False,
     verbose: bool = False
 ) -> dict:
     """
@@ -104,6 +105,7 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
+    print("?")
     number_of_test_samples = 500
     number_of_generated_points = 2000
 
@@ -137,7 +139,9 @@ def test_on_dataset_with_defined_sample_joint(
         "UX_wasserstein2": [],
         "UX_sliced_wasserstein2": [],
         "UX_kde_kl_divergence": [],
-        "UX_kde_l1_divergence": []
+        "UX_kde_l1_divergence": [],
+        "Q^(-1)(Y,X)_uv_l2": [],
+        "Q(U,X)_uv_l2": [],
     }
 
     random_number_generator = torch.Generator(
@@ -164,12 +168,13 @@ def test_on_dataset_with_defined_sample_joint(
         UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
         UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
 
-        metrics["Q^(-1)(Y,X)_uv_l2"].append(
-            percentage_of_unexplained_variance(Y_tensor, Y_approximation)
-        )
-        metrics["Q(U,X)_uv_l2"].append(
-            percentage_of_unexplained_variance(U_tensor, U_approximation)
-        )
+        if not exclude_unexplained_variance_percentage:
+            metrics["Q^(-1)(Y,X)_uv_l2"].append(
+                percentage_of_unexplained_variance(Y_tensor, Y_approximation)
+            )
+            metrics["Q(U,X)_uv_l2"].append(
+                percentage_of_unexplained_variance(U_tensor, U_approximation)
+            )
 
         if not exclude_wasserstein2:
             metrics["Y_wasserstein2"].append(wassertein2(Y_tensor, Y_approximation))
@@ -363,7 +368,7 @@ def test_on_dataset_with_defined_sample_joint(
         "UX_wasserstein2": [],
         "UX_sliced_wasserstein2": [],
         "UX_kde_kl_divergence": [],
-        "UX_kde_l1_divergence": []
+        "UX_kde_l1_divergence": [],
     }
 
     random_number_generator = torch.Generator(
