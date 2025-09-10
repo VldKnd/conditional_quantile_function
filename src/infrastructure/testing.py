@@ -165,9 +165,9 @@ def test_on_dataset_with_defined_pushforward_operator(
             X_tensor = dataset.sample_covariates(1).repeat(
                 number_of_generated_points // 5, 1
             )
-            U_tensor = torch.randn_like(Y_tensor)
 
             X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
+            U_tensor = torch.randn_like(Y_tensor)
 
             Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
             U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -441,9 +441,9 @@ def test_on_dataset_with_defined_sample_joint(
             X_tensor = dataset.sample_covariates(1).repeat(
                 number_of_generated_points // 5, 1
             )
-            U_tensor = torch.randn_like(Y_tensor)
 
             X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
+            U_tensor = torch.randn_like(Y_tensor)
 
             Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
             U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
