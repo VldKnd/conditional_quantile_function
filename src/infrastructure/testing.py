@@ -105,7 +105,6 @@ def test_on_dataset_with_defined_pushforward_operator(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    print("?")
     number_of_test_samples = 500
     number_of_generated_points = 2000
 
