@@ -144,6 +144,8 @@ def test_on_dataset_with_defined_pushforward_operator(
         "UX_sliced_wasserstein2": [],
         "UX_kde_kl_divergence": [],
         "UX_kde_l1_divergence": [],
+        "Q^(-1)(Y,X)_uv_l2": [],
+        "Q(U,X)_uv_l2": [],
     }
 
     for _ in tqdm(
