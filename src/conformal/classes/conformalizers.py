@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import torch
 
 from tqdm.auto import tqdm
 
+from conformal.otcp.ellipsoidal_conformal_utilities import ellipse_local_alpha_s, ellipse_volume, ellipsoidal_non_conformity_measure
 from conformal.otcp.functions import ConditionalRank_Adaptive, MultivQuantileTreshold_Adaptive, get_volume_QR, learn_psi
 from conformal.otcp.functions_refactor import MultivQuantileTresholdRefactor, RankFuncRefactor, sample_grid_refactor
 
@@ -15,13 +16,7 @@ class BaseRegionPredictor:
     alpha: float = 0.1
     lower_is_better: bool = True
 
-    def fit(
-        self,
-        X_cal: np.ndarray,
-        scores_cal: np.ndarray,
-        alpha: float,
-        lower_is_better=True
-    ):
+    def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
         pass
 
     def is_covered(
@@ -35,7 +30,7 @@ class BaseRegionPredictor:
 
 class SplitConformalPredictor(BaseRegionPredictor):
 
-    def fit(self, scores_cal: np.ndarray, alpha: float, lower_is_better=True):
+    def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float, lower_is_better=True):
         self.alpha = alpha
         self.lower_is_better = lower_is_better
         n = len(scores_cal)
@@ -63,9 +58,9 @@ class SplitConformalPredictor(BaseRegionPredictor):
 class OTCPGlobalPredictor(BaseRegionPredictor):
     split_ratio: float = 0.5
 
-    mu: np.ndarray | None = None
-    psi: np.ndarray | None = None
-    psi_star: np.ndarray | None = None
+    mu: np.ndarray = field(init=False, default_factory=lambda : np.zeros(0))
+    psi: np.ndarray = field(init=False, default_factory=lambda : np.zeros(0))
+    psi_star: np.ndarray = field(init=False, default_factory=lambda : np.zeros(0))
 
     def _solve_ot(
         self, scores_cal1: np.ndarray, positive: bool = False, seed: int | None = None
@@ -103,7 +98,7 @@ class OTCPGlobalPredictor(BaseRegionPredictor):
         scores_cal1, scores_cal2 = scores_cal[:n_cal_1], scores_cal[n_cal_1:]
 
         self.alpha = alpha
-        if self.psi is None or self.mu is None:
+        if len(self.psi) == 0 or len(self.mu) == 0:
             self._solve_ot(scores_cal1, seed=seed)
         self._compute_threshold(scores_cal2, alpha)
         return self
@@ -169,3 +164,58 @@ class OTCPLocalPredictor(BaseRegionPredictor):
             score, x, self.knn, self.scores_cal_1, n_neighbors=n, mu=self.mu
         )
         return get_volume_QR(self.Quantile_Treshold, self.mu, psi, Y)
+
+
+@dataclass
+class EllipsoidalLocal(BaseRegionPredictor):
+    split_ratio: float = 0.5
+    lam: float = 0.95  # lambda parameter for mixing local and global covariance
+    n_neighbors: int = 100
+    det_cov: float = field(init=False)
+    volume: float = field(init=False)
+
+    def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
+        self.alpha = alpha
+        n = scores_cal.shape[0]
+        self.n_cal_1 = int(self.split_ratio * n)
+        self.scores_cal_1 = scores_cal[:self.n_cal_1]
+        self.scores_cal_2 = scores_cal[self.n_cal_1:]
+        self.cov_cal_1 = np.cov(self.scores_cal_1.T)
+        self.knn, self.local_alpha_s = ellipse_local_alpha_s(
+            x_train=X_cal[:self.n_cal_1],
+            x_cal=X_cal[self.n_cal_1:],
+            y_true_train=self.scores_cal_1,
+            y_pred_train=np.zeros_like(self.scores_cal_1),
+            y_true_cal=self.scores_cal_2,
+            y_pred_cal=np.zeros_like(self.scores_cal_2),
+            epsilon=self.alpha,
+            n_neighbors=self.n_neighbors,
+            lam=self.lam,
+            cov_train=self.cov_cal_1,
+        )
+    
+    def _get_local_inv_cov(self, local_neighbors: np.ndarray) -> np.ndarray:
+        knn_scores = self.scores_cal_1[
+            local_neighbors, :
+        ]
+        local_cov_test = np.cov(knn_scores.T)
+        local_cov_test_regularized = self.lam * local_cov_test + (1 - self.lam) * self.cov_cal_1
+        local_inv_cov_test = np.linalg.inv(local_cov_test_regularized)
+
+        return local_inv_cov_test
+    
+    def is_covered(self, X_test: np.ndarray, scores_test: np.ndarray, verbose: bool = False) -> np.ndarray:
+        local_neighbors_test = self.knn.kneighbors(X_test, return_distance=False)
+        is_covered = np.zeros(X_test.shape[0])
+        for i in tqdm(range(X_test.shape[0]), disable=not verbose):
+            local_inv_cov_test = self._get_local_inv_cov(local_neighbors_test[i, :])
+            is_covered[i] = ellipsoidal_non_conformity_measure(scores_test[i], local_inv_cov_test) <= self.local_alpha_s
+            
+        return is_covered
+    
+    def get_volume(
+        self, x: np.ndarray, score: np.ndarray, verbose: bool = False) -> float:
+        local_neighbors = self.knn.kneighbors(x.reshape(1, -1), return_distance=False)
+        local_inv_cov = self._get_local_inv_cov(local_neighbors[0, :])
+        d = score.shape[-1]
+        return ellipse_volume(local_inv_cov, self.local_alpha_s, d)
