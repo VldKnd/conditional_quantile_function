@@ -4,9 +4,8 @@ import argparse
 
 import numpy as np
 import pandas as pd
+from sklearn.neighbors import KNeighborsRegressor
 import torch
-
-from sklearn.ensemble import RandomForestRegressor
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -15,10 +14,11 @@ from tqdm.auto import tqdm
 
 from conformal.classes.method_desc import ConformalMethodDescription
 from conformal.real_datasets.reproducible_split import get_dataset_split
-from conformal.wrappers.cvq_regressor import CVQRegressor, calculate_scores_cvqr
+from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, ScoreCalculator
+from conformal.wrappers.rf_score import RandomForestWithScore
 from metrics.wsc import wsc_unbiased
 from utils.network import get_total_number_of_parameters
-from conformal.method_zoo import section5, baselines
+from conformal.method_zoo import section5, baselines, cpflow_based
 
 RESULTS_DIR = "./conformal_results"
 
@@ -28,14 +28,9 @@ _model_config_small = {
     "number_of_hidden_layers": 2,
     "batch_size": 64,
     "n_epochs": 50,
-    "learning_rate": 0.01
+    "learning_rate": 0.01,
+    "dtype": torch.float32,
 }
-
-
-def calculate_scores_rf(rf: RandomForestRegressor, X: np.ndarray, Y: np.ndarray):
-    Y_pred = rf.predict(X)
-    signed_error = Y - Y_pred
-    return signed_error
 
 
 def run_experiment(args):
@@ -45,6 +40,8 @@ def run_experiment(args):
         methods += baselines.copy()
     if args.ours or args.all:
         methods += section5.copy()
+    if args.cpflow or args.all:
+        methods += cpflow_based.copy()
 
     print(f"Testing methods: {methods}")
     if len(methods) < 1:
@@ -54,7 +51,8 @@ def run_experiment(args):
     current_seed_dir = Path(RESULTS_DIR) / args.dataset / str(args.seed)
     os.makedirs(current_seed_dir, exist_ok=True)
 
-    trained_model_path = current_seed_dir / f"model.pth"
+    trained_model_path_cvqr = current_seed_dir / f"model_cvqr.pth"
+    trained_model_path_cpflow = current_seed_dir / f"model_cpflow.pth"
 
     #alpha = 0.3
     #alphas = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -62,51 +60,66 @@ def run_experiment(args):
     # Number of samples for volume estimation
     n_samples = 10_000
 
-    ds = get_dataset_split(name=args.dataset, seed=args.seed, n_test=100)
+    ds = get_dataset_split(name=args.dataset, seed=args.seed, n_test=5)
     if ds.n_train > 10_000:
         _model_config_small["batch_size"] = 1024
     if ds.n_train > 55_000:
         _model_config_small["batch_size"] = 8192
 
-    #_model_config_small["n_epochs"] = 1
+    _model_config_small["n_epochs"] = 1
+
+    # Instantiate conformal methods
+    required_model_names = set()
+    for method in methods:
+        required_model_names.add(method.base_model_name)
+        method.instance = method.cls(**method.kwargs, seed=args.seed)
 
     # Base multidimensional quantile model
-    reg = CVQRegressor(
+    reg_cvqr = CVQRegressor(
         feature_dimension=ds.n_features,
         response_dimension=ds.n_outputs,
         **_model_config_small
     )
     print(
-        f"Number of parameters: {get_total_number_of_parameters(reg.model.potential_network)}, "
+        f"Number of parameters: {get_total_number_of_parameters(reg_cvqr.model.potential_network)}, "
         f"number of training samples: {ds.n_train}."
     )
 
     # Base model for OT-CP: Random Forest
-    rf = RandomForestRegressor(random_state=args.seed)
+    rf = RandomForestWithScore(random_state=args.seed, n_jobs=-1)
 
-    # Instantiate conformal methods
-    for method in methods:
-        method.instance = method.cls(**method.kwargs, seed=args.seed)
+    reg_cpflow = CPFlowRegressor(        
+        feature_dimension=ds.n_features,
+        response_dimension=ds.n_outputs,
+        **_model_config_small
+    )
 
-    # Fit base models
-    if Path.is_file(trained_model_path):
-        reg.model.load(trained_model_path)
-    else:
-        reg.fit(ds.X_train, ds.Y_train)
-        reg.model.save(trained_model_path)
+    score_calculators: dict[str, ScoreCalculator] = {}
 
-    rf.fit(ds.X_train, ds.Y_train)
+    if "CVQRegressor" in required_model_names:
+        # Fit base models
+        if Path.is_file(trained_model_path_cvqr):
+            reg_cvqr.model.load(trained_model_path_cvqr)
+        else:
+            reg_cvqr.fit(ds.X_train, ds.Y_train)
+            reg_cvqr.model.save(trained_model_path_cvqr)
+        score_calculators["CVQRegressor"] = reg_cvqr
+
+    if "RandomForest" in required_model_names:
+        rf.fit(ds.X_train, ds.Y_train)
+        score_calculators["RandomForest"] = rf
+    
+    if "CPFlowRegressor" in required_model_names:
+        if Path.is_file(trained_model_path_cpflow):
+            reg_cpflow.model.load(trained_model_path_cpflow)
+        else:
+            reg_cpflow.fit(ds.X_train, ds.Y_train)
+            reg_cpflow.model.save(trained_model_path_cpflow)
+        score_calculators["CPFlowRegressor"] = reg_cvqr
+
 
     def _calculate_scores(X, Y):
-        quantiles, ranks, log_p = calculate_scores_cvqr(reg, X, Y)
-
-        signed_error = calculate_scores_rf(rf, X, Y)
-        return {
-            "MK Quantile": quantiles,
-            "MK Rank": ranks,
-            "Log Density": log_p,
-            "Signed Error": signed_error,
-        }
+        return {base_model_name: score_calculators[base_model_name].calculate_scores(X, Y) for base_model_name in required_model_names}
 
     # Calculate scores for Neural Vector Quantile regression
     scores_calibration = _calculate_scores(ds.X_cal, ds.Y_cal)
@@ -126,10 +139,10 @@ def run_experiment(args):
         records_alpha = []
         for method in methods:
             method.instance.fit(
-                ds.X_cal, scores_calibration[method.score_name], alpha=alpha
+                X_cal=ds.X_cal, scores_cal=scores_calibration[method.base_model_name][method.score_name], alpha=alpha
             )
             is_covered = method.instance.is_covered(
-                ds.X_test, scores_test[method.score_name]
+                X_test=ds.X_test, scores_test=scores_test[method.base_model_name][method.score_name]
             )
             coverage = is_covered.mean()
             wsc = wsc_unbiased(
@@ -148,6 +161,7 @@ def run_experiment(args):
                     method_name=method.name,
                     method_name_mathtext=method.name_mathtext,
                     score_name=method.score_name,
+                    conformalizer=method.class_name,
                     base_model_name=method.base_model_name,
                     alpha=alpha,
                     marginal_coverage=coverage,
@@ -170,13 +184,13 @@ def run_experiment(args):
                     is_covered = np.array(
                         [
                             method.instance.get_volume(
-                                ds.X_test[i], scores_test[method.score_name][i]
+                                ds.X_test[i], scores_test[method.base_model_name][method.score_name][i]
                             )
                         ]
                     )
                 else:
                     is_covered = method.instance.is_covered(
-                        X_samples, scores_samples[method.score_name]
+                        X_samples, scores_samples[method.base_model_name][method.score_name]
                     )
                 coverage_ratios[j, i] = is_covered.mean()
         mean_volumes = coverage_ratios.mean(axis=-1) * scale
@@ -197,6 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--seed", type=int, default=0)
     parser.add_argument("--baselines", action='store_true')
     parser.add_argument("--ours", action='store_true')
+    parser.add_argument("--cpflow", action='store_true')
     parser.add_argument("--all", action='store_true')
     args = parser.parse_args()
     print(f"{args=}")
