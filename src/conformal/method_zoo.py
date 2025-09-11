@@ -1,4 +1,4 @@
-from conformal.classes.conformalizers import OTCPGlobalPredictor, SplitConformalPredictor
+from conformal.classes.conformalizers import OTCPGlobalPredictor, OTCPLocalPredictor, SplitConformalPredictor
 from conformal.classes.method_desc import ConformalMethodDescription
 
 
@@ -40,6 +40,14 @@ baselines = [
         score_name="Signed Error",
         class_name="OTCPGlobalPredictor",
         cls=OTCPGlobalPredictor
+    ),
+    ConformalMethodDescription(
+        name="OT-CP-Local",
+        name_mathtext=r"$\mathrm{OT}$-$\mathrm{CP}$+",
+        base_model_name="RandomForest",
+        score_name="Signed Error",
+        class_name="OTCPLocalPredictor",
+        cls=OTCPLocalPredictor
     ),
 
 ]
