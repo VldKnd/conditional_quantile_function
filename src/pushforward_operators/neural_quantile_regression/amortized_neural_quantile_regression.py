@@ -204,10 +204,7 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         )
 
         training_time_start = time.perf_counter()
-        training_information_dict = {}
-
         for epoch_idx in progress_bar:
-
             start_of_epoch = time.perf_counter()
 
             for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
