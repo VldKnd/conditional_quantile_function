@@ -7,6 +7,8 @@ from scipy.io import arff
 import pandas as pd
 import pooch
 
+from conformal.real_datasets.preprocessing import preprocess
+
 #MULTIDIM_DATASETS = pooch.create(
 #    path="./data/raw/", # pooch.os_cache("conditional_quantile_function"),
 #    base_url="",
@@ -198,16 +200,11 @@ def sgemm_processor(fname):
 def bio_processor(fname):
     data, meta = arff.loadarff(fname)
     df = pd.DataFrame(data)
-    data_values = df.values
-    is_feature = np.ones(data_values.shape[1], dtype=bool)
-    is_feature[0] = False
-    is_feature[7] = False
-    X, Y = data_values[:, is_feature], data_values[:, ~is_feature]
-    from sklearn.impute import SimpleImputer
-    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
-    X = imputer.fit_transform(X)
-
-    return X, Y
+    targets = ['F7', 'F9']
+    x = df[df.columns.difference(targets)]
+    y = df[targets]
+    x, y, categorical_mask = preprocess(x, y)
+    return x, y
 
 
 @download_with_pooch(
@@ -218,17 +215,12 @@ def bio_processor(fname):
 @make_pooch_precessor(file_name_processed="blog.npz")
 def blog_processor(fname):
     fname_extracted = pooch.Unzip(members=["blogData_train.csv"])(fname, "download", pooch=None)[0]
-    df = pd.read_csv(fname_extracted)
-    data_values = df.values
-    is_feature = np.ones(data_values.shape[1], dtype=bool)
-    is_feature[-1] = False
-    is_feature[60] = False
-    X, Y = data_values[:, is_feature], data_values[:, ~is_feature]
-    from sklearn.impute import SimpleImputer
-    imputer = SimpleImputer(missing_values=np.nan, strategy='median')
-    X = imputer.fit_transform(X)
-
-    return X, Y
+    df = pd.read_csv(fname_extracted, header=None)
+    targets = [60, 280]
+    x = df[df.columns.difference(targets)]
+    y = df[targets]
+    x, y, categorical_mask = preprocess(x, y)
+    return x, y
 
 
 if __name__ == "__main__":
