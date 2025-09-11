@@ -13,12 +13,11 @@ import seaborn as sns
 
 from tqdm.auto import tqdm
 
-from conformal.classes.method_desc import ConformalMethodDescription
 from conformal.real_datasets.reproducible_split import get_dataset_split
 from conformal.wrappers.cvq_regressor import CVQRegressor, calculate_scores_cvqr
-from conformal.classes.conformalizers import SplitConformalPredictor, OTCPGlobalPredictor
 from metrics.wsc import wsc_unbiased
 from utils.network import get_total_number_of_parameters
+from conformal.method_zoo import section5, baselines
 
 RESULTS_DIR = "./conformal_results"
 
@@ -32,41 +31,7 @@ _model_config_small = {
 }
 
 
-methods = [
-    ConformalMethodDescription(
-        name="PB",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{pb}}$",
-        base_model_name="CVQRegressor",
-        score_name="MK Rank",
-        class_name="SplitConformalPredictor",
-        instance=SplitConformalPredictor()
-    ),
-    ConformalMethodDescription(
-        name="RPB",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{rpb}}$",
-        base_model_name="CVQRegressor",
-        score_name="MK Quantile",
-        class_name="OTCPGlobalPredictor",
-        instance=OTCPGlobalPredictor()
-    ),
-    ConformalMethodDescription(
-        name="HPD",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}}$",
-        base_model_name="CVQRegressor",
-        score_name="Log Density",
-        class_name="SplitConformalPredictor",
-        instance=SplitConformalPredictor(lower_is_better=False)
-    ),
-    ConformalMethodDescription(
-        name="OT-CP-Global",
-        name_mathtext=r"$\mathrm{OT}-\mathrm{CP}$",
-        base_model_name="RandomForest",
-        score_name="Signed Error",
-        class_name="OTCPGlobalPredictor",
-        instance=OTCPGlobalPredictor()
-    ),
-
-]
+methods = section5.copy() + baselines.copy()
 
 
 def calculate_scores_rf(rf: RandomForestRegressor, X:np.ndarray, Y:np.ndarray):
@@ -81,12 +46,19 @@ def run_experiment(args):
 
     trained_model_path = current_seed_dir / f"model.pth"
 
-    alpha = 0.3
-    alphas = [0.1, 0.2, 0.3, 0.4, 0.5]
+    #alpha = 0.3
+    #alphas = [0.1, 0.2, 0.3, 0.4, 0.5]
+    alphas = [0.1, 0.2, 0.3]
     # Number of samples for volume estimation
     n_samples = 10_000
 
     ds = get_dataset_split(name=args.dataset, seed=args.seed)
+    if ds.n_train > 10_000:
+        _model_config_small["batch_size"] = 1024
+    if ds.n_train > 55_000:
+        _model_config_small["batch_size"] = 8192
+
+    #_model_config_small["n_epochs"] = 1
 
     # Base multidimensional quantile model
     reg = CVQRegressor(
@@ -101,6 +73,10 @@ def run_experiment(args):
 
     # Base model for OT-CP: Random Forest
     rf = RandomForestRegressor(random_state=args.seed)
+
+    # Instantiate conformal methods
+    for method in methods:
+        method.instance = method.cls(**method.kwargs, seed=args.seed)
 
     # Fit base models
     if Path.is_file(trained_model_path):
@@ -139,8 +115,6 @@ def run_experiment(args):
     for alpha in alphas:
         records_alpha = []
         for method in methods:
-            if hasattr(method, "seed"):
-                setattr(method, "seed", args.seed)
             method.instance.fit(scores_calibration[method.score_name], alpha=alpha)
             is_covered = method.instance.is_covered(scores_test[method.score_name])
             coverage = is_covered.mean()
@@ -177,7 +151,7 @@ def run_experiment(args):
 
     df_metrics = pd.DataFrame(records)
 
-    df_metrics.to_feather(current_seed_dir / f"metrics.feather")
+    df_metrics.to_feather(current_seed_dir / f"metrics_all.feather")
 
     return df_metrics
 
@@ -187,6 +161,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--seed", type=int, required=True)
     args = parser.parse_args()
+    print(f"{args=}")
     results = run_experiment(args)
     print(results.head())
     print("Done!")
