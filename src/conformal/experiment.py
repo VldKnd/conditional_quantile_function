@@ -13,6 +13,7 @@ import seaborn as sns
 
 from tqdm.auto import tqdm
 
+from conformal.classes.method_desc import ConformalMethodDescription
 from conformal.real_datasets.reproducible_split import get_dataset_split
 from conformal.wrappers.cvq_regressor import CVQRegressor, calculate_scores_cvqr
 from metrics.wsc import wsc_unbiased
@@ -31,16 +32,25 @@ _model_config_small = {
 }
 
 
-methods = section5.copy() + baselines.copy()
-
-
-def calculate_scores_rf(rf: RandomForestRegressor, X:np.ndarray, Y:np.ndarray):
+def calculate_scores_rf(rf: RandomForestRegressor, X: np.ndarray, Y: np.ndarray):
     Y_pred = rf.predict(X)
     signed_error = Y - Y_pred
     return signed_error
 
 
 def run_experiment(args):
+    # Decide what methods to test\
+    methods: list[ConformalMethodDescription] = []
+    if args.baselines or args.all:
+        methods += baselines.copy()
+    if args.ours or args.all:
+        methods += section5.copy()
+
+    print(f"Testing methods: {methods}")
+    if len(methods) < 1:
+        print("Nothing to do!")
+        return pd.DataFrame()
+
     current_seed_dir = Path(RESULTS_DIR) / args.dataset / str(args.seed)
     os.makedirs(current_seed_dir, exist_ok=True)
 
@@ -52,7 +62,7 @@ def run_experiment(args):
     # Number of samples for volume estimation
     n_samples = 10_000
 
-    ds = get_dataset_split(name=args.dataset, seed=args.seed)
+    ds = get_dataset_split(name=args.dataset, seed=args.seed, n_test=100)
     if ds.n_train > 10_000:
         _model_config_small["batch_size"] = 1024
     if ds.n_train > 55_000:
@@ -115,8 +125,12 @@ def run_experiment(args):
     for alpha in alphas:
         records_alpha = []
         for method in methods:
-            method.instance.fit(scores_calibration[method.score_name], alpha=alpha)
-            is_covered = method.instance.is_covered(scores_test[method.score_name])
+            method.instance.fit(
+                ds.X_cal, scores_calibration[method.score_name], alpha=alpha
+            )
+            is_covered = method.instance.is_covered(
+                ds.X_test, scores_test[method.score_name]
+            )
             coverage = is_covered.mean()
             wsc = wsc_unbiased(
                 ds.X_test,
@@ -127,11 +141,20 @@ def run_experiment(args):
                 n_cpus=8,
                 verbose=True
             )
-            records_alpha.append(dict(dataset_name=args.dataset, seed=args.seed,
-                                method_name=method.name, method_name_mathtext=method.name_mathtext,
-                                score_name=method.score_name, base_model_name=method.base_model_name, 
-                                alpha=alpha, marginal_coverage=coverage, worst_slab_coverage=wsc))
-        
+            records_alpha.append(
+                dict(
+                    dataset_name=args.dataset,
+                    seed=args.seed,
+                    method_name=method.name,
+                    method_name_mathtext=method.name_mathtext,
+                    score_name=method.score_name,
+                    base_model_name=method.base_model_name,
+                    alpha=alpha,
+                    marginal_coverage=coverage,
+                    worst_slab_coverage=wsc
+                )
+            )
+
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
         coverage_ratios = np.zeros((len(methods), ds.n_test))
@@ -142,7 +165,19 @@ def run_experiment(args):
 
             scores_samples = _calculate_scores(X_samples, Y_smaples)
             for j, method in enumerate(methods):
-                is_covered = method.instance.is_covered(scores_samples[method.score_name])
+                if hasattr(method.instance, "get_volume"):
+                    # Can estimate volume without sampling
+                    is_covered = np.array(
+                        [
+                            method.instance.get_volume(
+                                ds.X_test[i], scores_test[method.score_name][i]
+                            )
+                        ]
+                    )
+                else:
+                    is_covered = method.instance.is_covered(
+                        X_samples, scores_samples[method.score_name]
+                    )
                 coverage_ratios[j, i] = is_covered.mean()
         mean_volumes = coverage_ratios.mean(axis=-1) * scale
         for j, _ in enumerate(methods):
@@ -158,8 +193,11 @@ def run_experiment(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, required=True)
-    parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("-d", "--dataset", type=str, default="rf1")
+    parser.add_argument("-s", "--seed", type=int, default=0)
+    parser.add_argument("--baselines", action='store_true')
+    parser.add_argument("--ours", action='store_true')
+    parser.add_argument("--all", action='store_true')
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)
