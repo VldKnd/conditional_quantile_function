@@ -111,7 +111,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         for epoch_idx in progress_bar:
             start_of_epoch = time.perf_counter()
 
-            for batch_index, (X_batch, Y_batch) in dataloader:
+            for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
                 Y_scaled = self.Y_scaler(Y_batch)
                 U_batch = sample_distribution_like(Y_batch, "normal")
 
