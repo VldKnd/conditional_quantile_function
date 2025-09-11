@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from typing import Type, Any
+from dataclasses import dataclass, field
 
 from conformal.classes.conformalizers import BaseRegionPredictor
 
@@ -10,4 +11,6 @@ class ConformalMethodDescription:
     base_model_name: str
     score_name: str
     class_name: str
-    instance: BaseRegionPredictor
+    cls: Type[BaseRegionPredictor]
+    kwargs: dict[str, Any] = field(default_factory=dict)
+    instance: BaseRegionPredictor | None = None

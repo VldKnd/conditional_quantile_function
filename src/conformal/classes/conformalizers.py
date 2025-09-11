@@ -9,6 +9,7 @@ from conformal.otcp.functions_refactor import MultivQuantileTresholdRefactor, Ra
 
 @dataclass
 class BaseRegionPredictor:
+    seed: int = 0
     alpha: float = 0.1
     lower_is_better: bool = True
 
@@ -43,7 +44,6 @@ class SplitConformalPredictor(BaseRegionPredictor):
 @dataclass
 class OTCPGlobalPredictor(BaseRegionPredictor):
     split_ratio: float = 0.5
-    seed: int = 0
 
     mu: np.ndarray | None  = None
     psi: np.ndarray | None = None
