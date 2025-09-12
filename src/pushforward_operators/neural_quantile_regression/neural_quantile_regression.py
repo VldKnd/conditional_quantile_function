@@ -47,6 +47,55 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
+    def warmup_networks(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        optimizer_parameters: dict = {},
+        warmup_iterations: int = 1,
+        verbose: bool = False
+    ):
+        potential_network_optimizer = torch.optim.AdamW(
+            params=self.potential_network.parameters(), **optimizer_parameters
+        )
+
+        progress_bar = trange(
+            1, warmup_iterations + 1, desc="Warming up networks", disable=not verbose
+        )
+        for iteration in progress_bar:
+            for X_batch, Y_batch in dataloader:
+                Y_scaled = self.Y_scaler(Y_batch)
+                U_batch = sample_distribution_like(Y_batch, "normal")
+
+                potential_network_optimizer.zero_grad()
+
+                if self.potential_to_estimate_with_neural_network == "y":
+                    Y_batch.requires_grad_(True)
+                    potential_tensor = self.potential_network(X_batch, Y_batch)
+                    potential_pushforward = torch.autograd.grad(
+                        potential_tensor.sum(), Y_batch, create_graph=True
+                    )[0]
+                    potential_loss = torch.norm(
+                        potential_pushforward - Y_batch, dim=-1
+                    ).mean()
+                    potential_loss.backward()
+                else:
+                    U_batch.requires_grad_(True)
+                    potential_tensor = self.potential_network(X_batch, U_batch)
+                    potential_pushforward = torch.autograd.grad(
+                        potential_tensor.sum(), U_batch, create_graph=True
+                    )[0]
+                    potential_loss = torch.norm(
+                        potential_pushforward - U_batch, dim=-1
+                    ).mean()
+                    potential_loss.backward()
+
+                potential_network_optimizer.step()
+                progress_bar.set_description(
+                    f"Warm up iteration: {iteration} Potential loss: {potential_loss.item():.3f}"
+                )
+
+        return self
+
     def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
         """Run over the data (no grad) to populate BatchNorm running stats."""
         self.Y_scaler.train()
@@ -130,6 +179,14 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
+
+        self.warmup_networks(
+            dataloader=dataloader,
+            optimizer_parameters=train_parameters.optimizer_parameters,
+            warmup_iterations=train_parameters.warmup_iterations,
+            verbose=verbose
+        )
+        self.warmup_scalers(dataloader=dataloader)
         potential_network_optimizer = torch.optim.AdamW(
             self.potential_network.parameters(), **train_parameters.optimizer_parameters
         )
@@ -142,7 +199,6 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             potential_network_scheduler = None
 
         training_information = []
-        self.warmup_scalers(dataloader=dataloader)
         progress_bar = trange(
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )

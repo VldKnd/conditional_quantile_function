@@ -7,6 +7,7 @@ class TrainParameters(pydantic.BaseModel):
     number_of_epochs_to_train: int = pydantic.Field(default=500)
     optimizer_parameters: dict = pydantic.Field(default={})
     scheduler_parameters: dict = pydantic.Field(default={})
+    warmup_iterations: int = 5
     verbose: bool = pydantic.Field(default=False)
 
 
