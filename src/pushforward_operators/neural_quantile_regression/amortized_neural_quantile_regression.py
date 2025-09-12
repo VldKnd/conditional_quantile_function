@@ -98,10 +98,16 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         last_learning_rate: float | None
     ):
         running_mean_potential_objective = sum(
-            [information["potential"] for information in training_information[-10:]]
+            [
+                information["potential_loss"]
+                for information in training_information[-10:]
+            ]
         ) / len(training_information[-10:])
         running_mean_amortization_objective = sum(
-            [information["amortization"] for information in training_information[-10:]]
+            [
+                information["amortization_loss"]
+                for information in training_information[-10:]
+            ]
         ) / len(training_information[-10:])
 
         description_message = (
@@ -199,7 +205,9 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         training_time_start = time.perf_counter()
         for epoch_idx in progress_bar:
-            for X_batch, Y_batch in dataloader:
+            start_of_epoch = time.perf_counter()
+
+            for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
                 Y_scaled = self.Y_scaler(Y_batch)
                 U_batch = sample_distribution_like(Y_batch, "normal")
 
@@ -244,15 +252,22 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
                     potential_network_scheduler.step()
                     amortization_network_scheduler.step()
 
-                if verbose:
-                    training_information.append(
-                        {
-                            "potential": potential_network_objective.item(),
-                            "amortization": amortization_network_objective.item(),
-                            "epoch_index": epoch_idx
-                        }
-                    )
+                training_information.append(
+                    {
+                        "potential_loss":
+                        potential_network_objective.item(),
+                        "amortization_loss":
+                        amortization_network_objective.item(),
+                        "batch_index":
+                        batch_index,
+                        "epoch_index":
+                        epoch_idx,
+                        "time_elapsed_since_last_epoch":
+                        time.perf_counter() - start_of_epoch,
+                    }
+                )
 
+                if verbose:
                     last_learning_rate = (
                         amortization_network_scheduler.get_last_lr()[0]
                         if amortization_network_scheduler is not None else None
@@ -271,10 +286,11 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         elapsed_training_time = time.perf_counter() - training_time_start
         training_time_per_epoch = elapsed_training_time / number_of_epochs_to_train
         self.model_information_dict["training_time"] = elapsed_training_time
-        self.model_information_dict["time_per_epoch"] = training_time_per_epoch
+        self.model_information_dict["average_time_per_epoch"] = training_time_per_epoch
         self.model_information_dict["number_of_epochs_to_train"
                                     ] = number_of_epochs_to_train
         self.model_information_dict["training_batch_size"] = dataloader.batch_size
+        self.model_information_dict["training_information"] = training_information
         return self
 
     def estimate_psi(

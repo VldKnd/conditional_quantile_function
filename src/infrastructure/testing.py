@@ -105,7 +105,6 @@ def test_on_dataset_with_defined_pushforward_operator(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    print("?")
     number_of_test_samples = 500
     number_of_generated_points = 2000
 
@@ -114,6 +113,11 @@ def test_on_dataset_with_defined_pushforward_operator(
     )
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
+    pushforward_operator.eval()
+    random_number_generator = torch.Generator(
+        device=experiment.tensor_parameters["device"]
+    )
+    random_number_generator.manual_seed(42)
 
     metrics = {
         "Y_wasserstein2": [],
@@ -144,10 +148,115 @@ def test_on_dataset_with_defined_pushforward_operator(
         "Q(U,X)_uv_l2": [],
     }
 
-    random_number_generator = torch.Generator(
-        device=experiment.tensor_parameters["device"]
-    )
-    random_number_generator.manual_seed(42)
+    for _ in tqdm(
+        range(number_of_test_samples // 10),
+        desc="Running Conditional Tests",
+        disable=not verbose
+    ):
+        conditional_metrics = {
+            "Y|X_wasserstein2": [],
+            "Y|X_sliced_wasserstein2": [],
+            "Y|X_kde_kl_divergence": [],
+            "Y|X_kde_l1_divergence": [],
+            "U|X_wasserstein2": [],
+            "U|X_sliced_wasserstein2": [],
+            "U|X_kde_kl_divergence": [],
+            "U|X_kde_l1_divergence": [],
+        }
+        for _ in range(10):
+            X_tensor = dataset.sample_covariates(1).repeat(
+                number_of_generated_points // 5, 1
+            )
+
+            X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
+            U_tensor = torch.randn_like(Y_tensor)
+
+            Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
+            U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
+
+            YX_tensor = torch.cat([Y_tensor, X_tensor], dim=1)
+            YX_approximation = torch.cat([Y_approximation, X_tensor], dim=1)
+
+            UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
+            UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
+
+            if not exclude_wasserstein2:
+                conditional_metrics["Y|X_wasserstein2"].append(
+                    wassertein2(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_wasserstein2"].append(
+                    wassertein2(U_tensor, U_approximation)
+                )
+
+            if not exclude_sliced_wasserstein2:
+                conditional_metrics["Y|X_sliced_wasserstein2"].append(
+                    sliced_wasserstein2(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_sliced_wasserstein2"].append(
+                    sliced_wasserstein2(U_tensor, U_approximation)
+                )
+
+            if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
+                X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
+                U_sample = torch.randn_like(Y_sample)
+                YX_sample = torch.cat([Y_sample, X_sample], dim=1)
+                UX_sample = torch.cat([U_sample, X_sample], dim=1)
+
+                if not exclude_kde_kl_divergence:
+                    conditional_metrics["Y|X_kde_kl_divergence"].append(
+                        kernel_density_estimate_kl_divergence(
+                            Y_tensor, Y_approximation, Y_sample
+                        )
+                    )
+                    conditional_metrics["U|X_kde_kl_divergence"].append(
+                        kernel_density_estimate_kl_divergence(
+                            U_tensor, U_approximation, U_sample
+                        )
+                    )
+
+                if not exclude_kde_l1_divergence:
+                    conditional_metrics["Y|X_kde_l1_divergence"].append(
+                        kernel_density_estimate_l1_divergence(
+                            Y_tensor, Y_approximation, Y_sample
+                        )
+                    )
+                    conditional_metrics["U|X_kde_l1_divergence"].append(
+                        kernel_density_estimate_l1_divergence(
+                            U_tensor, U_approximation, U_sample
+                        )
+                    )
+
+            if not exclude_wasserstein2:
+                metrics["Y|X_wasserstein2"].append(
+                    torch.stack(conditional_metrics["Y|X_wasserstein2"]).mean()
+                )
+                metrics["U|X_wasserstein2"].append(
+                    torch.stack(conditional_metrics["U|X_wasserstein2"]).mean()
+                )
+
+            if not exclude_sliced_wasserstein2:
+                metrics["Y|X_sliced_wasserstein2"].append(
+                    torch.stack(conditional_metrics["Y|X_sliced_wasserstein2"]).mean()
+                )
+                metrics["U|X_sliced_wasserstein2"].append(
+                    torch.stack(conditional_metrics["U|X_sliced_wasserstein2"]).mean()
+                )
+
+            if not exclude_kde_kl_divergence:
+                metrics["Y|X_kde_kl_divergence"].append(
+                    torch.stack(conditional_metrics["Y|X_kde_kl_divergence"]).mean()
+                )
+                metrics["U|X_kde_kl_divergence"].append(
+                    torch.stack(conditional_metrics["U|X_kde_kl_divergence"]).mean()
+                )
+
+            if not exclude_kde_l1_divergence:
+                metrics["Y|X_kde_l1_divergence"].append(
+                    torch.stack(conditional_metrics["Y|X_kde_l1_divergence"]).mean()
+                )
+                metrics["U|X_kde_l1_divergence"].append(
+                    torch.stack(conditional_metrics["U|X_kde_l1_divergence"]).mean()
+                )
 
     # Joint and Marginal
     for _ in tqdm(
@@ -251,67 +360,6 @@ def test_on_dataset_with_defined_pushforward_operator(
                     )
                 )
 
-    for _ in tqdm(
-        range(number_of_test_samples),
-        desc="Running Conditional Tests",
-        disable=not verbose
-    ):
-        X_tensor = dataset.sample_covariates(1).repeat(number_of_generated_points, 1)
-        U_tensor = torch.randn_like(Y_tensor)
-
-        X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
-
-        Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
-        U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
-
-        YX_tensor = torch.cat([Y_tensor, X_tensor], dim=1)
-        YX_approximation = torch.cat([Y_approximation, X_tensor], dim=1)
-
-        UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
-        UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
-
-        if not exclude_wasserstein2:
-            metrics["Y|X_wasserstein2"].append(wassertein2(Y_tensor, Y_approximation))
-            metrics["U|X_wasserstein2"].append(wassertein2(U_tensor, U_approximation))
-
-        if not exclude_sliced_wasserstein2:
-            metrics["Y|X_sliced_wasserstein2"].append(
-                sliced_wasserstein2(Y_tensor, Y_approximation)
-            )
-            metrics["U|X_sliced_wasserstein2"].append(
-                sliced_wasserstein2(U_tensor, U_approximation)
-            )
-
-        if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-            X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
-            U_sample = torch.randn_like(Y_sample)
-            YX_sample = torch.cat([Y_sample, X_sample], dim=1)
-            UX_sample = torch.cat([U_sample, X_sample], dim=1)
-
-            if not exclude_kde_kl_divergence:
-                metrics["Y|X_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U|X_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-
-            if not exclude_kde_l1_divergence:
-                metrics["Y|X_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U|X_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-
     return metrics
 
 
@@ -343,6 +391,11 @@ def test_on_dataset_with_defined_sample_joint(
     )
     pushforward_operator = load_pushforward_operator_from_experiment(experiment)
     pushforward_operator.to(**experiment.tensor_parameters)
+    pushforward_operator.eval()
+    random_number_generator = torch.Generator(
+        device=experiment.tensor_parameters["device"]
+    )
+    random_number_generator.manual_seed(42)
 
     metrics = {
         "Y_wasserstein2": [],
@@ -371,10 +424,115 @@ def test_on_dataset_with_defined_sample_joint(
         "UX_kde_l1_divergence": [],
     }
 
-    random_number_generator = torch.Generator(
-        device=experiment.tensor_parameters["device"]
-    )
-    random_number_generator.manual_seed(42)
+    for _ in tqdm(
+        range(number_of_test_samples // 10),
+        desc="Running Conditional Tests",
+        disable=not verbose
+    ):
+        conditional_metrics = {
+            "Y|X_wasserstein2": [],
+            "Y|X_sliced_wasserstein2": [],
+            "Y|X_kde_kl_divergence": [],
+            "Y|X_kde_l1_divergence": [],
+            "U|X_wasserstein2": [],
+            "U|X_sliced_wasserstein2": [],
+            "U|X_kde_kl_divergence": [],
+            "U|X_kde_l1_divergence": [],
+        }
+        for _ in range(10):
+            X_tensor = dataset.sample_covariates(1).repeat(
+                number_of_generated_points // 5, 1
+            )
+
+            X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
+            U_tensor = torch.randn_like(Y_tensor)
+
+            Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
+            U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
+
+            YX_tensor = torch.cat([Y_tensor, X_tensor], dim=1)
+            YX_approximation = torch.cat([Y_approximation, X_tensor], dim=1)
+
+            UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
+            UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
+
+            if not exclude_wasserstein2:
+                conditional_metrics["Y|X_wasserstein2"].append(
+                    wassertein2(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_wasserstein2"].append(
+                    wassertein2(U_tensor, U_approximation)
+                )
+
+            if not exclude_sliced_wasserstein2:
+                conditional_metrics["Y|X_sliced_wasserstein2"].append(
+                    sliced_wasserstein2(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_sliced_wasserstein2"].append(
+                    sliced_wasserstein2(U_tensor, U_approximation)
+                )
+
+            if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
+                X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
+                U_sample = torch.randn_like(Y_sample)
+                YX_sample = torch.cat([Y_sample, X_sample], dim=1)
+                UX_sample = torch.cat([U_sample, X_sample], dim=1)
+
+                if not exclude_kde_kl_divergence:
+                    conditional_metrics["Y|X_kde_kl_divergence"].append(
+                        kernel_density_estimate_kl_divergence(
+                            Y_tensor, Y_approximation, Y_sample
+                        )
+                    )
+                    conditional_metrics["U|X_kde_kl_divergence"].append(
+                        kernel_density_estimate_kl_divergence(
+                            U_tensor, U_approximation, U_sample
+                        )
+                    )
+
+                if not exclude_kde_l1_divergence:
+                    conditional_metrics["Y|X_kde_l1_divergence"].append(
+                        kernel_density_estimate_l1_divergence(
+                            Y_tensor, Y_approximation, Y_sample
+                        )
+                    )
+                    conditional_metrics["U|X_kde_l1_divergence"].append(
+                        kernel_density_estimate_l1_divergence(
+                            U_tensor, U_approximation, U_sample
+                        )
+                    )
+
+            if not exclude_wasserstein2:
+                metrics["Y|X_wasserstein2"].append(
+                    torch.stack(conditional_metrics["Y|X_wasserstein2"]).mean()
+                )
+                metrics["U|X_wasserstein2"].append(
+                    torch.stack(conditional_metrics["U|X_wasserstein2"]).mean()
+                )
+
+            if not exclude_sliced_wasserstein2:
+                metrics["Y|X_sliced_wasserstein2"].append(
+                    torch.stack(conditional_metrics["Y|X_sliced_wasserstein2"]).mean()
+                )
+                metrics["U|X_sliced_wasserstein2"].append(
+                    torch.stack(conditional_metrics["U|X_sliced_wasserstein2"]).mean()
+                )
+
+            if not exclude_kde_kl_divergence:
+                metrics["Y|X_kde_kl_divergence"].append(
+                    torch.stack(conditional_metrics["Y|X_kde_kl_divergence"]).mean()
+                )
+                metrics["U|X_kde_kl_divergence"].append(
+                    torch.stack(conditional_metrics["U|X_kde_kl_divergence"]).mean()
+                )
+
+            if not exclude_kde_l1_divergence:
+                metrics["Y|X_kde_l1_divergence"].append(
+                    torch.stack(conditional_metrics["Y|X_kde_l1_divergence"]).mean()
+                )
+                metrics["U|X_kde_l1_divergence"].append(
+                    torch.stack(conditional_metrics["U|X_kde_l1_divergence"]).mean()
+                )
 
     # Joint and Marginal
     for _ in tqdm(
@@ -466,66 +624,6 @@ def test_on_dataset_with_defined_sample_joint(
                 metrics["UX_kde_l1_divergence"].append(
                     kernel_density_estimate_l1_divergence(
                         UX_tensor, UX_approximation, UX_sample
-                    )
-                )
-
-    for _ in tqdm(
-        range(number_of_test_samples),
-        desc="Running Conditional Tests",
-        disable=not verbose
-    ):
-        X_tensor = dataset.sample_covariates(1).repeat(number_of_generated_points, 1)
-        X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
-        U_tensor = torch.randn_like(Y_tensor)
-
-        Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
-        U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
-
-        YX_tensor = torch.cat([Y_tensor, X_tensor], dim=1)
-        YX_approximation = torch.cat([Y_approximation, X_tensor], dim=1)
-
-        UX_tensor = torch.cat([U_tensor, X_tensor], dim=1)
-        UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
-
-        if not exclude_wasserstein2:
-            metrics["Y|X_wasserstein2"].append(wassertein2(Y_tensor, Y_approximation))
-            metrics["U|X_wasserstein2"].append(wassertein2(U_tensor, U_approximation))
-
-        if not exclude_sliced_wasserstein2:
-            metrics["Y|X_sliced_wasserstein2"].append(
-                sliced_wasserstein2(Y_tensor, Y_approximation)
-            )
-            metrics["U|X_sliced_wasserstein2"].append(
-                sliced_wasserstein2(U_tensor, U_approximation)
-            )
-
-        if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-            X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
-            U_sample = torch.randn_like(Y_sample)
-            YX_sample = torch.cat([Y_sample, X_sample], dim=1)
-            UX_sample = torch.cat([U_sample, X_sample], dim=1)
-
-            if not exclude_kde_kl_divergence:
-                metrics["Y|X_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U|X_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-
-            if not exclude_kde_l1_divergence:
-                metrics["Y|X_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U|X_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        U_tensor, U_approximation, U_sample
                     )
                 )
 

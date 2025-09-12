@@ -4,7 +4,9 @@ from tqdm import tqdm
 
 
 def sliced_wasserstein2(
-    ground_truth: torch.Tensor, approximation: torch.Tensor
+    ground_truth: torch.Tensor,
+    approximation: torch.Tensor,
+    n_projections=1000
 ) -> torch.Tensor:
     """
     Computes the Sliced Wasserstein distance between two sets of points.
@@ -17,7 +19,7 @@ def sliced_wasserstein2(
         torch.Tensor: The Sliced Wasserstein distance between the two sets of points.
     """
     return ot.sliced_wasserstein_distance(
-        X_s=ground_truth, X_t=approximation, n_projections=1000
+        X_s=ground_truth, X_t=approximation, n_projections=n_projections
     )
 
 

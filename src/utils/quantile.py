@@ -22,7 +22,7 @@ def get_quantile_level_analytically(
     """
     if distribution == "gaussian":
         scipy_quantile = stats.chi2.ppf(alpha.cpu().detach().numpy(), df=dimension)
-        return torch.from_numpy(scipy_quantile**(1 / 2))
+        return torch.from_numpy(scipy_quantile**(1 / 2)).to(alpha)
     elif distribution == "uniform_ball":
         return alpha**(1 / dimension)
     else:

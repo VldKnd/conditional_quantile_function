@@ -62,7 +62,10 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         last_learning_rate: float | None
     ):
         running_mean_objective = sum(
-            [information["objective"] for information in training_information[-10:]]
+            [
+                information["potential_loss"]
+                for information in training_information[-10:]
+            ]
         ) / len(training_information[-10:])
 
         return  (
@@ -146,8 +149,9 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         training_time_start = time.perf_counter()
         for epoch_idx in progress_bar:
-            for X_batch, Y_batch in dataloader:
+            start_of_epoch = time.perf_counter()
 
+            for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
                 Y_scaled = self.Y_scaler(Y_batch)
                 U_batch = sample_distribution_like(Y_batch, "normal")
 
@@ -175,13 +179,20 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
                 if potential_network_scheduler is not None:
                     potential_network_scheduler.step()
 
+                training_information.append(
+                    {
+                        "potential_loss":
+                        potential_network_objective.item(),
+                        "batch_index":
+                        batch_index,
+                        "epoch_index":
+                        epoch_idx,
+                        "time_elapsed_since_last_epoch":
+                        time.perf_counter() - start_of_epoch,
+                    }
+                )
+
                 if verbose:
-                    training_information.append(
-                        {
-                            "objective": potential_network_objective.item(),
-                            "epoch_index": epoch_idx
-                        }
-                    )
 
                     last_learning_rate = (
                         potential_network_scheduler.get_last_lr()
@@ -205,6 +216,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         self.model_information_dict["number_of_epochs_to_train"
                                     ] = number_of_epochs_to_train
         self.model_information_dict["training_batch_size"] = dataloader.batch_size
+        self.model_information_dict["training_information"] = training_information
         return self
 
     def estimate_psi(

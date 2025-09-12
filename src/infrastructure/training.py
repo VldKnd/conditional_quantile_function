@@ -30,8 +30,8 @@ def train(experiment: Experiment) -> PushForwardOperator:
     Returns:
         PushForwardOperator: The trained model.
     """
-    experiment.dataset_number_of_points = 10
-    experiment.train_parameters.number_of_epochs_to_train = 1
+    # experiment.dataset_number_of_points = 10
+    # experiment.train_parameters.number_of_epochs_to_train = 1
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
