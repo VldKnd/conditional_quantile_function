@@ -1,10 +1,10 @@
+import warnings
 import os
 from pathlib import Path
 import argparse
 
 import numpy as np
 import pandas as pd
-from sklearn.neighbors import KNeighborsRegressor
 import torch
 
 import matplotlib.pyplot as plt
@@ -13,6 +13,7 @@ import seaborn as sns
 from tqdm.auto import tqdm
 
 from conformal.classes.method_desc import ConformalMethodDescription
+from conformal.plots.diagnostic import draw_density_scores_pair, draw_qq_scores_pair
 from conformal.real_datasets.reproducible_split import get_dataset_split
 from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, ScoreCalculator
 from conformal.wrappers.rf_score import RandomForestWithScore
@@ -31,6 +32,8 @@ _model_config_small = {
     "learning_rate": 0.01,
     "dtype": torch.float32,
 }
+
+_scores_batch_size = 4096
 
 
 def run_experiment(args):
@@ -88,7 +91,7 @@ def run_experiment(args):
     # Base model for OT-CP: Random Forest
     rf = RandomForestWithScore(random_state=args.seed, n_jobs=-1)
 
-    reg_cpflow = CPFlowRegressor(        
+    reg_cpflow = CPFlowRegressor(
         feature_dimension=ds.n_features,
         response_dimension=ds.n_outputs,
         **_model_config_small
@@ -108,22 +111,42 @@ def run_experiment(args):
     if "RandomForest" in required_model_names:
         rf.fit(ds.X_train, ds.Y_train)
         score_calculators["RandomForest"] = rf
-    
+
     if "CPFlowRegressor" in required_model_names:
         if Path.is_file(trained_model_path_cpflow):
             reg_cpflow.model.load(trained_model_path_cpflow)
         else:
             reg_cpflow.fit(ds.X_train, ds.Y_train)
             reg_cpflow.model.save(trained_model_path_cpflow)
-        score_calculators["CPFlowRegressor"] = reg_cvqr
-
+        score_calculators["CPFlowRegressor"] = reg_cpflow
 
     def _calculate_scores(X, Y):
-        return {base_model_name: score_calculators[base_model_name].calculate_scores(X, Y) for base_model_name in required_model_names}
+        return {
+            base_model_name:
+            score_calculators[base_model_name].calculate_scores(
+                X, Y, batch_size=_scores_batch_size
+            )
+            for base_model_name in required_model_names
+        }
 
-    # Calculate scores for Neural Vector Quantile regression
+    # Calculate scores for all base models
     scores_calibration = _calculate_scores(ds.X_cal, ds.Y_cal)
     scores_test = _calculate_scores(ds.X_test, ds.Y_test)
+
+    # Diagnostic plotting
+    for model_name in scores_calibration.keys():
+        print(f"{list(scores_calibration.keys())=}")
+        if "MK Quantile" in scores_calibration[model_name]:
+            draw_qq_scores_pair(
+                scores_calibration[model_name]["MK Quantile"],
+                scores_test[model_name]["MK Quantile"],
+                save_path=current_seed_dir / f"{model_name}_QQ.png"
+            )
+            draw_density_scores_pair(
+                scores_calibration[model_name]["MK Quantile"],
+                scores_test[model_name]["MK Quantile"],
+                save_path=current_seed_dir / f"{model_name}_U_kde.png"
+            )
 
     # Compute metrics
     records = []
@@ -135,19 +158,26 @@ def run_experiment(args):
 
     scale = np.prod(ymax - ymin)
 
+    print("Computing metrics")
     for alpha in alphas:
         records_alpha = []
         for method in methods:
+            print(f"{alpha=:.2f}, {method.name=}")
             method.instance.fit(
-                X_cal=ds.X_cal, scores_cal=scores_calibration[method.base_model_name][method.score_name], alpha=alpha
+                X_cal=ds.X_cal,
+                scores_cal=scores_calibration[method.base_model_name][method.score_name
+                                                                      ],
+                alpha=alpha
             )
-            is_covered = method.instance.is_covered(
-                X_test=ds.X_test, scores_test=scores_test[method.base_model_name][method.score_name]
+            volume = method.instance.is_covered(
+                X_test=ds.X_test,
+                scores_test=scores_test[method.base_model_name][method.score_name],
+                verbose=True
             )
-            coverage = is_covered.mean()
+            coverage = volume.mean()
             wsc = wsc_unbiased(
                 ds.X_test,
-                is_covered,
+                volume,
                 delta=0.1,
                 M=5000,
                 random_state=args.seed,
@@ -171,7 +201,7 @@ def run_experiment(args):
 
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
-        coverage_ratios = np.zeros((len(methods), ds.n_test))
+        volumes = np.zeros((len(methods), ds.n_test))
         print(f"{alpha=:.2f}, estimating areas:")
         for i in tqdm(range(ds.n_test)):
             X_samples = np.repeat(ds.X_test[i:i + 1], repeats=n_samples, axis=0)
@@ -181,19 +211,18 @@ def run_experiment(args):
             for j, method in enumerate(methods):
                 if hasattr(method.instance, "get_volume"):
                     # Can estimate volume without sampling
-                    is_covered = np.array(
-                        [
-                            method.instance.get_volume(
-                                ds.X_test[i], scores_test[method.base_model_name][method.score_name][i]
-                            )
-                        ]
+                    volume = method.instance.get_volume(
+                        ds.X_test[i],
+                        scores_test[method.base_model_name][method.score_name][i]
                     )
                 else:
-                    is_covered = method.instance.is_covered(
-                        X_samples, scores_samples[method.base_model_name][method.score_name]
-                    )
-                coverage_ratios[j, i] = is_covered.mean()
-        mean_volumes = coverage_ratios.mean(axis=-1) * scale
+                    # Approximate volume using samples
+                    volume = method.instance.is_covered(
+                        X_samples,
+                        scores_samples[method.base_model_name][method.score_name]
+                    ).mean() * scale
+                volumes[j, i] = volume
+        mean_volumes = volumes.mean(axis=-1) * scale
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
         records += records_alpha

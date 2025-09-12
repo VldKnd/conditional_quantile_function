@@ -173,15 +173,19 @@ class EllipsoidalLocal(BaseRegionPredictor):
     n_neighbors: int = 100
     det_cov: float = field(init=False)
     volume: float = field(init=False)
+    _scores_cal: np.ndarray = field(init=False)
+    local_alphas: np.ndarray = field(init=False, default_factory=lambda: np.zeros(0))
+    local_alpha_threshold: float = 0
 
     def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
         self.alpha = alpha
         n = scores_cal.shape[0]
         self.n_cal_1 = int(self.split_ratio * n)
+        self._scores_cal = scores_cal
         self.scores_cal_1 = scores_cal[:self.n_cal_1]
         self.scores_cal_2 = scores_cal[self.n_cal_1:]
         self.cov_cal_1 = np.cov(self.scores_cal_1.T)
-        self.knn, self.local_alpha_s = ellipse_local_alpha_s(
+        self.knn, local_alphas, self.local_alpha_threshold = ellipse_local_alpha_s(
             x_train=X_cal[:self.n_cal_1],
             x_cal=X_cal[self.n_cal_1:],
             y_true_train=self.scores_cal_1,
@@ -193,6 +197,7 @@ class EllipsoidalLocal(BaseRegionPredictor):
             lam=self.lam,
             cov_train=self.cov_cal_1,
         )
+        self.local_alphas = np.array(local_alphas)
     
     def _get_local_inv_cov(self, local_neighbors: np.ndarray) -> np.ndarray:
         knn_scores = self.scores_cal_1[
@@ -209,7 +214,7 @@ class EllipsoidalLocal(BaseRegionPredictor):
         is_covered = np.zeros(X_test.shape[0])
         for i in tqdm(range(X_test.shape[0]), disable=not verbose):
             local_inv_cov_test = self._get_local_inv_cov(local_neighbors_test[i, :])
-            is_covered[i] = ellipsoidal_non_conformity_measure(scores_test[i], local_inv_cov_test) <= self.local_alpha_s
+            is_covered[i] = ellipsoidal_non_conformity_measure(scores_test[i], local_inv_cov_test) <= self.local_alpha_threshold
             
         return is_covered
     
@@ -218,4 +223,4 @@ class EllipsoidalLocal(BaseRegionPredictor):
         local_neighbors = self.knn.kneighbors(x.reshape(1, -1), return_distance=False)
         local_inv_cov = self._get_local_inv_cov(local_neighbors[0, :])
         d = score.shape[-1]
-        return ellipse_volume(local_inv_cov, self.local_alpha_s, d)
+        return ellipse_volume(local_inv_cov, self.local_alpha_threshold, d)
