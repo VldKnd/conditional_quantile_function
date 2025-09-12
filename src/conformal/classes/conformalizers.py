@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 import numpy as np
+from scipy.special import gamma
 import torch
 
 from tqdm.auto import tqdm
@@ -198,29 +199,41 @@ class EllipsoidalLocal(BaseRegionPredictor):
             cov_train=self.cov_cal_1,
         )
         self.local_alphas = np.array(local_alphas)
-    
-    def _get_local_inv_cov(self, local_neighbors: np.ndarray) -> np.ndarray:
-        knn_scores = self.scores_cal_1[
-            local_neighbors, :
-        ]
-        local_cov_test = np.cov(knn_scores.T)
-        local_cov_test_regularized = self.lam * local_cov_test + (1 - self.lam) * self.cov_cal_1
-        local_inv_cov_test = np.linalg.inv(local_cov_test_regularized)
 
-        return local_inv_cov_test
-    
-    def is_covered(self, X_test: np.ndarray, scores_test: np.ndarray, verbose: bool = False) -> np.ndarray:
+    def _get_local_cov(self, local_neighbors: np.ndarray) -> np.ndarray:
+        knn_scores = self.scores_cal_1[local_neighbors, :]
+        local_cov_test = np.cov(knn_scores.T)
+        local_cov_test_regularized = self.lam * local_cov_test + (
+            1 - self.lam
+        ) * self.cov_cal_1
+
+        return local_cov_test_regularized
+
+    def is_covered(
+        self,
+        X_test: np.ndarray,
+        scores_test: np.ndarray,
+        verbose: bool = False
+    ) -> np.ndarray:
         local_neighbors_test = self.knn.kneighbors(X_test, return_distance=False)
         is_covered = np.zeros(X_test.shape[0])
         for i in tqdm(range(X_test.shape[0]), disable=not verbose):
-            local_inv_cov_test = self._get_local_inv_cov(local_neighbors_test[i, :])
-            is_covered[i] = ellipsoidal_non_conformity_measure(scores_test[i], local_inv_cov_test) <= self.local_alpha_threshold
-            
+            local_cov_test = self._get_local_cov(local_neighbors_test[i, :])
+            local_inv_cov_test = np.linalg.inv(local_cov_test)
+            is_covered[i] = ellipsoidal_non_conformity_measure(
+                scores_test[i], local_inv_cov_test
+            ) <= self.local_alpha_threshold
+
         return is_covered
-    
+
     def get_volume(
-        self, x: np.ndarray, score: np.ndarray, verbose: bool = False) -> float:
+        self, x: np.ndarray, score: np.ndarray, verbose: bool = False
+    ) -> float:
         local_neighbors = self.knn.kneighbors(x.reshape(1, -1), return_distance=False)
-        local_inv_cov = self._get_local_inv_cov(local_neighbors[0, :])
+        local_cov = self._get_local_cov(local_neighbors[0, :])
         d = score.shape[-1]
-        return ellipse_volume(local_inv_cov, self.local_alpha_threshold, d)
+        volume_unit_ball = np.pi ** (d / 2) / gamma(d / 2 + 1)
+        volume_scalar = float(
+            np.linalg.det(local_cov) ** (1 / 2) * self.local_alpha_threshold * volume_unit_ball
+        )
+        return volume_scalar

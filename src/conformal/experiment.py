@@ -222,7 +222,7 @@ def run_experiment(args):
                         scores_samples[method.base_model_name][method.score_name]
                     ).mean() * scale
                 volumes[j, i] = volume
-        mean_volumes = volumes.mean(axis=-1) * scale
+        mean_volumes = volumes.mean(axis=-1)
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
         records += records_alpha
@@ -245,5 +245,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)
-    print(results.head())
+    print(results.head(10))
     print("Done!")
