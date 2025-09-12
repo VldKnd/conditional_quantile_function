@@ -55,7 +55,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         verbose: bool = False
     ):
         potential_network_optimizer = torch.optim.AdamW(
-            params=self.potential_network.parameters(), **optimizer_parameters
+            self.potential_network.parameters(), **optimizer_parameters
         )
 
         progress_bar = trange(
@@ -64,18 +64,18 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         for iteration in progress_bar:
             for X_batch, Y_batch in dataloader:
                 Y_scaled = self.Y_scaler(Y_batch)
-                U_batch = sample_distribution_like(Y_batch, "normal")
+                U_batch = sample_distribution_like(Y_scaled, "normal")
 
                 potential_network_optimizer.zero_grad()
 
                 if self.potential_to_estimate_with_neural_network == "y":
-                    Y_batch.requires_grad_(True)
-                    potential_tensor = self.potential_network(X_batch, Y_batch)
+                    Y_scaled.requires_grad_(True)
+                    potential_tensor = self.potential_network(X_batch, Y_scaled)
                     potential_pushforward = torch.autograd.grad(
-                        potential_tensor.sum(), Y_batch, create_graph=True
+                        potential_tensor.sum(), Y_scaled, create_graph=True
                     )[0]
                     potential_loss = torch.norm(
-                        potential_pushforward - Y_batch, dim=-1
+                        potential_pushforward - Y_scaled, dim=-1
                     ).mean()
                     potential_loss.backward()
                 else:
@@ -180,13 +180,13 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
 
+        self.warmup_scalers(dataloader=dataloader)
         self.warmup_networks(
             dataloader=dataloader,
             optimizer_parameters=train_parameters.optimizer_parameters,
             warmup_iterations=train_parameters.warmup_iterations,
             verbose=verbose
         )
-        self.warmup_scalers(dataloader=dataloader)
         potential_network_optimizer = torch.optim.AdamW(
             self.potential_network.parameters(), **train_parameters.optimizer_parameters
         )
