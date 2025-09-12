@@ -149,7 +149,7 @@ def MultivQuantileTreshold_Adaptive(scores_cal, x_cal, n_neighbors, alpha=0.9):
     )
 
     # Quantile regression (and a fortiori KNN) on data 1
-    knn = NearestNeighbors(n_neighbors=n_neighbors)
+    knn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=-1)
     knn.fit(x_cal[indices_split1])
 
     # Conformal treshold on data 2
