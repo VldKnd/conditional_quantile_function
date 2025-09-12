@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+import warnings
+
 import numpy as np
 from scipy.stats import multivariate_normal
 import torch
@@ -18,7 +20,7 @@ def _make_xy_dataloader(X: np.ndarray, Y: np.ndarray, batch_size: int, dtype=tor
 
 
 class ScoreCalculator:
-    def calculate_scores(self, X: np.ndarray, Y: np.ndarray) -> dict[str, np.ndarray]:
+    def calculate_scores(self, X: np.ndarray, Y: np.ndarray, batch_size: int | None = None) -> dict[str, np.ndarray]:
         return {"Zero": np.zeros_like(Y)}
 
 
@@ -67,14 +69,14 @@ class CVQRegressor(BaseVQRegressor):
             potential_to_estimate_with_neural_network="y",
         ).to(self.dtype)
 
-    def predict_logdet_hessian_potential(self, X, Y):
+    def predict_logdet_hessian_potential(self, X, Y, batch_size: int | None = None):
         _compute_batch_hessian = torch.vmap(func=hessian(self.model.potential_network, argnums=1), 
-                                            in_dims=0, chunk_size=self.batch_size)
+                                            in_dims=0, chunk_size=batch_size or self.batch_size)
         hessians = _compute_batch_hessian(torch.tensor(X, dtype=self.dtype), torch.tensor(Y, dtype=self.dtype))[:, 0].detach()
         logdet_h = torch.logdet(hessians).squeeze().detach().numpy(force=True)
         return logdet_h
 
-    def calculate_scores(self, X: np.ndarray, Y: np.ndarray) -> dict[str, np.ndarray]:
+    def calculate_scores(self, X: np.ndarray, Y: np.ndarray, batch_size: int | None = None) -> dict[str, np.ndarray]:
         """
         Calculate Monge-Kantorovich qunatiles and ranks for given sample pairs (x_i, y_i).
         Additionaly, calculate estimate of the log-density fro the given samples
@@ -86,7 +88,7 @@ class CVQRegressor(BaseVQRegressor):
         quantiles = self.predict_quantile(X, Y)
         ranks = np.linalg.norm(quantiles, axis=-1)
         log_p_U = multivariate_normal.logpdf(quantiles, mean=np.zeros(d))
-        logdet_h = self.predict_logdet_hessian_potential(X, Y)
+        logdet_h = self.predict_logdet_hessian_potential(X, Y, batch_size=batch_size)
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_p_U + logdet_h}
 
 @dataclass
@@ -102,7 +104,7 @@ class CPFlowRegressor(BaseVQRegressor):
             n_blocks=self.n_blocks,
         ).to(self.dtype)
 
-    def calculate_scores(self, X: np.ndarray, Y: np.ndarray) -> dict[str, np.ndarray]:
+    def calculate_scores(self, X: np.ndarray, Y: np.ndarray, batch_size: int | None = None) -> dict[str, np.ndarray]:
         """
         Calculate Monge-Kantorovich qunatiles and ranks for given sample pairs (x_i, y_i).
         Additionaly, calculate estimate of the log-density fro the given samples
@@ -111,7 +113,11 @@ class CPFlowRegressor(BaseVQRegressor):
         """
         n, m = X.shape
         _, d = Y.shape
-        quantiles = self.predict_quantile(X, Y)
-        ranks = np.linalg.norm(quantiles, axis=-1)
-        log_p = self.model.logp_cond(Y=torch.tensor(Y, dtype=self.dtype), X=torch.tensor(X, dtype=self.dtype)).numpy(force=True)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            quantiles = self.predict_quantile(X, Y)
+            ranks = np.linalg.norm(quantiles, axis=-1)
+            log_p = self.model.logp_cond(Y=torch.tensor(Y, dtype=self.dtype), X=torch.tensor(X, dtype=self.dtype)).numpy(force=True)
+        
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_p}
