@@ -16,6 +16,7 @@
 
 # Datasets
 data/
+conformal_results/
 
 # Experiments
 notebooks/sandbox.ipynb
