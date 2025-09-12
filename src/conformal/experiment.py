@@ -26,7 +26,7 @@ RESULTS_DIR = "./conformal_results"
 _model_config_small = {
     "hidden_dimension": 8,
     "number_of_hidden_layers": 2,
-    "batch_size": 64,
+    "batch_size": 256,
     "n_epochs": 50,
     "learning_rate": 0.01,
     "dtype": torch.float32,
@@ -60,13 +60,13 @@ def run_experiment(args):
     # Number of samples for volume estimation
     n_samples = 10_000
 
-    ds = get_dataset_split(name=args.dataset, seed=args.seed, n_test=5)
+    ds = get_dataset_split(name=args.dataset, seed=args.seed)
     if ds.n_train > 10_000:
         _model_config_small["batch_size"] = 1024
     if ds.n_train > 55_000:
         _model_config_small["batch_size"] = 8192
 
-    _model_config_small["n_epochs"] = 1
+    #_model_config_small["n_epochs"] = 1
 
     # Instantiate conformal methods
     required_model_names = set()
