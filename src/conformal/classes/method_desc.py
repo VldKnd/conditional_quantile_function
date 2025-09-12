@@ -13,4 +13,4 @@ class ConformalMethodDescription:
     class_name: str
     cls: Type[BaseRegionPredictor]
     kwargs: dict[str, Any] = field(default_factory=dict)
-    instance: BaseRegionPredictor | None = None
+    instance: BaseRegionPredictor = field(init=False, repr=False)
