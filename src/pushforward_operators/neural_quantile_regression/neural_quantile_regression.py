@@ -187,9 +187,11 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             warmup_iterations=train_parameters.warmup_iterations,
             verbose=verbose
         )
+
         potential_network_optimizer = torch.optim.AdamW(
             self.potential_network.parameters(), **train_parameters.optimizer_parameters
         )
+
         if train_parameters.scheduler_parameters:
             potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 potential_network_optimizer, total_number_of_optimizer_steps,
@@ -199,13 +201,15 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
             potential_network_scheduler = None
 
         training_information = []
+        training_information_per_epoch = []
+
         progress_bar = trange(
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
 
-        training_time_start = time.perf_counter()
         for epoch_idx in progress_bar:
             start_of_epoch = time.perf_counter()
+            potential_losses_per_epoch = []
 
             for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
                 Y_scaled = self.Y_scaler(Y_batch)
@@ -228,12 +232,14 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
                 potential_network_objective = torch.mean(phi) + torch.mean(psi)
                 potential_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(
-                    self.potential_network.parameters(), max_norm=10
+                    self.potential_network.parameters(), max_norm=1
                 )
                 potential_network_optimizer.step()
 
                 if potential_network_scheduler is not None:
                     potential_network_scheduler.step()
+
+                potential_losses_per_epoch.append(potential_network_objective.item())
 
                 training_information.append(
                     {
@@ -249,9 +255,8 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
                 )
 
                 if verbose:
-
                     last_learning_rate = (
-                        potential_network_scheduler.get_last_lr()
+                        potential_network_scheduler.get_last_lr()[0]
                         if potential_network_scheduler is not None else None
                     )
 
@@ -263,16 +268,19 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
                     progress_bar.set_description(progress_bar_message)
 
+        training_information_per_epoch.append(
+            {
+                "potential_loss": torch.mean(potential_losses_per_epoch),
+                "epoch_training_time": time.perf_counter() - start_of_epoch
+            }
+        )
         progress_bar.close()
 
-        elapsed_training_time = time.perf_counter() - training_time_start
-        training_time_per_epoch = elapsed_training_time / number_of_epochs_to_train
-        self.model_information_dict["training_time"] = elapsed_training_time
-        self.model_information_dict["time_per_epoch"] = training_time_per_epoch
         self.model_information_dict["number_of_epochs_to_train"
                                     ] = number_of_epochs_to_train
         self.model_information_dict["training_batch_size"] = dataloader.batch_size
-        self.model_information_dict["training_information"] = training_information
+        self.model_information_dict["training_information"
+                                    ] = training_information_per_epoch
         return self
 
     def estimate_psi(

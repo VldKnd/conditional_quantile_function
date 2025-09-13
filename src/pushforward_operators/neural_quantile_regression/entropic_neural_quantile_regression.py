@@ -125,6 +125,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
         """
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
+        total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
 
         self.warmup_scalers(dataloader=dataloader)
         self.warmup_networks(
@@ -134,11 +135,11 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             verbose=verbose
         )
 
-        total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
         potential_network_optimizer = torch.optim.AdamW(
             params=self.potential_network.parameters(),
             **train_parameters.optimizer_parameters
         )
+
         if train_parameters.scheduler_parameters:
             potential_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer=potential_network_optimizer,
@@ -149,14 +150,15 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
             potential_network_scheduler = None
 
         training_information = []
+        training_information_per_epoch = []
+
         progress_bar = trange(
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
 
-        training_time_start = time.perf_counter()
-
         for epoch_idx in progress_bar:
             start_of_epoch = time.perf_counter()
+            potential_losses_per_epoch = []
 
             for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
                 Y_scaled = self.Y_scaler(Y_batch)
@@ -174,6 +176,8 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
                 if potential_network_scheduler is not None:
                     potential_network_scheduler.step()
+
+                potential_losses_per_epoch.append(potential_network_objective.item())
 
                 training_information.append(
                     {
@@ -202,16 +206,21 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
                     progress_bar.set_description(progress_bar_message)
 
+            training_information_per_epoch.append(
+                {
+                    "potential_loss": torch.mean(potential_losses_per_epoch),
+                    "epoch_training_time": time.perf_counter() - start_of_epoch
+                }
+            )
+
         progress_bar.close()
 
-        elapsed_training_time = time.perf_counter() - training_time_start
-        training_time_per_epoch = elapsed_training_time / number_of_epochs_to_train
-        self.model_information_dict["training_time"] = elapsed_training_time
-        self.model_information_dict["time_per_epoch"] = training_time_per_epoch
         self.model_information_dict["number_of_epochs_to_train"
                                     ] = number_of_epochs_to_train
         self.model_information_dict["training_batch_size"] = dataloader.batch_size
-        self.model_information_dict['training_information'] = training_information
+        self.model_information_dict['training_information'
+                                    ] = training_information_per_epoch
+
         return self
 
     def estimate_psi(self, X_tensor: torch.Tensor, Y_tensor: torch.Tensor):
