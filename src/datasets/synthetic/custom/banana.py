@@ -17,6 +17,23 @@ class BananaDataset(Dataset):
         self.tensor_parameters = tensor_parameters
         self.seed = seed
 
+    def sample_conditional(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        input_shape = list(x.shape)
+        x_flat = x.flatten(0, -2)
+        n_points = x_flat.shape[0]
+
+        u_flat = torch.randn(size=(n_points, 2)).to(**self.tensor_parameters)
+        y_flat = torch.concatenate(
+            [
+                u_flat[:, 0:1] * x_flat,
+                u_flat[:, 1:2] / x_flat + (u_flat[:, 0:1]**2 + x_flat**3),
+            ],
+            dim=-1,
+        )
+
+        shape_to_reshape = input_shape[:-1] + [-1]
+        return x_flat.reshape(shape_to_reshape), y_flat.reshape(shape_to_reshape)
+
     def sample_covariates(self, n_points: int) -> torch.Tensor:
         """
         Sample the covariates from the uniform distribution between 1 and 5.

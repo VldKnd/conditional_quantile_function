@@ -208,7 +208,8 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
             training_information_per_epoch.append(
                 {
-                    "potential_loss": torch.mean(potential_losses_per_epoch),
+                    "potential_loss":
+                    torch.mean(torch.tensor(potential_losses_per_epoch)),
                     "epoch_training_time": time.perf_counter() - start_of_epoch
                 }
             )
