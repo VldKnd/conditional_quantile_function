@@ -7,7 +7,6 @@ from pushforward_operators.neural_quantile_regression import (
 from pushforward_operators.convex_potential_flow.core_flow import ConvexPotentialFlow
 from pushforward_operators.linear_quantile_regression import LinearQuantileRegression
 from pushforward_operators.protocol import PushForwardOperator
-from pushforward_operators.mean_quantile_regression import MeanQuantileRegression
 
 __all__ = [
     "EntropicNeuralQuantileRegression",
@@ -17,5 +16,4 @@ __all__ = [
     "PushForwardOperator",
     "ConvexPotentialFlow",
     "FastNonLinearQuantileRegression",
-    "MeanQuantileRegression",
 ]

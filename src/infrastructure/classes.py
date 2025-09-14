@@ -1,3 +1,4 @@
+from typing import Literal
 import pydantic
 import torch
 import os
@@ -36,6 +37,8 @@ class Experiment(pydantic.BaseModel):
     pushforward_operator_parameters: dict = pydantic.Field(default={})
     train_parameters: TrainParameters = pydantic.Field(default=TrainParameters())
     path_to_experiment_file: str | None = pydantic.Field(default=None)
+
+    latent_distribution_for_testing: Literal["gaussian", "uniform"] = "gaussian"
 
     tensor_parameters_raw: TensorParameters = pydantic.Field(
         default=TensorParameters(),
