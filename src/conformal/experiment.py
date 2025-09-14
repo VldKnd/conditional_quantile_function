@@ -29,6 +29,7 @@ _model_config_small = {
     "number_of_hidden_layers": 2,
     "batch_size": 256,
     "n_epochs": 50,
+    "warmup_iterations": 50,
     "learning_rate": 0.01,
     "dtype": torch.float32,
 }
@@ -245,5 +246,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)
-    print(results.head(10))
+    #print(results.head(10))
+    print(results)
     print("Done!")
