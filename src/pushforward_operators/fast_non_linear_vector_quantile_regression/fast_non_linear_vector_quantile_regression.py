@@ -7,6 +7,31 @@ from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr import
 from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr.solvers.regularized_lse import MLPRegularizedDualVQRSolver
 from pushforward_operators.picnn import PISCNN
 
+_DEFAULT_SOLVER_ARGUMENTS = dict(
+    hidden_layers=(32, ),
+    activation="relu",
+    skip=True,
+    batchnorm=False,
+    dropout=0,
+    T=50,
+    epsilon=1e-3,
+    num_epochs=1000,
+    lr=0.9,
+    lr_max_steps=10,
+    lr_factor=0.5,
+    lr_patience=100,
+    lr_threshold=5 * 0.01,
+    verbose=False,
+    nn_init=None,
+    batchsize_y=None,
+    batchsize_u=None,
+    inference_batch_size=1,
+    full_precision=False,
+    gpu=False,
+    device_num=None,
+    post_iter_callback=None,
+)
+
 
 class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
 
@@ -16,22 +41,26 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
         response_dimension: int,
         hidden_dimension: int,
         number_of_hidden_layers: int,
-        fnlvqr_mlp_arguments: dict = {},
+        vector_quantile_regression_solver_arguments: dict = {},
         *args,
         **kwargs
     ):
         super().__init__()
         self.init_dict = {
-            "feature_dimension": feature_dimension,
-            "response_dimension": response_dimension,
-            "hidden_dimension": hidden_dimension,
-            "fnlvqr_mlp_arguments": fnlvqr_mlp_arguments,
+            "feature_dimension":
+            feature_dimension,
+            "response_dimension":
+            response_dimension,
+            "hidden_dimension":
+            hidden_dimension,
+            "vector_quantile_regression_solver_arguments":
+            vector_quantile_regression_solver_arguments,
         }
         self.model_information_dict = {
             "name": "Fast Non Linear Vector Quantile Regression"
         }
-        self.fnlvqr_mlp_arguments = fnlvqr_mlp_arguments
-        self.fnlvqr = None
+        self.vector_quantile_regression_arguments = vector_quantile_regression_solver_arguments
+        self.vector_quantile_regression = None
 
         self.potential_network = PISCNN(
             feature_dimension=feature_dimension,
@@ -40,13 +69,15 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             number_of_hidden_layers=number_of_hidden_layers,
         )
 
-    def fit_fnlvqr(
+    def fit_vector_quantile_regression(
         self, dataloader: torch.utils.data.DataLoader
     ) -> VectorQuantileRegressor:
         dataloader.shuffle = False
         Y_tensors = torch.cat([Y_tensor for _, Y_tensor in dataloader])
         X_tensors = torch.cat([X_tensor for X_tensor, _ in dataloader])
-        nonlinear_mlp_solver = MLPRegularizedDualVQRSolver(**self.fnlvqr_mlp_arguments)
+        nonlinear_mlp_solver = MLPRegularizedDualVQRSolver(
+            **self.vector_quantile_regression_arguments
+        )
         vqr = VectorQuantileRegressor(solver=nonlinear_mlp_solver)
         return vqr.fit(X_tensors, Y_tensors)
 
@@ -78,7 +109,9 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             Y_tensor (torch.Tensor): Output tensor.
             verbose (bool): Whether to print verbose output.
         """
-        self.fnlvqr = self.fit_fnlvqr(dataloader=dataloader)
+        self.vector_quantile_regression = self.fit_vector_quantile_regression(
+            dataloader=dataloader
+        )
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
 
@@ -111,7 +144,9 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
                 u_samples = []
 
                 for x in X_batch:
-                    y, u = self.fnlvqr.sample_one_conditional_element(x)
+                    y, u = self.vector_quantile_regression.sample_one_conditional_element(
+                        x
+                    )
                     y_samples.append(y)
                     u_samples.append(u)
 
@@ -247,9 +282,11 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "FNLVQR":
+    ) -> "FastNonLinearQuantileRegression":
         data = torch.load(path, map_location=map_location)
-        fnlvqr = cls(**data["init_dict"])
-        fnlvqr.load_state_dict(data["state_dict"])
-        fnlvqr.model_information_dict = data.get("model_information_dict", {})
-        return fnlvqr
+        fast_non_linear_quantile_regression = cls(**data["init_dict"])
+        fast_non_linear_quantile_regression.load_state_dict(data["state_dict"])
+        fast_non_linear_quantile_regression.model_information_dict = data.get(
+            "model_information_dict", {}
+        )
+        return fast_non_linear_quantile_regression
