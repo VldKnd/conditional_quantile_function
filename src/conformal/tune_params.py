@@ -16,7 +16,7 @@ from conformal.experiment import RESULTS_DIR
 grid_cvqr_small = {
     "learning_rate": [0.1, 0.01, 0.001],
     "batch_size": [256, 512, 1024, 2048],
-    "n_epochs": [1, 2, 3],
+    "n_epochs": [50, 100, 150],
     "warmup_iterations":
     [50],
     "kwargs": [
@@ -47,9 +47,13 @@ def run_tuning(args):
     ds = get_dataset_split(name=args.dataset, seed=args.seed)
     grid = grid_cvqr_small
     if ds.n_train > 10_000:
-        grid = grid_cvqr_small
+        grid["batch_size"] = [1024, 2048]
+        for d in grid["kwargs"]:
+            d["hidden_dimension"] += 2
     if ds.n_train > 55_000:
-        grid = grid_cvqr_small
+        grid["batch_size"] = [4096, 8192]
+        for d in grid["kwargs"]:
+            d["hidden_dimension"] += 4
 
     records = []
 
@@ -67,6 +71,7 @@ def run_tuning(args):
                             response_dimension=ds.n_outputs,
                             **kwargs
                         )
+                        print(f"Trying {params=}")
                         reg_cvqr = CVQRegressor(**params)
                         print(
                             f"Number of parameters: {get_total_number_of_parameters(reg_cvqr.model.potential_network)}, "
