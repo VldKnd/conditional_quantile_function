@@ -11,7 +11,7 @@ from pushforward_operators.protocol import PushForwardOperator
 from infrastructure.classes import TrainParameters
 
 
-class CPFlow(PushForwardOperator, nn.Module):
+class ConvexPotentialFlow(PushForwardOperator, nn.Module):
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class CPFlow(PushForwardOperator, nn.Module):
             n_blocks=n_blocks,
         )
         self.model_information_dict = {
-            "class_name": "CPFlow",
+            "class_name": "ConvexPotentialFlow",
         }
         icnns = [
             PICNN(
@@ -124,7 +124,7 @@ class CPFlow(PushForwardOperator, nn.Module):
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
-                "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
+                "This ConvexPotentialFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
             )
 
         with torch.no_grad():
@@ -139,7 +139,7 @@ class CPFlow(PushForwardOperator, nn.Module):
         """Pushes y variable to the latent space given condition x"""
         if not self.is_fitted_:
             raise ValueError(
-                "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
+                "This ConvexPotentialFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
             )
 
         with torch.no_grad():
@@ -162,7 +162,7 @@ class CPFlow(PushForwardOperator, nn.Module):
     def logp_cond(self, Y: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         if not self.is_fitted_:
             raise ValueError(
-                "This CPFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
+                "This ConvexPotentialFlow instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator."
             )
         return self.flow.logp(Y, context=X)
 
@@ -207,7 +207,7 @@ class CPFlow(PushForwardOperator, nn.Module):
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "CPFlow":
+    ) -> "ConvexPotentialFlow":
         data = torch.load(path, map_location=map_location)
         convex_potential_flow = cls(**data["init_dict"])
         with torch.no_grad():

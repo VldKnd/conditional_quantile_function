@@ -5,12 +5,12 @@ from datasets import (
 )
 from pushforward_operators import (
     PushForwardOperator,
-    CPFlow,
+    ConvexPotentialFlow,
     EntropicNeuralQuantileRegression,
     AmortizedNeuralQuantileRegression,
     NeuralQuantileRegression,
     LinearQuantileRegression,
-    FNLVQR,
+    FastNonLinearQuantileRegression,
     MeanQuantileRegression,
 )
 
@@ -31,9 +31,9 @@ name_to_dataset_map: dict[str, Dataset] = {
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
-    "fast_non_linear_vector_quantile_regression": FNLVQR,
+    "fast_non_linear_vector_quantile_regression": FastNonLinearQuantileRegression,
     "entropic_neural_quantile_regression": EntropicNeuralQuantileRegression,
-    "convex_potential_flow": CPFlow,
+    "convex_potential_flow": ConvexPotentialFlow,
     "linear_quantile_regression": LinearQuantileRegression,
     "neural_quantile_regression": NeuralQuantileRegression,
     "amortized_neural_quantile_regression": AmortizedNeuralQuantileRegression,

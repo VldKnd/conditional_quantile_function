@@ -8,7 +8,7 @@ from pushforward_operators.fast_non_linear_vector_quantile_regression.vqr.solver
 from pushforward_operators.picnn import PISCNN
 
 
-class FNLVQR(PushForwardOperator, torch.nn.Module):
+class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
 
     def __init__(
         self,
