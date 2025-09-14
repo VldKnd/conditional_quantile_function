@@ -53,9 +53,12 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             response_dimension,
             "hidden_dimension":
             hidden_dimension,
+            "number_of_hidden_layers":
+            number_of_hidden_layers,
             "vector_quantile_regression_solver_arguments":
             vector_quantile_regression_solver_arguments,
         }
+
         self.model_information_dict = {
             "name": "Fast Non Linear Vector Quantile Regression"
         }

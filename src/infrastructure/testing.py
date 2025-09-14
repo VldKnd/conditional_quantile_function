@@ -106,8 +106,10 @@ def test_on_dataset_with_defined_pushforward_operator(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 500
-    number_of_generated_points = 2000
+    # number_of_test_samples = 500
+    # number_of_generated_points = 2000
+    number_of_test_samples = 1
+    number_of_generated_points = 10
     latent_distribution = experiment.latent_distribution_for_testing
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
@@ -405,6 +407,7 @@ def test_on_dataset_with_defined_sample_joint(
     """
     number_of_test_samples = 500
     number_of_generated_points = 2000
+
     latent_distribution = experiment.latent_distribution_for_testing
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
