@@ -1,4 +1,4 @@
-from conformal.classes.conformalizers import OTCPGlobalPredictor, OTCPLocalPredictor, SplitConformalPredictor, EllipsoidalLocal
+from conformal.classes.conformalizers import OTCPGlobalPredictor, OTCPLocalPredictor, QuantileEstimatePredictor, SplitConformalPredictor, EllipsoidalLocal
 from conformal.classes.method_desc import ConformalMethodDescription
 
 
@@ -28,7 +28,14 @@ section5 = [
         cls=SplitConformalPredictor,
         kwargs=dict(lower_is_better=False)
     ),
-
+    ConformalMethodDescription(
+        name="Quantile",
+        name_mathtext=r"$Q_{Y|X}$",
+        base_model_name="CVQRegressor",
+        score_name="MK Rank",
+        class_name="QuantileEstimatePredictor",
+        cls=QuantileEstimatePredictor
+    ),
 ]
 
 
@@ -58,7 +65,14 @@ cpflow_based = [
         cls=SplitConformalPredictor,
         kwargs=dict(lower_is_better=False)
     ),
-
+    ConformalMethodDescription(
+        name="Quantile (CPFlow)",
+        name_mathtext=r"$Q_{Y|X}$ (CPFlow)",
+        base_model_name="CPFlowRegressor",
+        score_name="MK Rank",
+        class_name="QuantileEstimatePredictor",
+        cls=QuantileEstimatePredictor
+    ),
 ]
 
 
@@ -87,5 +101,4 @@ baselines = [
         class_name="EllipsoidalLocal",
         cls=EllipsoidalLocal
     ),
-
 ]

@@ -9,6 +9,7 @@ from tqdm.auto import tqdm
 from conformal.otcp.ellipsoidal_conformal_utilities import ellipse_local_alpha_s, ellipse_volume, ellipsoidal_non_conformity_measure
 from conformal.otcp.functions import ConditionalRank_Adaptive, MultivQuantileTreshold_Adaptive, get_volume_QR, learn_psi
 from conformal.otcp.functions_refactor import MultivQuantileTresholdRefactor, RankFuncRefactor, sample_grid_refactor
+from utils.quantile import get_quantile_level_analytically
 
 
 @dataclass
@@ -31,7 +32,13 @@ class BaseRegionPredictor:
 
 class SplitConformalPredictor(BaseRegionPredictor):
 
-    def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float, lower_is_better=True):
+    def fit(
+        self,
+        X_cal: np.ndarray,
+        scores_cal: np.ndarray,
+        alpha: float,
+        lower_is_better=True
+    ):
         self.alpha = alpha
         self.lower_is_better = lower_is_better
         n = len(scores_cal)
@@ -59,9 +66,9 @@ class SplitConformalPredictor(BaseRegionPredictor):
 class OTCPGlobalPredictor(BaseRegionPredictor):
     split_ratio: float = 0.5
 
-    mu: np.ndarray = field(init=False, default_factory=lambda : np.zeros(0))
-    psi: np.ndarray = field(init=False, default_factory=lambda : np.zeros(0))
-    psi_star: np.ndarray = field(init=False, default_factory=lambda : np.zeros(0))
+    mu: np.ndarray = field(init=False, default_factory=lambda: np.zeros(0))
+    psi: np.ndarray = field(init=False, default_factory=lambda: np.zeros(0))
+    psi_star: np.ndarray = field(init=False, default_factory=lambda: np.zeros(0))
 
     def _solve_ot(
         self, scores_cal1: np.ndarray, positive: bool = False, seed: int | None = None
@@ -232,8 +239,26 @@ class EllipsoidalLocal(BaseRegionPredictor):
         local_neighbors = self.knn.kneighbors(x.reshape(1, -1), return_distance=False)
         local_cov = self._get_local_cov(local_neighbors[0, :])
         d = score.shape[-1]
-        volume_unit_ball = np.pi ** (d / 2) / gamma(d / 2 + 1)
+        volume_unit_ball = np.pi**(d / 2) / gamma(d / 2 + 1)
         volume_scalar = float(
-            np.linalg.det(local_cov) ** (1 / 2) * self.local_alpha_threshold * volume_unit_ball
+            np.linalg.det(local_cov)**(1 / 2) * self.local_alpha_threshold *
+            volume_unit_ball
         )
         return volume_scalar
+
+
+class QuantileEstimatePredictor(BaseRegionPredictor):
+
+    def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
+        d = scores_cal.shape[-1]
+        self.threshold = get_quantile_level_analytically(
+            alpha=torch.tensor([1 - alpha]), distribution="gaussian", dimension=d
+        ).numpy(force=True)[0]
+
+    def is_covered(
+        self,
+        X_test: np.ndarray,
+        scores_test: np.ndarray,
+        verbose: bool = False
+    ) -> np.ndarray:
+        return scores_test <= self.threshold
