@@ -4,14 +4,9 @@ from datasets import (
     PICNN_FNLVQR_Banana, PICNN_FNLVQR_Glasses, PICNN_FNLVQR_Star, FunnelDistribution
 )
 from pushforward_operators import (
-    PushForwardOperator,
-    CPFlow,
-    EntropicNeuralQuantileRegression,
-    AmortizedNeuralQuantileRegression,
-    NeuralQuantileRegression,
-    LinearQuantileRegression,
-    FastNonLinearVectorQuantileRegression,
-    MeanQuantileRegression,
+    PushForwardOperator, ConvexPotentialFlow, EntropicNeuralQuantileRegression,
+    AmortizedNeuralQuantileRegression, NeuralQuantileRegression,
+    LinearQuantileRegression, FastNonLinearQuantileRegression
 )
 
 # yapf: disable
@@ -31,12 +26,11 @@ name_to_dataset_map: dict[str, Dataset] = {
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
-    "fast_non_linear_vector_quantile_regression": FastNonLinearVectorQuantileRegression,
+    "fast_non_linear_vector_quantile_regression": FastNonLinearQuantileRegression,
     "entropic_neural_quantile_regression": EntropicNeuralQuantileRegression,
-    "convex_potential_flow": CPFlow,
+    "convex_potential_flow": ConvexPotentialFlow,
     "linear_quantile_regression": LinearQuantileRegression,
     "neural_quantile_regression": NeuralQuantileRegression,
     "amortized_neural_quantile_regression": AmortizedNeuralQuantileRegression,
-    "mean_quantile_regression": MeanQuantileRegression,
 }
 # yapf: enable

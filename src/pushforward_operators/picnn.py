@@ -175,7 +175,7 @@ class PICNN(torch.nn.Module):
         ) + \
         self.last_linear_layer_u(u)
 
-        return output
+        return self.z_activation(output)
 
 
 class PISCNN(PICNN):

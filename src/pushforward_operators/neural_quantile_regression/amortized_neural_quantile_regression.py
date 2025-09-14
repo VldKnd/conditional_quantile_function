@@ -83,6 +83,70 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
+    def warmup_networks(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        optimizer_parameters: dict = {},
+        warmup_iterations: int = 1,
+        verbose: bool = False
+    ):
+        potential_network_optimizer = torch.optim.AdamW(
+            self.potential_network.parameters(), **optimizer_parameters
+        )
+        amortization_network_optimizer = torch.optim.AdamW(
+            self.amortization_network.parameters(), **optimizer_parameters
+        )
+
+        progress_bar = trange(
+            1, warmup_iterations + 1, desc="Warming up networks", disable=not verbose
+        )
+        for iteration in progress_bar:
+            for X_batch, Y_batch in dataloader:
+                Y_scaled = self.Y_scaler(Y_batch)
+                U_batch = sample_distribution_like(Y_scaled, "normal")
+
+                amortization_network_optimizer.zero_grad()
+                potential_network_optimizer.zero_grad()
+
+                if self.potential_to_estimate_with_neural_network == "y":
+                    amortized_tensor = self.amortization_network(X_batch, U_batch)
+                    amortized_loss = torch.norm(amortized_tensor - U_batch,
+                                                dim=-1).mean()
+                    amortized_loss.backward()
+
+                    Y_scaled.requires_grad_(True)
+                    potential_tensor = self.potential_network(X_batch, Y_scaled)
+                    potential_pushforward = torch.autograd.grad(
+                        potential_tensor.sum(), Y_scaled, create_graph=True
+                    )[0]
+                    potential_loss = torch.norm(
+                        potential_pushforward - Y_scaled, dim=-1
+                    ).mean()
+                    potential_loss.backward()
+                else:
+                    amortized_tensor = self.amortization_network(X_batch, Y_scaled)
+                    amortized_loss = torch.norm(amortized_tensor - Y_scaled,
+                                                dim=-1).mean()
+                    amortized_loss.backward()
+
+                    U_batch.requires_grad_(True)
+                    potential_tensor = self.potential_network(X_batch, U_batch)
+                    potential_pushforward = torch.autograd.grad(
+                        potential_tensor.sum(), U_batch, create_graph=True
+                    )[0]
+                    potential_loss = torch.norm(
+                        potential_pushforward - U_batch, dim=-1
+                    ).mean()
+                    potential_loss.backward()
+
+                amortization_network_optimizer.step()
+                potential_network_optimizer.step()
+                progress_bar.set_description(
+                    f"Warm up iteration: {iteration} Potential loss: {potential_loss.item():.3f}, Amortization loss: {amortized_loss.item():.3f}"
+                )
+
+        return self
+
     def warmup_scalers(self, dataloader: torch.utils.data.DataLoader):
         """Run over the data (no grad) to populate BatchNorm running stats."""
         self.Y_scaler.train()
@@ -94,8 +158,11 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         self.Y_scaler.eval()
 
     def make_progress_bar_message(
-        self, training_information: list[dict], epoch_idx: int,
-        last_learning_rate: float | None
+        self,
+        training_information: list[dict],
+        epoch_idx: int,
+        last_amortization_network_learning_rate: float | None = None,
+        last_potential_network_learning_rate: float | None = None
     ):
         running_mean_potential_objective = sum(
             [
@@ -115,7 +182,11 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
             f"Potential Objective: {running_mean_potential_objective:.3f}, "
             f"Amortization Objective: {running_mean_amortization_objective:.3f}"
         ) + (
-            f", LR: {last_learning_rate:.6f}" if last_learning_rate is not None else ""
+            f", Potential LR: {last_potential_network_learning_rate:.6f}"
+            if last_potential_network_learning_rate is not None else ""
+        ) + (
+            f", Amortized LR: {last_amortization_network_learning_rate:.6f}"
+            if last_amortization_network_learning_rate is not None else ""
         )
 
         return description_message
@@ -173,6 +244,15 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
         total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
+
+        self.warmup_scalers(dataloader=dataloader)
+        self.warmup_networks(
+            dataloader=dataloader,
+            optimizer_parameters=train_parameters.optimizer_parameters,
+            warmup_iterations=train_parameters.warmup_iterations,
+            verbose=verbose
+        )
+
         potential_network_optimizer = torch.optim.AdamW(
             params=self.potential_network.parameters(),
             **train_parameters.optimizer_parameters
@@ -188,24 +268,28 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
                 T_max=total_number_of_optimizer_steps,
                 **train_parameters.scheduler_parameters
             )
+
             amortization_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 optimizer=amortization_network_optimizer,
-                T_0=max(total_number_of_optimizer_steps // 100, 1),
+                T_0=max((total_number_of_optimizer_steps) // 100, 1),
                 **train_parameters.scheduler_parameters
             )
+
         else:
             amortization_network_scheduler = None
             potential_network_scheduler = None
 
         training_information = []
-        self.warmup_scalers(dataloader=dataloader)
+        training_information_per_epoch = []
+
         progress_bar = trange(
             1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
         )
 
-        training_time_start = time.perf_counter()
         for epoch_idx in progress_bar:
             start_of_epoch = time.perf_counter()
+            amortization_losses_per_epoch = []
+            potential_losses_per_epoch = []
 
             for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
                 Y_scaled = self.Y_scaler(Y_batch)
@@ -224,13 +308,13 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
                     )
                     Y_batch_for_phi, U_batch_for_psi = None, inverse_tensor
 
-                self.amortization_network.zero_grad()
+                amortization_network_optimizer.zero_grad()
                 amortization_network_objective = torch.norm(
                     amortized_tensor - inverse_tensor, dim=-1
                 ).mean()
                 amortization_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(
-                    self.amortization_network.parameters(), max_norm=10
+                    self.amortization_network.parameters(), max_norm=1
                 )
                 amortization_network_optimizer.step()
 
@@ -244,7 +328,7 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
                 potential_network_objective = torch.mean(phi) + torch.mean(psi)
                 potential_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(
-                    self.potential_network.parameters(), max_norm=10
+                    self.potential_network.parameters(), max_norm=1.
                 )
                 potential_network_optimizer.step()
 
@@ -252,45 +336,60 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
                     potential_network_scheduler.step()
                     amortization_network_scheduler.step()
 
+                amortization_losses_per_epoch.append(
+                    amortization_network_objective.item()
+                )
+                potential_losses_per_epoch.append(potential_network_objective.item())
+
                 training_information.append(
                     {
-                        "potential_loss":
-                        potential_network_objective.item(),
-                        "amortization_loss":
-                        amortization_network_objective.item(),
-                        "batch_index":
-                        batch_index,
-                        "epoch_index":
-                        epoch_idx,
-                        "time_elapsed_since_last_epoch":
-                        time.perf_counter() - start_of_epoch,
+                        "potential_loss": potential_network_objective.item(),
+                        "amortization_loss": amortization_network_objective.item(),
+                        "batch_index": batch_index,
+                        "epoch_index": epoch_idx,
                     }
                 )
 
                 if verbose:
-                    last_learning_rate = (
+                    last_amortization_network_learning_rate = (
                         amortization_network_scheduler.get_last_lr()[0]
                         if amortization_network_scheduler is not None else None
+                    )
+                    last_potential_network_learning_rate = (
+                        potential_network_scheduler.get_last_lr()[0]
+                        if potential_network_scheduler is not None else None
                     )
 
                     description_message = self.make_progress_bar_message(
                         training_information=training_information,
                         epoch_idx=epoch_idx,
-                        last_learning_rate=last_learning_rate
+                        last_amortization_network_learning_rate=
+                        last_amortization_network_learning_rate,
+                        last_potential_network_learning_rate=
+                        last_potential_network_learning_rate,
                     )
 
                     progress_bar.set_description(description_message)
 
+            training_information_per_epoch.append(
+                {
+                    "potential_loss":
+                    torch.mean(torch.tensor(potential_losses_per_epoch)),
+                    "amortization_loss":
+                    torch.mean(torch.tensor(amortization_losses_per_epoch)),
+                    "epoch_training_time":
+                    time.perf_counter() - start_of_epoch
+                }
+            )
+
         progress_bar.close()
 
-        elapsed_training_time = time.perf_counter() - training_time_start
-        training_time_per_epoch = elapsed_training_time / number_of_epochs_to_train
-        self.model_information_dict["training_time"] = elapsed_training_time
-        self.model_information_dict["average_time_per_epoch"] = training_time_per_epoch
         self.model_information_dict["number_of_epochs_to_train"
                                     ] = number_of_epochs_to_train
         self.model_information_dict["training_batch_size"] = dataloader.batch_size
-        self.model_information_dict["training_information"] = training_information
+        self.model_information_dict["training_information"
+                                    ] = training_information_per_epoch
+
         return self
 
     def estimate_psi(
@@ -306,6 +405,7 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
             U_tensor (torch.Tensor): Random variable to be pushed forward.
             Y_tensor (torch.Tensor): Output tensor.
         """
+
         if self.potential_to_estimate_with_neural_network == "y":
             return self.potential_network(X_tensor, Y_tensor)
         else:
@@ -316,7 +416,7 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         self,
         X_tensor: torch.Tensor,
         U_tensor: torch.Tensor,
-        Y_tensor: torch.Tensor | None = None
+        Y_tensor: torch.Tensor | None = None,
     ):
         """Estimates phi, either with Neural Network or entropic dual.
 

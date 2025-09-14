@@ -1,3 +1,4 @@
+from typing import Literal
 import torch
 from tqdm import tqdm
 from datasets import (
@@ -107,6 +108,7 @@ def test_on_dataset_with_defined_pushforward_operator(
     """
     number_of_test_samples = 500
     number_of_generated_points = 2000
+    latent_distribution = experiment.latent_distribution_for_testing
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
@@ -169,7 +171,13 @@ def test_on_dataset_with_defined_pushforward_operator(
             )
 
             X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
-            U_tensor = torch.randn_like(Y_tensor)
+
+            if latent_distribution == "gaussian":
+                U_tensor = torch.randn_like(Y_tensor)
+            elif latent_distribution == "uniform":
+                U_tensor = torch.rand_like(Y_tensor)
+            else:
+                raise RuntimeError(f"{latent_distribution=} Is not supported.")
 
             Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
             U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -198,7 +206,12 @@ def test_on_dataset_with_defined_pushforward_operator(
 
             if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
                 X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
-                U_sample = torch.randn_like(Y_sample)
+
+                if latent_distribution == "gaussian":
+                    U_sample = torch.randn_like(Y_sample)
+                elif latent_distribution == "uniform":
+                    U_sample = torch.rand_like(Y_sample)
+
                 YX_sample = torch.cat([Y_sample, X_sample], dim=1)
                 UX_sample = torch.cat([U_sample, X_sample], dim=1)
 
@@ -258,15 +271,19 @@ def test_on_dataset_with_defined_pushforward_operator(
                     torch.stack(conditional_metrics["U|X_kde_l1_divergence"]).mean()
                 )
 
-    # Joint and Marginal
     for _ in tqdm(
         range(number_of_test_samples),
         desc="Running Marginal and Joint Tests",
         disable=not verbose
     ):
-        X_tensor, Y_tensor, U_tensor = dataset.sample_x_y_u(
+        X_tensor, Y_tensor, U_dataset_tensor = dataset.sample_x_y_u(
             n_points=number_of_generated_points
         )
+
+        if latent_distribution == "gaussian":
+            U_tensor = torch.randn_like(Y_tensor)
+        elif latent_distribution == "uniform":
+            U_tensor = torch.rand_like(Y_tensor)
 
         Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
         U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -278,8 +295,11 @@ def test_on_dataset_with_defined_pushforward_operator(
         UX_approximation = torch.cat([U_approximation, X_tensor], dim=1)
 
         if not exclude_unexplained_variance_percentage:
+            Y_dataset_approximation = pushforward_operator.push_u_given_x(
+                U_dataset_tensor, X_tensor
+            )
             metrics["Q^(-1)(Y,X)_uv_l2"].append(
-                percentage_of_unexplained_variance(Y_tensor, Y_approximation)
+                percentage_of_unexplained_variance(Y_tensor, Y_dataset_approximation)
             )
             metrics["Q(U,X)_uv_l2"].append(
                 percentage_of_unexplained_variance(U_tensor, U_approximation)
@@ -385,6 +405,7 @@ def test_on_dataset_with_defined_sample_joint(
     """
     number_of_test_samples = 500
     number_of_generated_points = 2000
+    latent_distribution = experiment.latent_distribution_for_testing
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters
@@ -445,7 +466,11 @@ def test_on_dataset_with_defined_sample_joint(
             )
 
             X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
-            U_tensor = torch.randn_like(Y_tensor)
+
+            if latent_distribution == "gaussian":
+                U_tensor = torch.randn_like(Y_tensor)
+            elif latent_distribution == "uniform":
+                U_tensor = torch.rand_like(Y_tensor)
 
             Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
             U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -474,7 +499,12 @@ def test_on_dataset_with_defined_sample_joint(
 
             if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
                 X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
-                U_sample = torch.randn_like(Y_sample)
+
+                if latent_distribution == "gaussian":
+                    U_sample = torch.randn_like(Y_sample)
+                elif latent_distribution == "uniform":
+                    U_sample = torch.rand_like(Y_sample)
+
                 YX_sample = torch.cat([Y_sample, X_sample], dim=1)
                 UX_sample = torch.cat([U_sample, X_sample], dim=1)
 
@@ -541,7 +571,11 @@ def test_on_dataset_with_defined_sample_joint(
         disable=not verbose
     ):
         X_tensor, Y_tensor = dataset.sample_joint(n_points=number_of_generated_points)
-        U_tensor = torch.randn_like(Y_tensor)
+
+        if latent_distribution == "gaussian":
+            U_tensor = torch.randn_like(Y_tensor)
+        elif latent_distribution == "uniform":
+            U_tensor = torch.rand_like(Y_tensor)
 
         Y_approximation = pushforward_operator.push_u_given_x(U_tensor, X_tensor)
         U_approximation = pushforward_operator.push_y_given_x(Y_tensor, X_tensor)
@@ -578,7 +612,12 @@ def test_on_dataset_with_defined_sample_joint(
             X_sample, Y_sample = dataset.sample_joint(
                 n_points=number_of_generated_points
             )
-            U_sample = torch.randn_like(Y_sample)
+
+            if latent_distribution == "gaussian":
+                U_sample = torch.randn_like(Y_sample)
+            elif latent_distribution == "uniform":
+                U_sample = torch.rand_like(Y_sample)
+
             YX_sample = torch.cat([Y_sample, X_sample], dim=1)
             UX_sample = torch.cat([U_sample, X_sample], dim=1)
 
@@ -637,7 +676,7 @@ def test(
     exclude_sliced_wasserstein2: bool = False,
     exclude_kde_kl_divergence: bool = False,
     exclude_kde_l1_divergence: bool = False,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> dict:
     dataset = name_to_dataset_map[experiment.dataset_name](
         **experiment.dataset_parameters, tensor_parameters=experiment.tensor_parameters

@@ -1,3 +1,4 @@
+from typing import Literal
 import pydantic
 import torch
 import os
@@ -7,6 +8,7 @@ class TrainParameters(pydantic.BaseModel):
     number_of_epochs_to_train: int = pydantic.Field(default=500)
     optimizer_parameters: dict = pydantic.Field(default={})
     scheduler_parameters: dict = pydantic.Field(default={})
+    warmup_iterations: int = 5
     verbose: bool = pydantic.Field(default=False)
 
 
@@ -35,6 +37,8 @@ class Experiment(pydantic.BaseModel):
     pushforward_operator_parameters: dict = pydantic.Field(default={})
     train_parameters: TrainParameters = pydantic.Field(default=TrainParameters())
     path_to_experiment_file: str | None = pydantic.Field(default=None)
+
+    latent_distribution_for_testing: Literal["gaussian", "uniform"] = "gaussian"
 
     tensor_parameters_raw: TensorParameters = pydantic.Field(
         default=TensorParameters(),
