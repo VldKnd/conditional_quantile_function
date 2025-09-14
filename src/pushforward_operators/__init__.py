@@ -1,4 +1,4 @@
-from pushforward_operators.fast_non_linear_vector_quantile_regression import FastNonLinearVectorQuantileRegression
+from pushforward_operators.fast_non_linear_vector_quantile_regression import FNLVQR
 from pushforward_operators.neural_quantile_regression import (
     NeuralQuantileRegression,
     EntropicNeuralQuantileRegression,
@@ -16,6 +16,6 @@ __all__ = [
     "LinearQuantileRegression",
     "PushForwardOperator",
     "CPFlow",
-    "FastNonLinearVectorQuantileRegression",
+    "FNLVQR",
     "MeanQuantileRegression",
 ]

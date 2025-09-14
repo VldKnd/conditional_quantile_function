@@ -170,7 +170,7 @@ class EntropicNeuralQuantileRegression(PushForwardOperator, nn.Module):
                 potential_network_objective = torch.mean(phi) + torch.mean(psi)
                 potential_network_objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_norm_(
-                    self.potential_network.parameters(), max_norm=10
+                    self.potential_network.parameters(), max_norm=1
                 )
                 potential_network_optimizer.step()
 
