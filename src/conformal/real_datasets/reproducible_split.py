@@ -59,7 +59,7 @@ class DatasetSplit:
                                           self.Y_cal_raw,
                                           self.Y_test_raw))
 
-        if self.reduce:
+        if self.reduce and self.n_features > 50:
             n_components = 50 if self.n_features < 150 else 100
             self.pca = PCA(n_components=n_components)
             self.pca.fit(self.X_train)
