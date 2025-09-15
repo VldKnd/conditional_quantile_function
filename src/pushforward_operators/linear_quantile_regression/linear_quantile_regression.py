@@ -16,7 +16,7 @@ _DEFAULT_SOLVER_ARGUMENTS = dict(
     lr_factor=0.5,
     lr_patience=100,
     lr_threshold=5 * 0.01,
-    verbose=False,
+    verbose=True,
     nn_init=None,
     batchsize_y=None,
     batchsize_u=None,
@@ -48,6 +48,8 @@ class LinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             response_dimension,
             "hidden_dimension":
             hidden_dimension,
+            "number_of_hidden_layers":
+            number_of_hidden_layers,
             "vector_quantile_regression_solver_arguments":
             vector_quantile_regression_solver_arguments,
         }

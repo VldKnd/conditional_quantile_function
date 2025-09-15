@@ -256,7 +256,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
                 if verbose:
                     last_learning_rate = (
-                        potential_network_scheduler.get_last_lr()[0]
+                        potential_network_scheduler.get_last_lr()
                         if potential_network_scheduler is not None else None
                     )
 
