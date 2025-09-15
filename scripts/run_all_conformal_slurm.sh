@@ -4,8 +4,8 @@ MAX_JOBS=64
 LOG_DIR="./logs"
 
 declare -a SBATCH_OPTS=(
-    [0]="--account=$ACCOUNT"
-    [1]="--partition=$PARTITION"
+    [0]="--account=$SLURM_ACCOUNT"
+    [1]="--partition=$SLURM_PARTITION"
 )
 
 # Function to limit concurrent jobs
@@ -20,9 +20,10 @@ function wait_for_jobs {
 for seed in "${seeds[@]}"; do
     for dataset in "${datasets[@]}"; do
         wait_for_jobs "$MAX_JOBS"
-        SBATCH_OPTS[2]="--job-name=conf_$dataset_$seed"
-        SBATCH_OPTS[3]="--output=$LOG_DIR/conformal_$dataset_$seed.log"
-        SBATCH_OPTS[4]="--error="$LOG_DIR/conformal_$dataset_$seed.err"
-        sbatch "${SBATCH_OPTS[@]}" ./scripts/slurm/conformal.sbatch.sh $dataset $seed --all
+        SBATCH_OPTS[2]="--job-name=conf_${dataset}_${seed}"
+        SBATCH_OPTS[3]="--output=$LOG_DIR/conformal_${dataset}_${seed}.log"
+        SBATCH_OPTS[4]="--error=$LOG_DIR/conformal_${dataset}_${seed}.err"
+        sbatch "${SBATCH_OPTS[@]}" ./scripts/slurm/conformal.sbatch.sh "$dataset" $seed --all
+        sleep 3
     done
 done
