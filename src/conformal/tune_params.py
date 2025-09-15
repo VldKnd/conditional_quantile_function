@@ -14,7 +14,7 @@ from utils.quantile import get_quantile_level_analytically
 from conformal.experiment import RESULTS_DIR
 
 grid_cvqr_small = {
-    "learning_rate": [0.1, 0.01, 0.001],
+    "learning_rate": [0.01, 0.001, 0.0001],
     "batch_size": [256, 512, 1024, 2048],
     "n_epochs": [50, 100, 150],
     "warmup_iterations":
@@ -42,7 +42,8 @@ alpha_grid_torch = torch.tensor(alpha_grid)
 def run_tuning(args):
     tuning_path = Path(RESULTS_DIR) / args.dataset / str(args.seed)
     os.makedirs(tuning_path, exist_ok=True)
-
+    fn_feather = tuning_path / "tuning.feather"
+    fn_csv = tuning_path / "tuning.csv"
 
     ds = get_dataset_split(name=args.dataset, seed=args.seed)
     grid = grid_cvqr_small
@@ -85,14 +86,16 @@ def run_tuning(args):
                             distribution="gaussian",
                             dimension=ds.n_outputs,
                         ).reshape(1, -1).numpy(force=True)
-                        err = np.abs((U_ranks <= levels).mean(axis=0) - alpha_grid).mean()
-                        records.append(dict(error=err, **params))
+                        errors = np.abs((U_ranks <= levels).mean(axis=0) - alpha_grid)
+                        err = errors.mean()
+                        records.append(dict(error=err, errors=errors, **params))
                         print(records[-1])
+                        df = pd.DataFrame(records)
+                        df.to_feather(fn_feather)
+                        df.to_csv(fn_csv)
 
     df = pd.DataFrame(records)
 
-    fn_feather = tuning_path / "tuning.feather"
-    fn_csv = tuning_path / "tuning.csv"
     df.to_feather(fn_feather)
     df.to_csv(fn_csv)
 
