@@ -7,10 +7,12 @@ def percentage_of_unexplained_variance(
     """
     Computes the unexplained variance percentage between two sets of points.
     """
+    ground_truth_flat = ground_truth.flatten(start_dim=0, end_dim=-2)
+    approximation_flat = approximation.flatten(start_dim=0, end_dim=-2)
     return (
-        ground_truth.sub(approximation).norm(dim=-1).pow(2).mean() /
-        ground_truth.mean(dim=-1, keepdim=True).sub(ground_truth).norm(dim=-1
-                                                                       ).pow(2).mean()
+        ground_truth_flat.sub(approximation_flat).norm(dim=-1).pow(2).mean() /
+        ground_truth_flat.mean(dim=0, keepdim=True).sub(ground_truth_flat
+                                                        ).norm(dim=-1).pow(2).mean()
     ) * 100
 
 
