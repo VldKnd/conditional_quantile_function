@@ -1,4 +1,3 @@
-from typing import Literal
 import torch
 from tqdm import tqdm
 from datasets import (
@@ -25,6 +24,9 @@ from metrics import (
     kernel_density_estimate_kl_divergence, kernel_density_estimate_l1_divergence
 )
 from pushforward_operators import PushForwardOperator
+
+NUMBER_OF_TEST_SAMPLES = 50
+NUMBER_OF_GENERATED_POINTS = 1000
 
 
 def test_from_json_file(
@@ -106,10 +108,6 @@ def test_on_dataset_with_defined_pushforward_operator(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 500
-    number_of_generated_points = 2000
-    # number_of_test_samples = 1
-    # number_of_generated_points = 10
     latent_distribution = experiment.latent_distribution_for_testing
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
@@ -153,7 +151,7 @@ def test_on_dataset_with_defined_pushforward_operator(
     }
 
     for _ in tqdm(
-        range(number_of_test_samples // 10),
+        range(NUMBER_OF_TEST_SAMPLES // 10),
         desc="Running Conditional Tests",
         disable=not verbose
     ):
@@ -169,7 +167,7 @@ def test_on_dataset_with_defined_pushforward_operator(
         }
         for _ in range(10):
             X_tensor = dataset.sample_covariates(1).repeat(
-                number_of_generated_points // 5, 1
+                NUMBER_OF_GENERATED_POINTS // 5, 1
             )
 
             X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
@@ -274,12 +272,12 @@ def test_on_dataset_with_defined_pushforward_operator(
                 )
 
     for _ in tqdm(
-        range(number_of_test_samples),
+        range(NUMBER_OF_TEST_SAMPLES),
         desc="Running Marginal and Joint Tests",
         disable=not verbose
     ):
         X_tensor, Y_tensor, U_dataset_tensor = dataset.sample_x_y_u(
-            n_points=number_of_generated_points
+            n_points=NUMBER_OF_GENERATED_POINTS
         )
 
         if latent_distribution == "gaussian":
@@ -331,7 +329,7 @@ def test_on_dataset_with_defined_pushforward_operator(
 
         if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
             X_sample, Y_sample = dataset.sample_joint(
-                n_points=number_of_generated_points
+                n_points=NUMBER_OF_GENERATED_POINTS
             )
             U_sample = torch.randn_like(Y_sample)
             YX_sample = torch.cat([Y_sample, X_sample], dim=1)
@@ -405,9 +403,6 @@ def test_on_dataset_with_defined_sample_joint(
         exclude_kde_l1_divergence (bool): Whether to exclude the KDE L1 divergence.
         verbose (bool): Whether to print verbose output.
     """
-    number_of_test_samples = 500
-    number_of_generated_points = 2000
-
     latent_distribution = experiment.latent_distribution_for_testing
 
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
@@ -449,7 +444,7 @@ def test_on_dataset_with_defined_sample_joint(
     }
 
     for _ in tqdm(
-        range(number_of_test_samples // 10),
+        range(NUMBER_OF_TEST_SAMPLES // 10),
         desc="Running Conditional Tests",
         disable=not verbose
     ):
@@ -465,7 +460,7 @@ def test_on_dataset_with_defined_sample_joint(
         }
         for _ in range(10):
             X_tensor = dataset.sample_covariates(1).repeat(
-                number_of_generated_points // 5, 1
+                NUMBER_OF_GENERATED_POINTS // 5, 1
             )
 
             X_tensor, Y_tensor = dataset.sample_conditional(x=X_tensor)
@@ -569,11 +564,11 @@ def test_on_dataset_with_defined_sample_joint(
 
     # Joint and Marginal
     for _ in tqdm(
-        range(number_of_test_samples),
+        range(NUMBER_OF_TEST_SAMPLES),
         desc="Running Marginal and Joint Tests",
         disable=not verbose
     ):
-        X_tensor, Y_tensor = dataset.sample_joint(n_points=number_of_generated_points)
+        X_tensor, Y_tensor = dataset.sample_joint(n_points=NUMBER_OF_GENERATED_POINTS)
 
         if latent_distribution == "gaussian":
             U_tensor = torch.randn_like(Y_tensor)
@@ -613,7 +608,7 @@ def test_on_dataset_with_defined_sample_joint(
 
         if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
             X_sample, Y_sample = dataset.sample_joint(
-                n_points=number_of_generated_points
+                n_points=NUMBER_OF_GENERATED_POINTS
             )
 
             if latent_distribution == "gaussian":
