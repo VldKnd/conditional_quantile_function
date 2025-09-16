@@ -204,40 +204,21 @@ def test_on_dataset_with_defined_pushforward_operator(
                     sliced_wasserstein2(U_tensor, U_approximation)
                 )
 
-            if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-                X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
+            if not exclude_kde_kl_divergence:
+                conditional_metrics["Y|X_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(U_tensor, U_approximation)
+                )
 
-                if latent_distribution == "gaussian":
-                    U_sample = torch.randn_like(Y_sample)
-                elif latent_distribution == "uniform":
-                    U_sample = torch.rand_like(Y_sample)
-
-                YX_sample = torch.cat([Y_sample, X_sample], dim=1)
-                UX_sample = torch.cat([U_sample, X_sample], dim=1)
-
-                if not exclude_kde_kl_divergence:
-                    conditional_metrics["Y|X_kde_kl_divergence"].append(
-                        kernel_density_estimate_kl_divergence(
-                            Y_tensor, Y_approximation, Y_sample
-                        )
-                    )
-                    conditional_metrics["U|X_kde_kl_divergence"].append(
-                        kernel_density_estimate_kl_divergence(
-                            U_tensor, U_approximation, U_sample
-                        )
-                    )
-
-                if not exclude_kde_l1_divergence:
-                    conditional_metrics["Y|X_kde_l1_divergence"].append(
-                        kernel_density_estimate_l1_divergence(
-                            Y_tensor, Y_approximation, Y_sample
-                        )
-                    )
-                    conditional_metrics["U|X_kde_l1_divergence"].append(
-                        kernel_density_estimate_l1_divergence(
-                            U_tensor, U_approximation, U_sample
-                        )
-                    )
+            if not exclude_kde_l1_divergence:
+                conditional_metrics["Y|X_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(U_tensor, U_approximation)
+                )
 
             if not exclude_wasserstein2:
                 metrics["Y|X_wasserstein2"].append(
@@ -327,58 +308,34 @@ def test_on_dataset_with_defined_pushforward_operator(
                 sliced_wasserstein2(UX_tensor, UX_approximation)
             )
 
-        if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-            X_sample, Y_sample = dataset.sample_joint(
-                n_points=NUMBER_OF_GENERATED_POINTS
+        if not exclude_kde_kl_divergence:
+            metrics["Y_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(Y_tensor, Y_approximation)
             )
-            U_sample = torch.randn_like(Y_sample)
-            YX_sample = torch.cat([Y_sample, X_sample], dim=1)
-            UX_sample = torch.cat([U_sample, X_sample], dim=1)
+            metrics["U_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(U_tensor, U_approximation)
+            )
 
-            if not exclude_kde_kl_divergence:
-                metrics["Y_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
+            metrics["YX_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(YX_tensor, YX_approximation)
+            )
+            metrics["UX_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(UX_tensor, UX_approximation)
+            )
 
-                metrics["YX_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        YX_tensor, YX_approximation, YX_sample
-                    )
-                )
-                metrics["UX_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        UX_tensor, UX_approximation, UX_sample
-                    )
-                )
-
-            if not exclude_kde_l1_divergence:
-                metrics["Y_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-                metrics["YX_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        YX_tensor, YX_approximation, YX_sample
-                    )
-                )
-                metrics["UX_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        UX_tensor, UX_approximation, UX_sample
-                    )
-                )
+        if not exclude_kde_l1_divergence:
+            metrics["Y_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(Y_tensor, Y_approximation)
+            )
+            metrics["U_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(U_tensor, U_approximation)
+            )
+            metrics["YX_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(YX_tensor, YX_approximation)
+            )
+            metrics["UX_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(UX_tensor, UX_approximation)
+            )
 
     return metrics
 
@@ -495,40 +452,21 @@ def test_on_dataset_with_defined_sample_joint(
                     sliced_wasserstein2(U_tensor, U_approximation)
                 )
 
-            if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-                X_sample, Y_sample = dataset.sample_conditional(x=X_tensor)
+            if not exclude_kde_kl_divergence:
+                conditional_metrics["Y|X_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_kde_kl_divergence"].append(
+                    kernel_density_estimate_kl_divergence(U_tensor, U_approximation)
+                )
 
-                if latent_distribution == "gaussian":
-                    U_sample = torch.randn_like(Y_sample)
-                elif latent_distribution == "uniform":
-                    U_sample = torch.rand_like(Y_sample)
-
-                YX_sample = torch.cat([Y_sample, X_sample], dim=1)
-                UX_sample = torch.cat([U_sample, X_sample], dim=1)
-
-                if not exclude_kde_kl_divergence:
-                    conditional_metrics["Y|X_kde_kl_divergence"].append(
-                        kernel_density_estimate_kl_divergence(
-                            Y_tensor, Y_approximation, Y_sample
-                        )
-                    )
-                    conditional_metrics["U|X_kde_kl_divergence"].append(
-                        kernel_density_estimate_kl_divergence(
-                            U_tensor, U_approximation, U_sample
-                        )
-                    )
-
-                if not exclude_kde_l1_divergence:
-                    conditional_metrics["Y|X_kde_l1_divergence"].append(
-                        kernel_density_estimate_l1_divergence(
-                            Y_tensor, Y_approximation, Y_sample
-                        )
-                    )
-                    conditional_metrics["U|X_kde_l1_divergence"].append(
-                        kernel_density_estimate_l1_divergence(
-                            U_tensor, U_approximation, U_sample
-                        )
-                    )
+            if not exclude_kde_l1_divergence:
+                conditional_metrics["Y|X_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(Y_tensor, Y_approximation)
+                )
+                conditional_metrics["U|X_kde_l1_divergence"].append(
+                    kernel_density_estimate_l1_divergence(U_tensor, U_approximation)
+                )
 
             if not exclude_wasserstein2:
                 metrics["Y|X_wasserstein2"].append(
@@ -606,63 +544,34 @@ def test_on_dataset_with_defined_sample_joint(
                 sliced_wasserstein2(UX_tensor, UX_approximation)
             )
 
-        if not exclude_kde_kl_divergence or not exclude_kde_l1_divergence:
-            X_sample, Y_sample = dataset.sample_joint(
-                n_points=NUMBER_OF_GENERATED_POINTS
+        if not exclude_kde_kl_divergence:
+            metrics["Y_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(Y_tensor, Y_approximation)
+            )
+            metrics["U_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(U_tensor, U_approximation)
             )
 
-            if latent_distribution == "gaussian":
-                U_sample = torch.randn_like(Y_sample)
-            elif latent_distribution == "uniform":
-                U_sample = torch.rand_like(Y_sample)
+            metrics["YX_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(YX_tensor, YX_approximation)
+            )
+            metrics["UX_kde_kl_divergence"].append(
+                kernel_density_estimate_kl_divergence(UX_tensor, UX_approximation)
+            )
 
-            YX_sample = torch.cat([Y_sample, X_sample], dim=1)
-            UX_sample = torch.cat([U_sample, X_sample], dim=1)
-
-            if not exclude_kde_kl_divergence:
-                metrics["Y_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-
-                metrics["YX_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        YX_tensor, YX_approximation, YX_sample
-                    )
-                )
-                metrics["UX_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        UX_tensor, UX_approximation, UX_sample
-                    )
-                )
-
-            if not exclude_kde_l1_divergence:
-                metrics["Y_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        Y_tensor, Y_approximation, Y_sample
-                    )
-                )
-                metrics["U_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        U_tensor, U_approximation, U_sample
-                    )
-                )
-                metrics["YX_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        YX_tensor, YX_approximation, YX_sample
-                    )
-                )
-                metrics["UX_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        UX_tensor, UX_approximation, UX_sample
-                    )
-                )
+        if not exclude_kde_l1_divergence:
+            metrics["Y_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(Y_tensor, Y_approximation)
+            )
+            metrics["U_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(U_tensor, U_approximation)
+            )
+            metrics["YX_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(YX_tensor, YX_approximation)
+            )
+            metrics["UX_kde_l1_divergence"].append(
+                kernel_density_estimate_l1_divergence(UX_tensor, UX_approximation)
+            )
 
     return metrics
 

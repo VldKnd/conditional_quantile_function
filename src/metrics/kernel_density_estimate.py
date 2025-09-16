@@ -78,7 +78,7 @@ def kernel_density_estimate_kl_divergence(
 
     denisty_points_bandwidth = compute_scott_bandwidth(ground_truth)
     query_points_bandwidth = compute_scott_bandwidth(approximation)
-    idx = torch.randint(0, n, (sample_size, ), device=device)
+    idx = torch.randint(0, n, (sample_size, ))
     sample = ground_truth[idx]
 
     log_p = log_kde_gaussian(
@@ -105,7 +105,7 @@ def kernel_density_estimate_l1_divergence(
     n = ground_truth.shape[0]
     sample_size = min(n, 1000)
 
-    idx = torch.randint(0, n, (sample_size, ), device=device)
+    idx = torch.randint(0, n, (sample_size, ))
     sample = ground_truth[idx]
 
     denisty_points_bandwidth = compute_scott_bandwidth(ground_truth)
@@ -124,12 +124,11 @@ def kernel_density_estimate_l1_divergence(
 
 
 if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_samples = 100000
     d = 5
 
-    P = torch.randn(n_samples, d, device=device)
-    Q = torch.randn(n_samples, d, device=device)
+    P = torch.randn(n_samples, d)
+    Q = torch.randn(n_samples, d)
 
     kl = kernel_density_estimate_kl_divergence(P, Q)
     l1 = kernel_density_estimate_l1_divergence(P, Q)
