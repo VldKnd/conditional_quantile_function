@@ -1,5 +1,5 @@
 import torch
-from tqdm import tqdm
+from tqdm import trange
 from datasets import (
     # Prototype
     Dataset,
@@ -25,12 +25,12 @@ from metrics import (
 )
 from pushforward_operators import PushForwardOperator
 
-NUMBER_OF_JOINT_TEST_REPETITIONS = 500
+NUMBER_OF_JOINT_TEST_REPETITIONS = 100
 NUMBER_OF_JOINT_TEST_SAMPLES = 2000
 
-NUMBER_OF_CONDITIONAL_TEST_REPETITIONS = 500
+NUMBER_OF_CONDITIONAL_TEST_REPETITIONS = 100
 NUMBER_OF_CONDITIONAL_TEST_CONDITIONS = 100
-NUMBER_OF_CONDITIONAL_TEST_SAMPLES = 100
+NUMBER_OF_CONDITIONAL_TEST_SAMPLES = 500
 
 
 def load_pushforward_operator_from_experiment(
@@ -155,11 +155,13 @@ def test(
         "Q(U,X)_uv_l2": [],
     }
 
-    for _ in tqdm(
-        range(NUMBER_OF_CONDITIONAL_TEST_REPETITIONS),
+    conditional_tests_progress_bar = trange(
+        NUMBER_OF_CONDITIONAL_TEST_REPETITIONS,
         desc="Running Conditional Tests",
         disable=not verbose
-    ):
+    )
+
+    for conditional_run_idx in conditional_tests_progress_bar:
         conditional_metrics = {
             "Y|X_wasserstein2": [],
             "Y|X_sliced_wasserstein2": [],
@@ -171,7 +173,7 @@ def test(
             "U|X_kde_l1_divergence": [],
         }
 
-        for _ in range(NUMBER_OF_CONDITIONAL_TEST_CONDITIONS):
+        for conditional_sub_run_idx in range(NUMBER_OF_CONDITIONAL_TEST_CONDITIONS):
             covariates_tensor = dataset.sample_covariates(1).repeat(
                 NUMBER_OF_CONDITIONAL_TEST_SAMPLES, 1
             )
@@ -236,6 +238,13 @@ def test(
                     )
                 )
 
+            conditional_tests_progress_bar.set_postfix(
+                {
+                    "Conditional sub-run index": conditional_sub_run_idx,
+                    "Conditional run index": conditional_run_idx,
+                }
+            )
+
         if not exclude_wasserstein2:
             metrics["Y|X_wasserstein2"].append(
                 torch.stack(conditional_metrics["Y|X_wasserstein2"]).mean()
@@ -268,11 +277,13 @@ def test(
                 torch.stack(conditional_metrics["U|X_kde_l1_divergence"]).mean()
             )
 
-    for _ in tqdm(
-        range(NUMBER_OF_JOINT_TEST_REPETITIONS),
+    joint_tests_progress_bar = trange(
+        NUMBER_OF_JOINT_TEST_REPETITIONS,
         desc="Running Marginal and Joint Tests",
         disable=not verbose
-    ):
+    )
+
+    for joint_run_idx in joint_tests_progress_bar:
         X_joint_tensor, Y_joint_tensor = dataset.sample_joint(
             n_points=NUMBER_OF_JOINT_TEST_SAMPLES
         )
@@ -396,6 +407,8 @@ def test(
                     UX_joint_tensor, UX_joint_approximation
                 )
             )
+
+        joint_tests_progress_bar.set_postfix({"Joint run index": joint_run_idx})
 
     return metrics
 
