@@ -99,7 +99,7 @@ def run_tuning(args):
     df.to_feather(fn_feather)
     df.to_csv(fn_csv)
 
-    return
+    return df
 
 
 if __name__ == "__main__":
@@ -109,5 +109,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"{args=}")
     results = run_tuning(args)
-    print(results.head(10))
+    print(results)
     print("Done!")

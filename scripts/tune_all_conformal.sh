@@ -1,5 +1,5 @@
 datasets=("rf1" "rf2" "scm1d" "scm20d" "sgemm" "bio" "blog")
-seeds=(52)
+seeds=(53)
 
 for seed in "${seeds[@]}"; do
     for dataset in "${datasets[@]}"; do
