@@ -302,7 +302,7 @@ def test_on_dataset_with_defined_pushforward_operator(
                 percentage_of_unexplained_variance(Y_tensor, Y_dataset_approximation)
             )
             metrics["Q(U,X)_uv_l2"].append(
-                percentage_of_unexplained_variance(U_tensor, U_approximation)
+                percentage_of_unexplained_variance(U_dataset_tensor, U_approximation)
             )
 
         if not exclude_wasserstein2:
