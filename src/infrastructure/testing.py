@@ -25,7 +25,7 @@ from metrics import (
 )
 from pushforward_operators import PushForwardOperator
 
-NUMBER_OF_TEST_SAMPLES = 100
+NUMBER_OF_TEST_SAMPLES = 500
 NUMBER_OF_GENERATED_POINTS = 2000
 
 
