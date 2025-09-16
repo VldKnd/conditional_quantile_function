@@ -1,4 +1,5 @@
 import warnings
+import copy
 import os
 from pathlib import Path
 import argparse
@@ -34,6 +35,17 @@ _model_config_small = {
     "dtype": torch.float32,
 }
 
+_tuned_configs = {
+    "bio": {
+        "hidden_dimension": 16,
+        "number_of_hidden_layers": 4,
+        "batch_size": 512,
+        "n_epochs": 100,
+        "warmup_iterations": 10,
+        "learning_rate": 0.01,
+        "dtype": torch.float32,
+    }
+}
 _scores_batch_size = 4096
 
 
@@ -65,10 +77,15 @@ def run_experiment(args):
     n_samples = 10_000
 
     ds = get_dataset_split(name=args.dataset, seed=args.seed)
+    model_config = copy.deepcopy(_model_config_small)
+
     if ds.n_train > 10_000:
         _model_config_small["batch_size"] = 1024
     if ds.n_train > 55_000:
         _model_config_small["batch_size"] = 8192
+    
+    if args.dataset in _tuned_configs:
+        model_config = _tuned_configs[args.dataset]
 
     #_model_config_small["n_epochs"] = 1
 
@@ -82,7 +99,7 @@ def run_experiment(args):
     reg_cvqr = CVQRegressor(
         feature_dimension=ds.n_features,
         response_dimension=ds.n_outputs,
-        **_model_config_small
+        **model_config
     )
     print(
         f"Number of parameters: {get_total_number_of_parameters(reg_cvqr.model.potential_network)}, "
@@ -249,3 +266,4 @@ if __name__ == "__main__":
     #print(results.head(10))
     print(results)
     print("Done!")
+    

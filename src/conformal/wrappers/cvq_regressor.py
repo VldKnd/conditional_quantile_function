@@ -43,14 +43,21 @@ class BaseVQRegressor(ScoreCalculator):
     n_epochs: int
     learning_rate: float = 0.01
     dtype: torch.dtype = torch.float64
+    betas: tuple[float, float] = (0.5, 0.5)
+    weight_decay: float = 1e-4
+    warmup_iterations: int = 5
     model: PushForwardOperator = field(init=False)
 
     def __post_init__(self):
+        _optimizer_parameters = dict(
+            lr=self.learning_rate, betas=self.betas, weight_decay=self.weight_decay
+        )
         self.train_parameters = TrainParameters(
             number_of_epochs_to_train=self.n_epochs,
-            optimizer_parameters=dict(lr=self.learning_rate),
+            optimizer_parameters=_optimizer_parameters,
             scheduler_parameters={"eta_min": 0.},
-            verbose=True
+            verbose=True,
+            warmup_iterations=self.warmup_iterations,
         )
 
     def fit(self, X: np.ndarray, Y: np.ndarray):
@@ -79,11 +86,9 @@ class BaseVQRegressor(ScoreCalculator):
 
 @dataclass
 class CVQRegressor(BaseVQRegressor):
-    warmup_iterations: int = 5
 
     def __post_init__(self):
         super().__post_init__()
-        self.train_parameters.warmup_iterations = self.warmup_iterations
         self.model = AmortizedNeuralQuantileRegression(
             feature_dimension=self.feature_dimension,
             response_dimension=self.response_dimension,
@@ -134,6 +139,7 @@ class CPFlowRegressor(BaseVQRegressor):
     n_blocks: int = 4
 
     def __post_init__(self):
+        super().__post_init__()
         self.model = ConvexPotentialFlow(
             feature_dimension=self.feature_dimension,
             response_dimension=self.response_dimension,
