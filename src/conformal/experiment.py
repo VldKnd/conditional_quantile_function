@@ -67,6 +67,11 @@ def run_experiment(args):
     current_seed_dir = Path(RESULTS_DIR) / args.dataset / str(args.seed)
     os.makedirs(current_seed_dir, exist_ok=True)
 
+    # Metrics paths
+    fn_feather = current_seed_dir / f"metrics_all.feather"
+    fn_csv = current_seed_dir / f"metrics_all.csv"
+
+    # Trianed models path
     trained_model_path_cvqr = current_seed_dir / f"model_cvqr.pth"
     trained_model_path_cpflow = current_seed_dir / f"model_cpflow.pth"
 
@@ -216,6 +221,7 @@ def run_experiment(args):
                     worst_slab_coverage=wsc
                 )
             )
+            print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
 
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
@@ -244,10 +250,11 @@ def run_experiment(args):
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
         records += records_alpha
+        pd.DataFrame(records).to_csv(fn_csv, index=False)
 
     df_metrics = pd.DataFrame(records)
 
-    df_metrics.to_feather(current_seed_dir / f"metrics_all.feather")
+    df_metrics.to_feather(fn_feather)
 
     return df_metrics
 

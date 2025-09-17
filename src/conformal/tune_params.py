@@ -92,7 +92,7 @@ def run_tuning(args):
                         print(records[-1])
                         df = pd.DataFrame(records)
                         df.to_feather(fn_feather)
-                        df.to_csv(fn_csv)
+                        df.to_csv(fn_csv, index=False)
 
     df = pd.DataFrame(records)
 
