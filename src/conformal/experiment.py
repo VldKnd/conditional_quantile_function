@@ -44,7 +44,17 @@ _tuned_configs = {
         "warmup_iterations": 10,
         "learning_rate": 0.01,
         "dtype": torch.float32,
-    }
+    },
+    "blog": {
+        "hidden_dimension": 16,
+        "number_of_hidden_layers": 4,
+        "batch_size": 512,
+        "n_epochs": 30,
+        "warmup_iterations": 10,
+        "learning_rate": 0.01,
+        "dtype": torch.float32,
+    },
+
 }
 _scores_batch_size = 4096
 
@@ -88,7 +98,7 @@ def run_experiment(args):
         _model_config_small["batch_size"] = 1024
     if ds.n_train > 55_000:
         _model_config_small["batch_size"] = 8192
-    
+
     if args.dataset in _tuned_configs:
         model_config = _tuned_configs[args.dataset]
 
@@ -263,6 +273,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", type=str, default="rf1")
     parser.add_argument("-s", "--seed", type=int, default=0)
+    parser.add_argument("-j", "--jobs", type=int, default=-1)
     parser.add_argument("--baselines", action='store_true')
     parser.add_argument("--ours", action='store_true')
     parser.add_argument("--cpflow", action='store_true')
@@ -273,4 +284,3 @@ if __name__ == "__main__":
     #print(results.head(10))
     print(results)
     print("Done!")
-    
