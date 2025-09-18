@@ -64,10 +64,12 @@ class BaseVQRegressor(ScoreCalculator):
         dataloader = _make_xy_dataloader(
             X, Y, batch_size=self.batch_size, dtype=self.dtype
         )
+        self.model.train()
         self.model.fit(
             dataloader,
             train_parameters=self.train_parameters,
         )
+        self.model.eval()
 
     def predict_mean(self, X: np.ndarray):
         n = X.shape[0]
@@ -75,13 +77,23 @@ class BaseVQRegressor(ScoreCalculator):
         X_tensor = torch.tensor(X, dtype=self.dtype)
         #dataset = TensorDataset(X_tensor, U)
         #dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+        self.model.eval()
         Y = self.model.push_u_given_x(x=X_tensor, u=U)
         return Y.numpy(force=True)
 
     def predict_quantile(self, X: np.ndarray, Y: np.ndarray):
-        return self.model.push_y_given_x(
+        u = self.model.push_y_given_x(
             y=torch.tensor(Y, dtype=self.dtype), x=torch.tensor(X, dtype=self.dtype)
         ).numpy(force=True)
+        self.model.eval()
+        return u
+
+    def predict_inverse_quantile(self, X: np.ndarray, U: np.ndarray):
+        y = self.model.push_u_given_x(
+            u=torch.tensor(U, dtype=self.dtype), x=torch.tensor(X, dtype=self.dtype)
+        ).numpy(force=True)
+        self.model.eval()
+        return y
 
 
 @dataclass
@@ -123,10 +135,13 @@ class CVQRegressor(BaseVQRegressor):
         """
         n, m = X.shape
         _, d = Y.shape
+        self.model.eval()
         quantiles = self.predict_quantile(X, Y)
         ranks = np.linalg.norm(quantiles, axis=-1)
         log_p_U = multivariate_normal.logpdf(quantiles, mean=np.zeros(d))
+        self.model.eval()
         logdet_h = self.predict_logdet_hessian_potential(X, Y, batch_size=batch_size)
+        self.model.eval()
         return {
             "MK Quantile": quantiles,
             "MK Rank": ranks,
@@ -165,11 +180,13 @@ class CPFlowRegressor(BaseVQRegressor):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
+            self.model.eval()
             quantiles = self.predict_quantile(X, Y)
             ranks = np.linalg.norm(quantiles, axis=-1)
+            self.model.eval()
             log_p = self.model.logp_cond(
                 Y=torch.tensor(Y, dtype=self.dtype),
                 X=torch.tensor(X, dtype=self.dtype)
             ).numpy(force=True)
-
+            self.model.eval()
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_p}
