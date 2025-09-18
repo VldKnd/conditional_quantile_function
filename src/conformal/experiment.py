@@ -49,7 +49,16 @@ _tuned_configs = {
         "hidden_dimension": 16,
         "number_of_hidden_layers": 4,
         "batch_size": 512,
-        "n_epochs": 30,
+        "n_epochs": 50,
+        "warmup_iterations": 10,
+        "learning_rate": 0.01,
+        "dtype": torch.float32,
+    },
+    "sgemm": {
+        "hidden_dimension": 24,
+        "number_of_hidden_layers": 4,
+        "batch_size": 4096,
+        "n_epochs": 50,
         "warmup_iterations": 10,
         "learning_rate": 0.01,
         "dtype": torch.float32,
@@ -127,7 +136,7 @@ def run_experiment(args):
     reg_cpflow = CPFlowRegressor(
         feature_dimension=ds.n_features,
         response_dimension=ds.n_outputs,
-        **_model_config_small
+        **model_config
     )
 
     score_calculators: dict[str, ScoreCalculator] = {}
