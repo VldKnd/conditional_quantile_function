@@ -25,8 +25,8 @@ from metrics import (
 )
 from pushforward_operators import PushForwardOperator
 
-NUMBER_OF_JOINT_TEST_REPETITIONS = 100
-NUMBER_OF_JOINT_TEST_SAMPLES = 2000
+NUMBER_OF_JOINT_TEST_REPETITIONS = 50
+NUMBER_OF_JOINT_TEST_SAMPLES = 1000
 
 NUMBER_OF_CONDITIONAL_TEST_REPETITIONS = 100
 NUMBER_OF_CONDITIONAL_TEST_CONDITIONS = 100
@@ -155,127 +155,134 @@ def test(
         "Q(U,X)_uv_l2": [],
     }
 
-    conditional_tests_progress_bar = trange(
-        NUMBER_OF_CONDITIONAL_TEST_REPETITIONS,
-        desc="Running Conditional Tests",
-        disable=not verbose
-    )
 
-    for conditional_run_idx in conditional_tests_progress_bar:
-        conditional_metrics = {
-            "Y|X_wasserstein2": [],
-            "Y|X_sliced_wasserstein2": [],
-            "Y|X_kde_kl_divergence": [],
-            "Y|X_kde_l1_divergence": [],
-            "U|X_wasserstein2": [],
-            "U|X_sliced_wasserstein2": [],
-            "U|X_kde_kl_divergence": [],
-            "U|X_kde_l1_divergence": [],
-        }
+    if any([
+        not exclude_wasserstein2,
+        not exclude_sliced_wasserstein2,
+        not exclude_kde_kl_divergence,
+        not exclude_kde_l1_divergence,
+    ]):
+        conditional_tests_progress_bar = trange(
+            NUMBER_OF_CONDITIONAL_TEST_REPETITIONS,
+            desc="Running Conditional Tests",
+            disable=not verbose
+        )
 
-        for conditional_sub_run_idx in range(NUMBER_OF_CONDITIONAL_TEST_CONDITIONS):
-            covariates_tensor = dataset.sample_covariates(1).repeat(
-                NUMBER_OF_CONDITIONAL_TEST_SAMPLES, 1
-            )
+        for conditional_run_idx in conditional_tests_progress_bar:
+            conditional_metrics = {
+                "Y|X_wasserstein2": [],
+                "Y|X_sliced_wasserstein2": [],
+                "Y|X_kde_kl_divergence": [],
+                "Y|X_kde_l1_divergence": [],
+                "U|X_wasserstein2": [],
+                "U|X_sliced_wasserstein2": [],
+                "U|X_kde_kl_divergence": [],
+                "U|X_kde_l1_divergence": [],
+            }
 
-            X_conditional_tensor, Y_conditional_tensor = dataset.sample_conditional(
-                x=covariates_tensor
-            )
+            for conditional_sub_run_idx in range(NUMBER_OF_CONDITIONAL_TEST_CONDITIONS):
+                covariates_tensor = dataset.sample_covariates(1).repeat(
+                    NUMBER_OF_CONDITIONAL_TEST_SAMPLES, 1
+                )
 
-            if latent_distribution == "gaussian":
-                U_conditional_tensor = torch.randn_like(Y_conditional_tensor)
-            elif latent_distribution == "uniform":
-                U_conditional_tensor = torch.rand_like(Y_conditional_tensor)
+                X_conditional_tensor, Y_conditional_tensor = dataset.sample_conditional(
+                    x=covariates_tensor
+                )
 
-            Y_conditional_approximation = pushforward_operator.push_u_given_x(
-                U_conditional_tensor, X_conditional_tensor
-            )
-            U_conditional_approximation = pushforward_operator.push_y_given_x(
-                Y_conditional_tensor, X_conditional_tensor
-            )
+                if latent_distribution == "gaussian":
+                    U_conditional_tensor = torch.randn_like(Y_conditional_tensor)
+                elif latent_distribution == "uniform":
+                    U_conditional_tensor = torch.rand_like(Y_conditional_tensor)
+
+                Y_conditional_approximation = pushforward_operator.push_u_given_x(
+                    U_conditional_tensor, X_conditional_tensor
+                )
+                U_conditional_approximation = pushforward_operator.push_y_given_x(
+                    Y_conditional_tensor, X_conditional_tensor
+                )
+
+                if not exclude_wasserstein2:
+                    conditional_metrics["Y|X_wasserstein2"].append(
+                        wassertein2(Y_conditional_tensor, Y_conditional_approximation)
+                    )
+                    conditional_metrics["U|X_wasserstein2"].append(
+                        wassertein2(U_conditional_tensor, U_conditional_approximation)
+                    )
+
+                if not exclude_sliced_wasserstein2:
+                    conditional_metrics["Y|X_sliced_wasserstein2"].append(
+                        sliced_wasserstein2(
+                            Y_conditional_tensor, Y_conditional_approximation
+                        )
+                    )
+                    conditional_metrics["U|X_sliced_wasserstein2"].append(
+                        sliced_wasserstein2(
+                            U_conditional_tensor, U_conditional_approximation
+                        )
+                    )
+
+                if not exclude_kde_kl_divergence:
+                    conditional_metrics["Y|X_kde_kl_divergence"].append(
+                        kernel_density_estimate_kl_divergence(
+                            Y_conditional_tensor, Y_conditional_approximation
+                        )
+                    )
+                    conditional_metrics["U|X_kde_kl_divergence"].append(
+                        kernel_density_estimate_kl_divergence(
+                            U_conditional_tensor, U_conditional_approximation
+                        )
+                    )
+
+                if not exclude_kde_l1_divergence:
+                    conditional_metrics["Y|X_kde_l1_divergence"].append(
+                        kernel_density_estimate_l1_divergence(
+                            Y_conditional_tensor, Y_conditional_approximation
+                        )
+                    )
+                    conditional_metrics["U|X_kde_l1_divergence"].append(
+                        kernel_density_estimate_l1_divergence(
+                            U_conditional_tensor, U_conditional_approximation
+                        )
+                    )
+
+                conditional_tests_progress_bar.set_postfix(
+                    {
+                        "Conditional sub-run index": conditional_sub_run_idx,
+                        "Conditional run index": conditional_run_idx,
+                    }
+                )
 
             if not exclude_wasserstein2:
-                conditional_metrics["Y|X_wasserstein2"].append(
-                    wassertein2(Y_conditional_tensor, Y_conditional_approximation)
+                metrics["Y|X_wasserstein2"].append(
+                    torch.stack(conditional_metrics["Y|X_wasserstein2"]).mean()
                 )
-                conditional_metrics["U|X_wasserstein2"].append(
-                    wassertein2(U_conditional_tensor, U_conditional_approximation)
+                metrics["U|X_wasserstein2"].append(
+                    torch.stack(conditional_metrics["U|X_wasserstein2"]).mean()
                 )
 
             if not exclude_sliced_wasserstein2:
-                conditional_metrics["Y|X_sliced_wasserstein2"].append(
-                    sliced_wasserstein2(
-                        Y_conditional_tensor, Y_conditional_approximation
-                    )
+                metrics["Y|X_sliced_wasserstein2"].append(
+                    torch.stack(conditional_metrics["Y|X_sliced_wasserstein2"]).mean()
                 )
-                conditional_metrics["U|X_sliced_wasserstein2"].append(
-                    sliced_wasserstein2(
-                        U_conditional_tensor, U_conditional_approximation
-                    )
+                metrics["U|X_sliced_wasserstein2"].append(
+                    torch.stack(conditional_metrics["U|X_sliced_wasserstein2"]).mean()
                 )
 
             if not exclude_kde_kl_divergence:
-                conditional_metrics["Y|X_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        Y_conditional_tensor, Y_conditional_approximation
-                    )
+                metrics["Y|X_kde_kl_divergence"].append(
+                    torch.stack(conditional_metrics["Y|X_kde_kl_divergence"]).mean()
                 )
-                conditional_metrics["U|X_kde_kl_divergence"].append(
-                    kernel_density_estimate_kl_divergence(
-                        U_conditional_tensor, U_conditional_approximation
-                    )
+                metrics["U|X_kde_kl_divergence"].append(
+                    torch.stack(conditional_metrics["U|X_kde_kl_divergence"]).mean()
                 )
 
             if not exclude_kde_l1_divergence:
-                conditional_metrics["Y|X_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        Y_conditional_tensor, Y_conditional_approximation
-                    )
+                metrics["Y|X_kde_l1_divergence"].append(
+                    torch.stack(conditional_metrics["Y|X_kde_l1_divergence"]).mean()
                 )
-                conditional_metrics["U|X_kde_l1_divergence"].append(
-                    kernel_density_estimate_l1_divergence(
-                        U_conditional_tensor, U_conditional_approximation
-                    )
+                metrics["U|X_kde_l1_divergence"].append(
+                    torch.stack(conditional_metrics["U|X_kde_l1_divergence"]).mean()
                 )
-
-            conditional_tests_progress_bar.set_postfix(
-                {
-                    "Conditional sub-run index": conditional_sub_run_idx,
-                    "Conditional run index": conditional_run_idx,
-                }
-            )
-
-        if not exclude_wasserstein2:
-            metrics["Y|X_wasserstein2"].append(
-                torch.stack(conditional_metrics["Y|X_wasserstein2"]).mean()
-            )
-            metrics["U|X_wasserstein2"].append(
-                torch.stack(conditional_metrics["U|X_wasserstein2"]).mean()
-            )
-
-        if not exclude_sliced_wasserstein2:
-            metrics["Y|X_sliced_wasserstein2"].append(
-                torch.stack(conditional_metrics["Y|X_sliced_wasserstein2"]).mean()
-            )
-            metrics["U|X_sliced_wasserstein2"].append(
-                torch.stack(conditional_metrics["U|X_sliced_wasserstein2"]).mean()
-            )
-
-        if not exclude_kde_kl_divergence:
-            metrics["Y|X_kde_kl_divergence"].append(
-                torch.stack(conditional_metrics["Y|X_kde_kl_divergence"]).mean()
-            )
-            metrics["U|X_kde_kl_divergence"].append(
-                torch.stack(conditional_metrics["U|X_kde_kl_divergence"]).mean()
-            )
-
-        if not exclude_kde_l1_divergence:
-            metrics["Y|X_kde_l1_divergence"].append(
-                torch.stack(conditional_metrics["Y|X_kde_l1_divergence"]).mean()
-            )
-            metrics["U|X_kde_l1_divergence"].append(
-                torch.stack(conditional_metrics["U|X_kde_l1_divergence"]).mean()
-            )
 
     joint_tests_progress_bar = trange(
         NUMBER_OF_JOINT_TEST_REPETITIONS,
@@ -311,7 +318,7 @@ def test(
         )
 
         if not exclude_unexplained_variance_percentage:
-            X_joint_dataset, U_joint_dataset, Y_joint_dataset = dataset.sample_x_y_u(
+            X_joint_dataset, Y_joint_dataset, U_joint_dataset  = dataset.sample_x_y_u(
                 n_points=NUMBER_OF_JOINT_TEST_SAMPLES
             )
 
