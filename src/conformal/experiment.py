@@ -241,6 +241,7 @@ def run_experiment(args):
                 )
             )
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
+        print(pd.DataFrame(records_alpha))
 
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
@@ -268,6 +269,7 @@ def run_experiment(args):
         mean_volumes = volumes.mean(axis=-1)
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
+        print(pd.DataFrame(records_alpha))
         records += records_alpha
         pd.DataFrame(records).to_csv(fn_csv, index=False)
 
