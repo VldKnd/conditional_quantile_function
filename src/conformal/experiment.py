@@ -117,7 +117,7 @@ def run_experiment(args):
     required_model_names = set()
     for method in methods:
         required_model_names.add(method.base_model_name)
-        method.instance = method.cls(**method.kwargs, seed=args.seed)
+        method.instance = method.cls(**method.kwargs, seed=args.seed, d_y=ds.n_outputs)
 
     # Base multidimensional quantile model
     reg_cvqr = CVQRegressor(

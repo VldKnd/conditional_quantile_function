@@ -14,6 +14,7 @@ from utils.quantile import get_quantile_level_analytically
 
 @dataclass
 class BaseRegionPredictor:
+    d_y: int = 1
     seed: int = 0
     alpha: float = 0.1
     lower_is_better: bool = True
@@ -250,9 +251,8 @@ class EllipsoidalLocal(BaseRegionPredictor):
 class QuantileEstimatePredictor(BaseRegionPredictor):
 
     def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
-        d = scores_cal.shape[-1]
         self.threshold = get_quantile_level_analytically(
-            alpha=torch.tensor([1 - alpha]), distribution="gaussian", dimension=d
+            alpha=torch.tensor([1 - alpha]), distribution="gaussian", dimension=self.d_y
         ).numpy(force=True)[0]
 
     def is_covered(
