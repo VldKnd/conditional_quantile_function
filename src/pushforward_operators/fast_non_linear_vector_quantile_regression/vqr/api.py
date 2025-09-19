@@ -361,6 +361,24 @@ class VectorQuantileRegressor(RegressorMixin, _Base):
             grid_element_numpy
         ).unsqueeze(0)
 
+    def sample_one_conditional_element(self, x: torch.Tensor) -> torch.Tensor:
+        check_is_fitted(self)
+        x_numpy = x.numpy(force=True)
+        x_numpy = self._validate_X_(X=x_numpy, single=True)
+
+        vqf: DiscreteVQF = self.vector_quantiles(X=x_numpy)[0]
+        quantile_surfaces = np.stack(tuple(vqf))
+        quantile_grid = vqf.quantile_grid
+
+        d, T = get_d_T(quantile_surfaces)
+
+        Us = np.random.randint(0, T, size=(d))
+        sample_numpy, grid_element_numpy = quantile_surfaces[:, *Us], quantile_grid[:,
+                                                                                    *Us]
+        return torch.tensor(sample_numpy).unsqueeze(0), torch.tensor(
+            grid_element_numpy
+        ).unsqueeze(0)
+
     def sample(self, n: int, x: Array) -> Array:
         """
         Sample from Y|X=x based on the fitted vector quantile function Q(u;x).

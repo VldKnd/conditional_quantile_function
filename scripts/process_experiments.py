@@ -25,7 +25,14 @@ def process_config(file_path: str, training: bool, testing: bool):
     if testing:
         try:
             print(f"Testing: {file_path}")
-            test_from_json_file(file_path, verbose=True)
+            test_from_json_file(
+                file_path,
+                exclude_kde_kl_divergence=True,
+                exclude_kde_l1_divergence=True,
+                exclude_sliced_wasserstein2=True,
+                exclude_wasserstein2=True,
+                verbose=True
+            )
         except Exception as exception:
             with open(f"{file_folder_path}/test_error.log", "w") as error_file:
                 error_file.write(str(exception))
