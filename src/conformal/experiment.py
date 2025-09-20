@@ -19,6 +19,7 @@ from conformal.real_datasets.reproducible_split import get_dataset_split
 from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, ScoreCalculator
 from conformal.wrappers.rf_score import RandomForestWithScore
 from metrics.wsc import wsc_unbiased
+from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
 from utils.network import get_total_number_of_parameters
 from conformal.method_zoo import section5, baselines, cpflow_based
 
@@ -55,15 +56,14 @@ _tuned_configs = {
         "dtype": torch.float32,
     },
     "sgemm": {
-        "hidden_dimension": 24,
+        "hidden_dimension": 32,
         "number_of_hidden_layers": 4,
-        "batch_size": 4096,
+        "batch_size": 8192,
         "n_epochs": 50,
         "warmup_iterations": 10,
         "learning_rate": 0.01,
         "dtype": torch.float32,
     },
-
 }
 _scores_batch_size = 4096
 
@@ -144,7 +144,10 @@ def run_experiment(args):
     if "CVQRegressor" in required_model_names:
         # Fit base models
         if Path.is_file(trained_model_path_cvqr):
-            reg_cvqr.model.load(trained_model_path_cvqr)
+            #reg_cvqr.model.load(trained_model_path_cvqr)
+            reg_cvqr.model = AmortizedNeuralQuantileRegression.load_class(
+                trained_model_path_cvqr
+            )
         else:
             reg_cvqr.fit(ds.X_train, ds.Y_train)
             reg_cvqr.model.save(trained_model_path_cvqr)
@@ -241,8 +244,9 @@ def run_experiment(args):
                 )
             )
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
+        # Print the incomplete results (without volume) for this alpha
         print(pd.DataFrame(records_alpha))
-
+        
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
         volumes = np.zeros((len(methods), ds.n_test))
@@ -269,8 +273,12 @@ def run_experiment(args):
         mean_volumes = volumes.mean(axis=-1)
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
+        
+        # Print results for this alpha
         print(pd.DataFrame(records_alpha))
         records += records_alpha
+
+        # Save all results obtained so far
         pd.DataFrame(records).to_csv(fn_csv, index=False)
 
     df_metrics = pd.DataFrame(records)
