@@ -153,7 +153,7 @@ class CVQRegressor(BaseVQRegressor):
 
         if self.potential_to_estimate_with_neural_network == "u":
             logdet_hessians = self.compute_logdet_hessian(
-                condition=X_tensor, tensor=Y_tensor, batch_size=batch_size
+                condition=X_tensor, tensor=quantiles, batch_size=batch_size
             )
 
             log_density_in_u = multivariate_normal.logpdf(quantiles, mean=np.zeros(d))
