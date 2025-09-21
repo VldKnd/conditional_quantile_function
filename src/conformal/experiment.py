@@ -64,7 +64,52 @@ _tuned_configs = {
         "learning_rate": 0.01,
         "dtype": torch.float32,
     },
+    'rf1': {
+        'learning_rate': 0.001,
+        'batch_size': 512,
+        'n_epochs': 150,
+        'warmup_iterations': 50,
+        'feature_dimension': 50,
+        'response_dimension': 8,
+        'hidden_dimension': 10,
+        'number_of_hidden_layers': 1,
+        "dtype": torch.float32,
+    },
+    'rf2': {
+        'learning_rate': 0.001,
+        'batch_size': 2048,
+        'n_epochs': 150,
+        'warmup_iterations': 50,
+        'feature_dimension': 100,
+        'response_dimension': 8,
+        'hidden_dimension': 8,
+        'number_of_hidden_layers': 2,
+        "dtype": torch.float32,
+    },
+    'scm1d': {
+        'learning_rate': 0.01,
+        'batch_size': 2048,
+        'n_epochs': 150,
+        'warmup_iterations': 50,
+        'feature_dimension': 100,
+        'response_dimension': 16,
+        'hidden_dimension': 6,
+        'number_of_hidden_layers': 3,
+        "dtype": torch.float32,
+    },
+    'scm20d': {
+        'learning_rate': 0.0001,
+        'batch_size': 256,
+        'n_epochs': 50,
+        'warmup_iterations': 50,
+        'feature_dimension': 50,
+        'response_dimension': 16,
+        'hidden_dimension': 10,
+        'number_of_hidden_layers': 1,
+        "dtype": torch.float32,
+    }
 }
+
 _scores_batch_size = 4096
 
 
@@ -246,7 +291,7 @@ def run_experiment(args):
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
         # Print the incomplete results (without volume) for this alpha
         print(pd.DataFrame(records_alpha))
-        
+
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
         volumes = np.zeros((len(methods), ds.n_test))
@@ -273,7 +318,7 @@ def run_experiment(args):
         mean_volumes = volumes.mean(axis=-1)
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
-        
+
         # Print results for this alpha
         print(pd.DataFrame(records_alpha))
         records += records_alpha
