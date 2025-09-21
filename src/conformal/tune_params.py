@@ -17,8 +17,7 @@ grid_cvqr_small = {
     "learning_rate": [0.01, 0.001, 0.0001],
     "batch_size": [256, 512, 1024, 2048],
     "n_epochs": [50, 100, 150],
-    "warmup_iterations":
-    [50],
+    "warmup_iterations": [50],
     "kwargs": [
         {
             "hidden_dimension": 10,

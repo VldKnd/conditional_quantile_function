@@ -1,7 +1,6 @@
 from conformal.classes.conformalizers import OTCPGlobalPredictor, OTCPLocalPredictor, QuantileEstimatePredictor, SplitConformalPredictor, EllipsoidalLocal
 from conformal.classes.method_desc import ConformalMethodDescription
 
-
 section5 = [
     ConformalMethodDescription(
         name="PB",
@@ -38,7 +37,6 @@ section5 = [
     ),
 ]
 
-
 cpflow_based = [
     ConformalMethodDescription(
         name="PB (CPFlow)",
@@ -74,7 +72,6 @@ cpflow_based = [
         cls=QuantileEstimatePredictor
     ),
 ]
-
 
 baselines = [
     ConformalMethodDescription(

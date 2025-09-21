@@ -214,7 +214,8 @@ def bio_processor(fname):
 )
 @make_pooch_precessor(file_name_processed="blog.npz")
 def blog_processor(fname):
-    fname_extracted = pooch.Unzip(members=["blogData_train.csv"])(fname, "download", pooch=None)[0]
+    fname_extracted = pooch.Unzip(members=["blogData_train.csv"]
+                                  )(fname, "download", pooch=None)[0]
     df = pd.read_csv(fname_extracted, header=None)
     targets = [60, 280]
     x = df[df.columns.difference(targets)]

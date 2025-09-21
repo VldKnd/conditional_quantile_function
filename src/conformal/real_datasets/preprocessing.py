@@ -62,7 +62,9 @@ def preprocess(x, y, categorical_mask=None):
         y = pd.DataFrame(y)
     n_columns = len(x.columns)
     categorical_mask = identify_categorical_columns(x, categorical_mask)
-    x, y, categorical_mask, n_high_cardinality = remove_high_cardinality(x, y, categorical_mask)
+    x, y, categorical_mask, n_high_cardinality = remove_high_cardinality(
+        x, y, categorical_mask
+    )
     x, y, n_pseudo_categorical = remove_pseudo_categorical(x, y, categorical_mask)
     x, y, n_missing_cols, n_missing_rows = remove_missing_values(x, y)
     n_removed = n_high_cardinality + n_pseudo_categorical + n_missing_cols

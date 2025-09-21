@@ -2,7 +2,6 @@
 Code adapted from https://github.com/gauthierthurin/OTCP/blob/main/ellipsoidal_conformal_utilities.py
 """
 
-
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -16,12 +15,10 @@ def matrix_to_param(mat):
     :param mat: Covariance matrix
     :return: Ellipse's parameters
     """
-    lambda1 = (mat[0, 0] + mat[1, 1]) / 2 + np.sqrt(
-        ((mat[0, 0] - mat[1, 1]) / 2) ** 2 + mat[0, 1] ** 2
-    )
-    lambda2 = (mat[0, 0] + mat[1, 1]) / 2 - np.sqrt(
-        ((mat[0, 0] - mat[1, 1]) / 2) ** 2 + mat[0, 1] ** 2
-    )
+    lambda1 = (mat[0, 0] + mat[1, 1]
+               ) / 2 + np.sqrt(((mat[0, 0] - mat[1, 1]) / 2)**2 + mat[0, 1]**2)
+    lambda2 = (mat[0, 0] + mat[1, 1]
+               ) / 2 - np.sqrt(((mat[0, 0] - mat[1, 1]) / 2)**2 + mat[0, 1]**2)
 
     if mat[0, 1] == 0 and mat[0, 0] >= mat[1, 1]:
         theta = 0
@@ -41,7 +38,7 @@ def ellipse_volume(inv_cov, alpha, dim):
     :param dim: Output dimension number k
     :return: Ellipsoid's volume
     """
-    base_volume = 1 / np.sqrt(np.linalg.det(inv_cov / alpha ** 2))
+    base_volume = 1 / np.sqrt(np.linalg.det(inv_cov / alpha**2))
     if dim == 2:
         volume = base_volume * np.pi
     elif dim == 3:
@@ -117,9 +114,8 @@ def ellipse_local_alpha_s(
     local_alphas = []
 
     for i in range(local_neighbors_cal.shape[0]):
-        local_y_minus_y_true = (y_true_train - y_pred_train)[
-            local_neighbors_cal[i, :], :
-        ]
+        local_y_minus_y_true = (y_true_train -
+                                y_pred_train)[local_neighbors_cal[i, :], :]
 
         local_cov_cal = np.cov(local_y_minus_y_true.T)
         local_cov_test_regularized = lam * local_cov_cal + (1 - lam) * cov_train
@@ -163,9 +159,8 @@ def local_ellipse_validity_efficiency(
     local_ellipse_surface_all = []
 
     for i in range(local_neighbors_test.shape[0]):
-        local_y_minus_y_true = (y_true_train - y_pred_train)[
-            local_neighbors_test[i, :], :
-        ]
+        local_y_minus_y_true = (y_true_train -
+                                y_pred_train)[local_neighbors_test[i, :], :]
 
         local_cov_test = np.cov(local_y_minus_y_true.T)
         local_cov_test_regularized = lam * local_cov_test + (1 - lam) * cov_train
@@ -216,7 +211,7 @@ def plot_ellipse_global(title, max_points, y_true_test, y_pred_test, alphas, cov
         label="Pred",
     )
 
-    width, height, theta = matrix_to_param(cov_train * alphas ** 2)
+    width, height, theta = matrix_to_param(cov_train * alphas**2)
     for a_x, a_y in zip(y_pred_test[:max_points, 0], y_pred_test[:max_points, 1]):
         ax.add_patch(
             Ellipse(
@@ -275,11 +270,10 @@ def plot_ellipse_local(
         label="Pred",
     )
     for i in range(max_points):
-        local_y_minus_y_true = (y_true_train - y_pred_train)[
-            local_neighbors_test[i, :], :
-        ]
+        local_y_minus_y_true = (y_true_train -
+                                y_pred_train)[local_neighbors_test[i, :], :]
         local_cov_test = np.cov(local_y_minus_y_true.T)
-        width, height, theta = matrix_to_param(local_cov_test * alphas ** 2)
+        width, height, theta = matrix_to_param(local_cov_test * alphas**2)
         ax.add_patch(
             Ellipse(
                 xy=(y_pred_test[i, 0], y_pred_test[i, 1]),

@@ -88,7 +88,7 @@ def run_experiment(args):
         _model_config_small["batch_size"] = 1024
     if ds.n_train > 55_000:
         _model_config_small["batch_size"] = 8192
-    
+
     if args.dataset in _tuned_configs:
         model_config = _tuned_configs[args.dataset]
 
@@ -273,4 +273,3 @@ if __name__ == "__main__":
     #print(results.head(10))
     print(results)
     print("Done!")
-    
