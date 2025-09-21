@@ -153,13 +153,20 @@ class CVQRegressor(BaseVQRegressor):
 
         if self.potential_to_estimate_with_neural_network == "u":
             logdet_hessians = self.compute_logdet_hessian(
-                condition=X_tensor, tensor=quantiles, batch_size=batch_size
+                condition=X_tensor,
+                tensor=torch.tensor(quantiles).to(X_tensor),
+                batch_size=batch_size
             )
 
             log_density_in_u = multivariate_normal.logpdf(quantiles, mean=np.zeros(d))
             log_density = log_density_in_u - logdet_hessians
 
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_density}
+
+
+@dataclass
+class CVQRegressorY(CVQRegressor):
+    potential_to_estimate_with_neural_network = "y"
 
 
 @dataclass
@@ -203,3 +210,24 @@ class CPFlowRegressor(BaseVQRegressor):
             ).numpy(force=True)
             self.model.eval()
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_p}
+
+
+if __name__ == "__main__":
+    cvqr = CVQRegressor(
+        feature_dimension=1,
+        response_dimension=1,
+        hidden_dimension=1,
+        number_of_hidden_layers=1,
+        batch_size=1,
+        n_epochs=1
+    )
+    print(cvqr.potential_to_estimate_with_neural_network)
+    cvqr_y = CVQRegressorY(
+        feature_dimension=1,
+        response_dimension=1,
+        hidden_dimension=1,
+        number_of_hidden_layers=1,
+        batch_size=1,
+        n_epochs=1
+    )
+    print(cvqr_y.potential_to_estimate_with_neural_network)
