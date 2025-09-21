@@ -283,14 +283,14 @@ def run_experiment(args):
             )
             coverage = is_covered.mean()
             wsc_list = []
-            for _ in range(10):
+            for k in range(10):
                 wsc_list.append(
                     wsc_unbiased(
                         ds.X_test,
                         is_covered,
                         delta=0.1,
                         M=10000,
-                        random_state=args.seed,
+                        random_state=args.seed + k,
                         n_cpus=8,
                         verbose=True
                     )
