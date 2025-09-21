@@ -67,7 +67,7 @@ _tuned_configs = {
     'rf1': {
         'learning_rate': 0.001,
         'batch_size': 512,
-        'n_epochs': 150,
+        'n_epochs': 450,
         'warmup_iterations': 50,
         'hidden_dimension': 10,
         'number_of_hidden_layers': 1,
@@ -76,7 +76,7 @@ _tuned_configs = {
     'rf2': {
         'learning_rate': 0.001,
         'batch_size': 2048,
-        'n_epochs': 150,
+        'n_epochs': 450,
         'warmup_iterations': 50,
         'hidden_dimension': 8,
         'number_of_hidden_layers': 2,
@@ -85,7 +85,7 @@ _tuned_configs = {
     'scm1d': {
         'learning_rate': 0.01,
         'batch_size': 2048,
-        'n_epochs': 150,
+        'n_epochs': 450,
         'warmup_iterations': 50,
         'hidden_dimension': 6,
         'number_of_hidden_layers': 3,
@@ -94,7 +94,7 @@ _tuned_configs = {
     'scm20d': {
         'learning_rate': 0.0001,
         'batch_size': 256,
-        'n_epochs': 50,
+        'n_epochs': 450,
         'warmup_iterations': 50,
         'hidden_dimension': 10,
         'number_of_hidden_layers': 1,
