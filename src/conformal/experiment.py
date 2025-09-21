@@ -6,6 +6,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+import scipy
 import torch
 
 import matplotlib.pyplot as plt
@@ -16,14 +17,14 @@ from tqdm.auto import tqdm
 from conformal.classes.method_desc import ConformalMethodDescription
 from conformal.plots.diagnostic import draw_density_scores_pair, draw_qq_scores_pair
 from conformal.real_datasets.reproducible_split import get_dataset_split
-from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, ScoreCalculator
+from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, CVQRegressorY, ScoreCalculator
 from conformal.wrappers.rf_score import RandomForestWithScore
 from metrics.wsc import wsc_unbiased
 from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
 from utils.network import get_total_number_of_parameters
-from conformal.method_zoo import section5, baselines, cpflow_based
+from conformal.method_zoo import section5, section5_y, baselines, cpflow_based
 
-RESULTS_DIR = "./conformal_results"
+RESULTS_DIR = "./conformal_results_u"
 
 # CVQR configuration for ~ 1000 parameters
 _model_config_small = {
@@ -56,10 +57,10 @@ _tuned_configs = {
         "dtype": torch.float32,
     },
     "sgemm": {
-        "hidden_dimension": 32,
+        "hidden_dimension": 46,
         "number_of_hidden_layers": 4,
         "batch_size": 8192,
-        "n_epochs": 50,
+        "n_epochs": 150,
         "warmup_iterations": 10,
         "learning_rate": 0.01,
         "dtype": torch.float32,
@@ -67,7 +68,7 @@ _tuned_configs = {
     'rf1': {
         'learning_rate': 0.001,
         'batch_size': 512,
-        'n_epochs': 450,
+        'n_epochs': 500,
         'warmup_iterations': 50,
         'hidden_dimension': 10,
         'number_of_hidden_layers': 1,
@@ -76,7 +77,7 @@ _tuned_configs = {
     'rf2': {
         'learning_rate': 0.001,
         'batch_size': 2048,
-        'n_epochs': 450,
+        'n_epochs': 500,
         'warmup_iterations': 50,
         'hidden_dimension': 8,
         'number_of_hidden_layers': 2,
@@ -85,7 +86,7 @@ _tuned_configs = {
     'scm1d': {
         'learning_rate': 0.01,
         'batch_size': 2048,
-        'n_epochs': 450,
+        'n_epochs': 500,
         'warmup_iterations': 50,
         'hidden_dimension': 6,
         'number_of_hidden_layers': 3,
@@ -94,7 +95,7 @@ _tuned_configs = {
     'scm20d': {
         'learning_rate': 0.0001,
         'batch_size': 256,
-        'n_epochs': 450,
+        'n_epochs': 500,
         'warmup_iterations': 50,
         'hidden_dimension': 10,
         'number_of_hidden_layers': 1,
@@ -111,7 +112,7 @@ def run_experiment(args):
     if args.baselines or args.all:
         methods += baselines.copy()
     if args.ours or args.all:
-        methods += section5.copy()
+        methods += section5.copy() + section5_y.copy()
     if args.cpflow or args.all:
         methods += cpflow_based.copy()
 
@@ -129,6 +130,7 @@ def run_experiment(args):
 
     # Trianed models path
     trained_model_path_cvqr = current_seed_dir / f"model_cvqr.pth"
+    trained_model_path_cvqr_y = current_seed_dir / f"model_cvqr_y.pth"
     trained_model_path_cpflow = current_seed_dir / f"model_cpflow.pth"
 
     #alpha = 0.3
@@ -167,6 +169,17 @@ def run_experiment(args):
         f"number of training samples: {ds.n_train}."
     )
 
+    # Base multidimensional quantile model
+    reg_cvqr_y = CVQRegressorY(
+        feature_dimension=ds.n_features,
+        response_dimension=ds.n_outputs,
+        **model_config
+    )
+    print(
+        f"Number of parameters: {get_total_number_of_parameters(reg_cvqr_y.model.potential_network)}, "
+        f"number of training samples: {ds.n_train}."
+    )
+
     # Base model for OT-CP: Random Forest
     rf = RandomForestWithScore(random_state=args.seed, n_jobs=-1)
 
@@ -189,6 +202,18 @@ def run_experiment(args):
             reg_cvqr.fit(ds.X_train, ds.Y_train)
             reg_cvqr.model.save(trained_model_path_cvqr)
         score_calculators["CVQRegressor"] = reg_cvqr
+
+    if "CVQRegressorY" in required_model_names:
+        # Fit base models
+        if Path.is_file(trained_model_path_cvqr_y):
+            #reg_cvqr.model.load(trained_model_path_cvqr)
+            reg_cvqr_y.model = AmortizedNeuralQuantileRegression.load_class(
+                trained_model_path_cvqr_y
+            )
+        else:
+            reg_cvqr_y.fit(ds.X_train, ds.Y_train)
+            reg_cvqr_y.model.save(trained_model_path_cvqr_y)
+        score_calculators["CVQRegressorY"] = reg_cvqr_y
 
     if "RandomForest" in required_model_names:
         rf.fit(ds.X_train, ds.Y_train)
@@ -251,21 +276,26 @@ def run_experiment(args):
                                                                       ],
                 alpha=alpha
             )
-            volume = method.instance.is_covered(
+            is_covered = method.instance.is_covered(
                 X_test=ds.X_test,
                 scores_test=scores_test[method.base_model_name][method.score_name],
                 verbose=True
             )
-            coverage = volume.mean()
-            wsc = wsc_unbiased(
-                ds.X_test,
-                volume,
-                delta=0.1,
-                M=5000,
-                random_state=args.seed,
-                n_cpus=8,
-                verbose=True
-            )
+            coverage = is_covered.mean()
+            wsc_list = []
+            for _ in range(10):
+                wsc_list.append(
+                    wsc_unbiased(
+                        ds.X_test,
+                        is_covered,
+                        delta=0.1,
+                        M=10000,
+                        random_state=args.seed,
+                        n_cpus=8,
+                        verbose=True
+                    )
+                )
+            wsc = np.mean(wsc_list)
             records_alpha.append(
                 dict(
                     dataset_name=args.dataset,
@@ -277,7 +307,8 @@ def run_experiment(args):
                     base_model_name=method.base_model_name,
                     alpha=alpha,
                     marginal_coverage=coverage,
-                    worst_slab_coverage=wsc
+                    worst_slab_coverage=wsc,
+                    worst_slab_coverage_se=scipy.stats.sem(wsc_list)
                 )
             )
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
