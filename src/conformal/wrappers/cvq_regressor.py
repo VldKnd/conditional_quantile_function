@@ -76,8 +76,6 @@ class BaseVQRegressor(ScoreCalculator):
         n = X.shape[0]
         U = torch.zeros((n, self.response_dimension), dtype=self.dtype)
         X_tensor = torch.tensor(X, dtype=self.dtype)
-        #dataset = TensorDataset(X_tensor, U)
-        #dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         self.model.eval()
         Y = self.model.push_u_given_x(x=X_tensor, u=U)
         return Y.numpy(force=True)
