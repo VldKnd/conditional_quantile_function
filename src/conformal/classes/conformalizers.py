@@ -14,9 +14,9 @@ from utils.quantile import get_quantile_level_analytically
 
 @dataclass
 class BaseRegionPredictor:
+    d_y: int = 1
     seed: int = 0
     alpha: float = 0.1
-    lower_is_better: bool = True
 
     def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
         pass
@@ -30,17 +30,17 @@ class BaseRegionPredictor:
         return np.zeros(scores_test.shape[0], dtype=bool)
 
 
+@dataclass
 class SplitConformalPredictor(BaseRegionPredictor):
+    lower_is_better: bool = True
 
     def fit(
         self,
         X_cal: np.ndarray,
         scores_cal: np.ndarray,
         alpha: float,
-        lower_is_better=True
     ):
         self.alpha = alpha
-        self.lower_is_better = lower_is_better
         n = len(scores_cal)
         if self.lower_is_better:
             level = np.min([np.ceil((n + 1) * (1 - alpha)) / n, 1])
@@ -250,9 +250,8 @@ class EllipsoidalLocal(BaseRegionPredictor):
 class QuantileEstimatePredictor(BaseRegionPredictor):
 
     def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
-        d = scores_cal.shape[-1]
         self.threshold = get_quantile_level_analytically(
-            alpha=torch.tensor([1 - alpha]), distribution="gaussian", dimension=d
+            alpha=torch.tensor([1 - alpha]), distribution="gaussian", dimension=self.d_y
         ).numpy(force=True)[0]
 
     def is_covered(

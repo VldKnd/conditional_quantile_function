@@ -19,6 +19,7 @@ from conformal.real_datasets.reproducible_split import get_dataset_split
 from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, ScoreCalculator
 from conformal.wrappers.rf_score import RandomForestWithScore
 from metrics.wsc import wsc_unbiased
+from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
 from utils.network import get_total_number_of_parameters
 from conformal.method_zoo import section5, baselines, cpflow_based
 
@@ -44,8 +45,63 @@ _tuned_configs = {
         "warmup_iterations": 10,
         "learning_rate": 0.01,
         "dtype": torch.float32,
+    },
+    "blog": {
+        "hidden_dimension": 16,
+        "number_of_hidden_layers": 4,
+        "batch_size": 512,
+        "n_epochs": 50,
+        "warmup_iterations": 10,
+        "learning_rate": 0.01,
+        "dtype": torch.float32,
+    },
+    "sgemm": {
+        "hidden_dimension": 32,
+        "number_of_hidden_layers": 4,
+        "batch_size": 8192,
+        "n_epochs": 50,
+        "warmup_iterations": 10,
+        "learning_rate": 0.01,
+        "dtype": torch.float32,
+    },
+    'rf1': {
+        'learning_rate': 0.001,
+        'batch_size': 512,
+        'n_epochs': 450,
+        'warmup_iterations': 50,
+        'hidden_dimension': 10,
+        'number_of_hidden_layers': 1,
+        "dtype": torch.float32,
+    },
+    'rf2': {
+        'learning_rate': 0.001,
+        'batch_size': 2048,
+        'n_epochs': 450,
+        'warmup_iterations': 50,
+        'hidden_dimension': 8,
+        'number_of_hidden_layers': 2,
+        "dtype": torch.float32,
+    },
+    'scm1d': {
+        'learning_rate': 0.01,
+        'batch_size': 2048,
+        'n_epochs': 450,
+        'warmup_iterations': 50,
+        'hidden_dimension': 6,
+        'number_of_hidden_layers': 3,
+        "dtype": torch.float32,
+    },
+    'scm20d': {
+        'learning_rate': 0.0001,
+        'batch_size': 256,
+        'n_epochs': 450,
+        'warmup_iterations': 50,
+        'hidden_dimension': 10,
+        'number_of_hidden_layers': 1,
+        "dtype": torch.float32,
     }
 }
+
 _scores_batch_size = 4096
 
 
@@ -98,7 +154,7 @@ def run_experiment(args):
     required_model_names = set()
     for method in methods:
         required_model_names.add(method.base_model_name)
-        method.instance = method.cls(**method.kwargs, seed=args.seed)
+        method.instance = method.cls(**method.kwargs, seed=args.seed, d_y=ds.n_outputs)
 
     # Base multidimensional quantile model
     reg_cvqr = CVQRegressor(
@@ -117,7 +173,7 @@ def run_experiment(args):
     reg_cpflow = CPFlowRegressor(
         feature_dimension=ds.n_features,
         response_dimension=ds.n_outputs,
-        **_model_config_small
+        **model_config
     )
 
     score_calculators: dict[str, ScoreCalculator] = {}
@@ -125,7 +181,10 @@ def run_experiment(args):
     if "CVQRegressor" in required_model_names:
         # Fit base models
         if Path.is_file(trained_model_path_cvqr):
-            reg_cvqr.model.load(trained_model_path_cvqr)
+            #reg_cvqr.model.load(trained_model_path_cvqr)
+            reg_cvqr.model = AmortizedNeuralQuantileRegression.load_class(
+                trained_model_path_cvqr
+            )
         else:
             reg_cvqr.fit(ds.X_train, ds.Y_train)
             reg_cvqr.model.save(trained_model_path_cvqr)
@@ -222,6 +281,8 @@ def run_experiment(args):
                 )
             )
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
+        # Print the incomplete results (without volume) for this alpha
+        print(pd.DataFrame(records_alpha))
 
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
@@ -249,7 +310,12 @@ def run_experiment(args):
         mean_volumes = volumes.mean(axis=-1)
         for j, _ in enumerate(methods):
             records_alpha[j]["volume"] = mean_volumes[j]
+
+        # Print results for this alpha
+        print(pd.DataFrame(records_alpha))
         records += records_alpha
+
+        # Save all results obtained so far
         pd.DataFrame(records).to_csv(fn_csv, index=False)
 
     df_metrics = pd.DataFrame(records)
@@ -263,6 +329,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", type=str, default="rf1")
     parser.add_argument("-s", "--seed", type=int, default=0)
+    parser.add_argument("-j", "--jobs", type=int, default=-1)
     parser.add_argument("--baselines", action='store_true')
     parser.add_argument("--ours", action='store_true')
     parser.add_argument("--cpflow", action='store_true')
