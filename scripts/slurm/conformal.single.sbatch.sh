@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=10
 #SBATCH --cpus-per-task=12
 #SBATCH --time=0-01:00:00 
-#SBATCH --mem-per-task=16G
+#SBATCH --mem-per-cpu=2G
 
 DATSETS=("bio" "blog" "sgemm")
 SEEDS=(0 1 2 3 4 5 6 7 8 9)
