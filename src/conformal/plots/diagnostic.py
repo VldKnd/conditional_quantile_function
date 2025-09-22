@@ -30,6 +30,7 @@ def draw_qq_scores_pair(
     scores_2: np.ndarray,
     title_1="Calibration",
     title_2="Test",
+    sup_title: str | None = None,
     save_path: str | None = None
 ):
     fig, ax = plt.subplots(1, 2, figsize=(16, 5))
@@ -37,6 +38,8 @@ def draw_qq_scores_pair(
     ax[0].set_title(title_1)
     draw_qq_scores(scores_2, ax[1])
     ax[1].set_title(title_2)
+    if sup_title is not None:
+        fig.suptitle(sup_title)
     if save_path is not None:
         fig.savefig(save_path, bbox_inches='tight', dpi=300)
     plt.close(fig)
@@ -48,6 +51,7 @@ def draw_density_scores_pair(
     scores_2,
     title_1="Calibration",
     title_2="Test",
+    sup_title: str | None = None,
     save_path: str | None = None
 ):
     t_min = min(scores_1.min(), scores_2.min())
@@ -66,6 +70,8 @@ def draw_density_scores_pair(
     p1 = ax[1].plot(t, stats.norm.pdf(t), 'k--', label=r"$\mathcal{N}(0, 1)$")
     ax[1].set_title(title_2)
     ax[1].set_xlim(-5, 5)
+    if sup_title is not None:
+        fig.suptitle(sup_title)
     if save_path is not None:
         fig.savefig(save_path, bbox_inches='tight', dpi=300)
     plt.close(fig)
