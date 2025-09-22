@@ -333,7 +333,9 @@ def run_experiment(args):
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
         # Print the incomplete results (without volume) for this alpha
         print(pd.DataFrame(records_alpha))
-            
+        # Save all results obtained so far (without volume)
+        pd.DataFrame(records + records_alpha).to_csv(fn_csv, index=False)
+
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
         volumes = np.zeros((len(methods), ds.n_test))
