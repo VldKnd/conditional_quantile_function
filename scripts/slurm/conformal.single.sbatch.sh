@@ -14,8 +14,8 @@ for dataset in "${DATSETS[@]}"; do
         #SRUN_OPTS[2]="--job-name=conf_${dataset}_${seed}"
         SRUN_OPTS[0]="--output=$LOG_DIR/conf_single_${dataset}_${seed}.log"
         SRUN_OPTS[1]="--error=$LOG_DIR/conf_single_${dataset}_${seed}.err"
-        SRUN_OPTS[2]="-N 1 -n 1 -c 12"
-        srun "${SRUN_OPTS[@]}" uv run python -m conformal.experiment --dataset=$dataset --seed=$seed --n_cpus=12 --all &
+        #SRUN_OPTS[2]="-N 1 -n 1 -c 12"
+        srun "${SRUN_OPTS[@]}" -N 1 -n 1 -c 12 uv run python -m conformal.experiment --dataset=$dataset --seed=$seed --n_cpus=12 --all &
     done
     wait
     echo Finished $dataset
