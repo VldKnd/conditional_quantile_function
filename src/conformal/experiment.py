@@ -53,15 +53,15 @@ def run_experiment(args):
     if args.rf or args.all:
         methods += section5_rf + section5_y_rf
 
-    df_methods_desc = pd.DataFrame([asdict(method) for method in methods])
-    print(f"Testing methods: \n {df_methods_desc}")
+    #df_methods_desc = pd.DataFrame([asdict(method) for method in methods])
+    print(f"Testing methods: \n {methods}")
     if len(methods) < 1:
         print("Nothing to do!")
         return pd.DataFrame()
 
     skip_area_computation = args.skip_area_computation
 
-    current_seed_dir = Path(RESULTS_DIR) / args.dataset / str(args.seed)
+    current_seed_dir = Path(args.path if args.path is not None else RESULTS_DIR) / args.dataset / str(args.seed)
     os.makedirs(current_seed_dir, exist_ok=True)
 
     # Metrics paths
@@ -249,6 +249,7 @@ if __name__ == "__main__":
     parser.add_argument("--rf", action='store_true')
     parser.add_argument("--all", action='store_true')
     parser.add_argument("-f", "--skip-area-computation", action='store_true', default=False)
+    parser.add_argument("-p", "--path", type=str, default=RESULTS_DIR)
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)
