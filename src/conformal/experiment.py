@@ -17,12 +17,12 @@ from tqdm.auto import tqdm
 from conformal.classes.method_desc import ConformalMethodDescription
 from conformal.plots.diagnostic import draw_density_scores_pair, draw_qq_scores_pair
 from conformal.real_datasets.reproducible_split import get_dataset_split
-from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, CVQRegressorY, ScoreCalculator
+from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, CVQRegressorRF, CVQRegressorY, ScoreCalculator
 from conformal.wrappers.rf_score import RandomForestWithScore
 from metrics.wsc import wsc_unbiased
 from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
 from utils.network import get_total_number_of_parameters
-from conformal.method_zoo import section5, section5_y, baselines, cpflow_based
+from conformal.method_zoo import section5, section5_y, baselines, cpflow_based, section5_rf
 
 RESULTS_DIR = "./conformal_results_u"
 
@@ -115,6 +115,8 @@ def run_experiment(args):
         methods += section5.copy() + section5_y.copy()
     if args.cpflow or args.all:
         methods += cpflow_based.copy()
+    if args.rf or args.all:
+        methods += section5_rf
 
     print(f"Testing methods: {methods}")
     if len(methods) < 1:
@@ -214,6 +216,22 @@ def run_experiment(args):
             reg_cvqr_y.fit(ds.X_train, ds.Y_train)
             reg_cvqr_y.model.save(trained_model_path_cvqr_y)
         score_calculators["CVQRegressorY"] = reg_cvqr_y
+
+    if "CVQRegressorRF" in required_model_names:
+        print("CVQRegressorRF training")
+        # Fit base models
+        n_rf = ds.n_train // 2
+        _rf = RandomForestWithScore(
+            random_state=args.seed, n_jobs=-1
+        ).fit(ds.X_train[:n_rf], ds.Y_train[:n_rf])
+        _cvqr = CVQRegressor(
+            feature_dimension=ds.n_features,
+            response_dimension=ds.n_outputs,
+            **model_config
+        )
+        _cvqr.fit(ds.X_train[n_rf:], ds.Y_train[n_rf:] - _rf.predict(ds.X_train[n_rf:]))
+        cvqr_rf = CVQRegressorRF(_cvqr, _rf)
+        score_calculators["CVQRegressorRF"] = cvqr_rf
 
     if "RandomForest" in required_model_names:
         rf.fit(ds.X_train, ds.Y_train)
@@ -364,6 +382,7 @@ if __name__ == "__main__":
     parser.add_argument("--baselines", action='store_true')
     parser.add_argument("--ours", action='store_true')
     parser.add_argument("--cpflow", action='store_true')
+    parser.add_argument("--rf", action='store_true')
     parser.add_argument("--all", action='store_true')
     args = parser.parse_args()
     print(f"{args=}")

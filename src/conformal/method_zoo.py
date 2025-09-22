@@ -73,6 +73,42 @@ section5_y = [
     ),
 ]
 
+section5_rf = [
+    ConformalMethodDescription(
+        name="PB (RF)",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{pb}} \: Y$",
+        base_model_name="CVQRegressorRF",
+        score_name="MK Rank",
+        class_name="SplitConformalPredictor",
+        cls=SplitConformalPredictor,
+    ),
+    ConformalMethodDescription(
+        name="RPB (RF)",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{rpb}} \: Y$",
+        base_model_name="CVQRegressorRF",
+        score_name="MK Quantile",
+        class_name="OTCPGlobalPredictor",
+        cls=OTCPGlobalPredictor
+    ),
+    ConformalMethodDescription(
+        name="HPD (RF)",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}} \: Y$",
+        base_model_name="CVQRegressorRF",
+        score_name="Log Density",
+        class_name="SplitConformalPredictor",
+        cls=SplitConformalPredictor,
+        kwargs=dict(lower_is_better=False)
+    ),
+    ConformalMethodDescription(
+        name="Quantile (RF)",
+        name_mathtext=r"$Q_{Y|X} \: Y$",
+        base_model_name="CVQRegressorRF",
+        score_name="MK Rank",
+        class_name="QuantileEstimatePredictor",
+        cls=QuantileEstimatePredictor
+    ),
+]
+
 cpflow_based = [
     ConformalMethodDescription(
         name="PB (CPFlow)",

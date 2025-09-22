@@ -3,6 +3,7 @@ import warnings
 
 import numpy as np
 from scipy.stats import multivariate_normal
+from sklearn.ensemble import RandomForestRegressor
 import torch
 from torch.func import hessian
 from torch.utils.data import TensorDataset, DataLoader
@@ -210,6 +211,20 @@ class CPFlowRegressor(BaseVQRegressor):
             ).numpy(force=True)
             self.model.eval()
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_p}
+
+
+@dataclass
+class CVQRegressorRF(ScoreCalculator):
+    cvqr: CVQRegressor
+    rf: RandomForestRegressor
+
+    def calculate_scores(
+        self,
+        X: np.ndarray,
+        Y: np.ndarray,
+        batch_size: int | None = None
+    ) -> dict[str, np.ndarray]:
+        return self.cvqr.calculate_scores(X, Y - self.rf.predict(X), batch_size=batch_size)
 
 
 if __name__ == "__main__":
