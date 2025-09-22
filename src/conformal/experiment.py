@@ -39,7 +39,7 @@ _model_config_small = {
 
 _tuned_configs = {
     "bio": {
-        "hidden_dimension": 16,
+        "hidden_dimension": 12,
         "number_of_hidden_layers": 4,
         "batch_size": 512,
         "n_epochs": 100,
@@ -70,7 +70,7 @@ _tuned_configs = {
         'batch_size': 512,
         'n_epochs': 500,
         'warmup_iterations': 50,
-        'hidden_dimension': 10,
+        'hidden_dimension': 8,
         'number_of_hidden_layers': 1,
         "dtype": torch.float32,
     },
@@ -108,6 +108,7 @@ _scores_batch_size = 4096
 
 def run_experiment(args):
     # Decide what methods to test\
+    
     methods: list[ConformalMethodDescription] = []
     if args.baselines or args.all:
         methods += baselines.copy()
@@ -122,6 +123,8 @@ def run_experiment(args):
     if len(methods) < 1:
         print("Nothing to do!")
         return pd.DataFrame()
+
+    skip_area_computation = args.skip_area_computation
 
     current_seed_dir = Path(RESULTS_DIR) / args.dataset / str(args.seed)
     os.makedirs(current_seed_dir, exist_ok=True)
@@ -218,9 +221,7 @@ def run_experiment(args):
         score_calculators["CVQRegressorY"] = reg_cvqr_y
 
     if "CVQRegressorRF" in required_model_names:
-        print("CVQRegressorRF training")
-        # Fit base models
-        n_rf = ds.n_train // 2
+        n_rf = ds.n_train // 4
         _rf = RandomForestWithScore(
             random_state=args.seed, n_jobs=-1
         ).fit(ds.X_train[:n_rf], ds.Y_train[:n_rf])
@@ -332,34 +333,36 @@ def run_experiment(args):
             print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
         # Print the incomplete results (without volume) for this alpha
         print(pd.DataFrame(records_alpha))
-
+            
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
         volumes = np.zeros((len(methods), ds.n_test))
-        print(f"{alpha=:.2f}, estimating areas:")
-        for i in tqdm(range(ds.n_test)):
-            X_samples = np.repeat(ds.X_test[i:i + 1], repeats=n_samples, axis=0)
-            Y_smaples = ymin + rng.random((n_samples, ds.n_outputs)) * (ymax - ymin)
+        if not skip_area_computation:
+            print(f"{alpha=:.2f}, estimating areas:")
+            for i in tqdm(range(ds.n_test)):
+                X_samples = np.repeat(ds.X_test[i:i + 1], repeats=n_samples, axis=0)
+                Y_smaples = ymin + rng.random((n_samples, ds.n_outputs)) * (ymax - ymin)
 
-            scores_samples = _calculate_scores(X_samples, Y_smaples)
-            for j, method in enumerate(methods):
-                if hasattr(method.instance, "get_volume"):
-                    # Can estimate volume without sampling
-                    volume = method.instance.get_volume(
-                        ds.X_test[i],
-                        scores_test[method.base_model_name][method.score_name][i]
-                    )
-                else:
-                    # Approximate volume using samples
-                    volume = method.instance.is_covered(
-                        X_samples,
-                        scores_samples[method.base_model_name][method.score_name]
-                    ).mean() * scale
-                volumes[j, i] = volume
-        mean_volumes = volumes.mean(axis=-1)
-        for j, _ in enumerate(methods):
-            records_alpha[j]["volume"] = mean_volumes[j]
-
+                scores_samples = _calculate_scores(X_samples, Y_smaples)
+                for j, method in enumerate(methods):
+                    if hasattr(method.instance, "get_volume"):
+                        # Can estimate volume without sampling
+                        volume = method.instance.get_volume(
+                            ds.X_test[i],
+                            scores_test[method.base_model_name][method.score_name][i]
+                        )
+                    else:
+                        # Approximate volume using samples
+                        volume = method.instance.is_covered(
+                            X_samples,
+                            scores_samples[method.base_model_name][method.score_name]
+                        ).mean() * scale
+                    volumes[j, i] = volume
+            mean_volumes = volumes.mean(axis=-1)
+            for j, _ in enumerate(methods):
+                records_alpha[j]["volume"] = mean_volumes[j]
+        else:
+            mean_volumes = volumes.mean(axis=-1)
         # Print results for this alpha
         print(pd.DataFrame(records_alpha))
         records += records_alpha
@@ -384,9 +387,9 @@ if __name__ == "__main__":
     parser.add_argument("--cpflow", action='store_true')
     parser.add_argument("--rf", action='store_true')
     parser.add_argument("--all", action='store_true')
+    parser.add_argument("--skip-area-computation", action='store_true', default=False)
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)
-    #print(results.head(10))
     print(results)
     print("Done!")
