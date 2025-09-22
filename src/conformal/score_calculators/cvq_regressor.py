@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Self, Type
 import warnings
 
 import numpy as np
@@ -8,6 +10,9 @@ import torch
 from torch.func import hessian
 from torch.utils.data import TensorDataset, DataLoader
 
+from conformal.real_datasets.reproducible_split import DatasetSplit
+from conformal.score_calculators.protocol import ScoreCalculator
+from conformal.score_calculators.selected_params import selected_params
 from infrastructure.classes import TrainParameters
 from pushforward_operators.convex_potential_flow.core_flow import ConvexPotentialFlow
 from pushforward_operators.protocol import PushForwardOperator
@@ -20,17 +25,6 @@ def _make_xy_dataloader(
     dataset = TensorDataset(torch.tensor(X, dtype=dtype), torch.tensor(Y, dtype=dtype))
     dataloader = DataLoader(dataset, batch_size=batch_size)
     return dataloader
-
-
-class ScoreCalculator:
-
-    def calculate_scores(
-        self,
-        X: np.ndarray,
-        Y: np.ndarray,
-        batch_size: int | None = None
-    ) -> dict[str, np.ndarray]:
-        return {"Zero": np.zeros_like(Y)}
 
 
 @dataclass
@@ -94,6 +88,30 @@ class BaseVQRegressor(ScoreCalculator):
         ).numpy(force=True)
         self.model.eval()
         return y
+
+    @classmethod
+    def _train_or_load(
+        cls,
+        pf_cls: Type[PushForwardOperator],
+        save_path: Path,
+        model_config,
+        X_train: np.ndarray,
+        Y_train: np.ndarray,
+    ) -> Self:
+        n_features = X_train.shape[1]
+        n_outputs = Y_train.shape[1]
+
+        reg_cvqr = cls(
+            feature_dimension=n_features, response_dimension=n_outputs, **model_config
+        )
+        # Fit base models
+        if Path.is_file(save_path):
+            #reg_cvqr.model.load(trained_model_path_cvqr)
+            reg_cvqr.model = pf_cls.load_class(str(save_path))
+        else:
+            reg_cvqr.fit(X_train, Y_train)
+            reg_cvqr.model.save(str(save_path))
+        return reg_cvqr
 
 
 @dataclass
@@ -164,6 +182,16 @@ class CVQRegressor(BaseVQRegressor):
 
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_density}
 
+    @classmethod
+    def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
+        return cls._train_or_load(
+            pf_cls=AmortizedNeuralQuantileRegression,
+            save_path=path / f"model_{str(cls)}.pth",
+            model_config=selected_params[args.dataset],
+            X_train=dataset_split.X_train,
+            Y_train=dataset_split.Y_train
+        )
+
 
 @dataclass
 class CVQRegressorY(CVQRegressor):
@@ -212,6 +240,16 @@ class CPFlowRegressor(BaseVQRegressor):
             self.model.eval()
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_p}
 
+    @classmethod
+    def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
+        return cls._train_or_load(
+            pf_cls=ConvexPotentialFlow,
+            save_path=path / f"model_{str(cls)}.pth",
+            model_config=selected_params[args.dataset],
+            X_train=dataset_split.X_train,
+            Y_train=dataset_split.Y_train
+        )
+
 
 @dataclass
 class CVQRegressorRF(ScoreCalculator):
@@ -224,7 +262,48 @@ class CVQRegressorRF(ScoreCalculator):
         Y: np.ndarray,
         batch_size: int | None = None
     ) -> dict[str, np.ndarray]:
-        return self.cvqr.calculate_scores(X, Y - self.rf.predict(X), batch_size=batch_size)
+        return self.cvqr.calculate_scores(
+            X, Y - self.rf.predict(X), batch_size=batch_size
+        )
+
+    @classmethod
+    def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
+        # Number of points to reserve for training the random forest base moidel
+        n = int(0.25 * dataset_split.n_train)
+        rf = RandomForestRegressor(random_state=args.seed, n_jobs=args.n_cpus)
+        rf.fit(dataset_split.X_train[:n], dataset_split.Y_train[:n])
+
+        cvqr = CVQRegressor._train_or_load(
+            pf_cls=AmortizedNeuralQuantileRegression,
+            save_path=path / f"model_CVQRegressor_RF.pth",
+            model_config=selected_params[args.dataset],
+            X_train=dataset_split.X_train[n:],
+            Y_train=dataset_split.Y_train[n:] - rf.predict(dataset_split.X_train[n:])
+        )
+
+        return cls(cvqr, rf)
+
+
+@dataclass
+class CVQRegressorYRF(CVQRegressorRF):
+    cvqr: CVQRegressorY
+
+    @classmethod
+    def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
+        # Number of points to reserve for training the random forest base moidel
+        n = int(0.25 * dataset_split.n_train)
+        rf = RandomForestRegressor(random_state=args.seed, n_jobs=args.n_cpus)
+        rf.fit(dataset_split.X_train[:n], dataset_split.Y_train[:n])
+
+        cvqr = CVQRegressorY._train_or_load(
+            pf_cls=AmortizedNeuralQuantileRegression,
+            save_path=path / f"model_CVQRegressorY_RF.pth",
+            model_config=selected_params[args.dataset],
+            X_train=dataset_split.X_train[n:],
+            Y_train=dataset_split.Y_train[n:] - rf.predict(dataset_split.X_train[n:])
+        )
+
+        return cls(cvqr, rf)
 
 
 if __name__ == "__main__":

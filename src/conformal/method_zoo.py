@@ -76,7 +76,7 @@ section5_y = [
 section5_rf = [
     ConformalMethodDescription(
         name="PB (RF)",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{pb}} \: Y$",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{pb}} \: RF$",
         base_model_name="CVQRegressorRF",
         score_name="MK Rank",
         class_name="SplitConformalPredictor",
@@ -84,7 +84,7 @@ section5_rf = [
     ),
     ConformalMethodDescription(
         name="RPB (RF)",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{rpb}} \: Y$",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{rpb}} \: RF$",
         base_model_name="CVQRegressorRF",
         score_name="MK Quantile",
         class_name="OTCPGlobalPredictor",
@@ -92,7 +92,7 @@ section5_rf = [
     ),
     ConformalMethodDescription(
         name="HPD (RF)",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}} \: Y$",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}} \: RF$",
         base_model_name="CVQRegressorRF",
         score_name="Log Density",
         class_name="SplitConformalPredictor",
@@ -101,8 +101,44 @@ section5_rf = [
     ),
     ConformalMethodDescription(
         name="Quantile (RF)",
-        name_mathtext=r"$Q_{Y|X} \: Y$",
+        name_mathtext=r"$Q_{Y|X} \: RF$",
         base_model_name="CVQRegressorRF",
+        score_name="MK Rank",
+        class_name="QuantileEstimatePredictor",
+        cls=QuantileEstimatePredictor
+    ),
+]
+
+section5_y_rf = [
+    ConformalMethodDescription(
+        name="PB (Y, RF)",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{pb}} \: Y \: RF$",
+        base_model_name="CVQRegressorYRF",
+        score_name="MK Rank",
+        class_name="SplitConformalPredictor",
+        cls=SplitConformalPredictor,
+    ),
+    ConformalMethodDescription(
+        name="RPB (Y, RF)",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{rpb}} \: Y \: RF$",
+        base_model_name="CVQRegressorYRF",
+        score_name="MK Quantile",
+        class_name="OTCPGlobalPredictor",
+        cls=OTCPGlobalPredictor
+    ),
+    ConformalMethodDescription(
+        name="HPD (Y, RF)",
+        name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}} \: Y \: RF$",
+        base_model_name="CVQRegressorYRF",
+        score_name="Log Density",
+        class_name="SplitConformalPredictor",
+        cls=SplitConformalPredictor,
+        kwargs=dict(lower_is_better=False)
+    ),
+    ConformalMethodDescription(
+        name="Quantile (Y, RF)",
+        name_mathtext=r"$Q_{Y|X} \: Y \: RF$",
+        base_model_name="CVQRegressorYRF",
         score_name="MK Rank",
         class_name="QuantileEstimatePredictor",
         cls=QuantileEstimatePredictor

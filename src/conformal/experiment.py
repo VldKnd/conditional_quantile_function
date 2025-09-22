@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import warnings
 import copy
 import os
@@ -17,12 +18,11 @@ from tqdm.auto import tqdm
 from conformal.classes.method_desc import ConformalMethodDescription
 from conformal.plots.diagnostic import draw_density_scores_pair, draw_qq_scores_pair
 from conformal.real_datasets.reproducible_split import get_dataset_split
-from conformal.wrappers.cvq_regressor import CVQRegressor, CPFlowRegressor, CVQRegressorRF, CVQRegressorY, ScoreCalculator
-from conformal.wrappers.rf_score import RandomForestWithScore
+import conformal.score_calculators as all_score_calculators
 from metrics.wsc import wsc_unbiased
 from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
 from utils.network import get_total_number_of_parameters
-from conformal.method_zoo import section5, section5_y, baselines, cpflow_based, section5_rf
+from conformal.method_zoo import section5, section5_y, baselines, cpflow_based, section5_rf, section5_y_rf
 
 RESULTS_DIR = "./conformal_results_u"
 
@@ -35,72 +35,6 @@ _model_config_small = {
     "warmup_iterations": 50,
     "learning_rate": 0.01,
     "dtype": torch.float32,
-}
-
-_tuned_configs = {
-    "bio": {
-        "hidden_dimension": 12,
-        "number_of_hidden_layers": 4,
-        "batch_size": 512,
-        "n_epochs": 100,
-        "warmup_iterations": 10,
-        "learning_rate": 0.01,
-        "dtype": torch.float32,
-    },
-    "blog": {
-        "hidden_dimension": 16,
-        "number_of_hidden_layers": 4,
-        "batch_size": 512,
-        "n_epochs": 50,
-        "warmup_iterations": 10,
-        "learning_rate": 0.01,
-        "dtype": torch.float32,
-    },
-    "sgemm": {
-        "hidden_dimension": 46,
-        "number_of_hidden_layers": 4,
-        "batch_size": 8192,
-        "n_epochs": 150,
-        "warmup_iterations": 10,
-        "learning_rate": 0.01,
-        "dtype": torch.float32,
-    },
-    'rf1': {
-        'learning_rate': 0.001,
-        'batch_size': 512,
-        'n_epochs': 500,
-        'warmup_iterations': 50,
-        'hidden_dimension': 8,
-        'number_of_hidden_layers': 1,
-        "dtype": torch.float32,
-    },
-    'rf2': {
-        'learning_rate': 0.001,
-        'batch_size': 2048,
-        'n_epochs': 500,
-        'warmup_iterations': 50,
-        'hidden_dimension': 8,
-        'number_of_hidden_layers': 2,
-        "dtype": torch.float32,
-    },
-    'scm1d': {
-        'learning_rate': 0.01,
-        'batch_size': 2048,
-        'n_epochs': 500,
-        'warmup_iterations': 50,
-        'hidden_dimension': 6,
-        'number_of_hidden_layers': 3,
-        "dtype": torch.float32,
-    },
-    'scm20d': {
-        'learning_rate': 0.0001,
-        'batch_size': 256,
-        'n_epochs': 500,
-        'warmup_iterations': 50,
-        'hidden_dimension': 10,
-        'number_of_hidden_layers': 1,
-        "dtype": torch.float32,
-    }
 }
 
 _scores_batch_size = 4096
@@ -117,9 +51,10 @@ def run_experiment(args):
     if args.cpflow or args.all:
         methods += cpflow_based.copy()
     if args.rf or args.all:
-        methods += section5_rf
+        methods += section5_rf + section5_y_rf
 
-    print(f"Testing methods: {methods}")
+    df_methods_desc = pd.DataFrame([asdict(method) for method in methods])
+    print(f"Testing methods: \n {df_methods_desc}")
     if len(methods) < 1:
         print("Nothing to do!")
         return pd.DataFrame()
@@ -152,8 +87,8 @@ def run_experiment(args):
     if ds.n_train > 55_000:
         _model_config_small["batch_size"] = 8192
 
-    if args.dataset in _tuned_configs:
-        model_config = _tuned_configs[args.dataset]
+    #if args.dataset in _tuned_configs:
+    #    model_config = _tuned_configs[args.dataset]
 
     #_model_config_small["n_epochs"] = 1
 
@@ -163,88 +98,12 @@ def run_experiment(args):
         required_model_names.add(method.base_model_name)
         method.instance = method.cls(**method.kwargs, seed=args.seed, d_y=ds.n_outputs)
 
-    # Base multidimensional quantile model
-    reg_cvqr = CVQRegressor(
-        feature_dimension=ds.n_features,
-        response_dimension=ds.n_outputs,
-        **model_config
-    )
-    print(
-        f"Number of parameters: {get_total_number_of_parameters(reg_cvqr.model.potential_network)}, "
-        f"number of training samples: {ds.n_train}."
-    )
-
-    # Base multidimensional quantile model
-    reg_cvqr_y = CVQRegressorY(
-        feature_dimension=ds.n_features,
-        response_dimension=ds.n_outputs,
-        **model_config
-    )
-    print(
-        f"Number of parameters: {get_total_number_of_parameters(reg_cvqr_y.model.potential_network)}, "
-        f"number of training samples: {ds.n_train}."
-    )
-
-    # Base model for OT-CP: Random Forest
-    rf = RandomForestWithScore(random_state=args.seed, n_jobs=-1)
-
-    reg_cpflow = CPFlowRegressor(
-        feature_dimension=ds.n_features,
-        response_dimension=ds.n_outputs,
-        **model_config
-    )
-
-    score_calculators: dict[str, ScoreCalculator] = {}
-
-    if "CVQRegressor" in required_model_names:
-        # Fit base models
-        if Path.is_file(trained_model_path_cvqr):
-            #reg_cvqr.model.load(trained_model_path_cvqr)
-            reg_cvqr.model = AmortizedNeuralQuantileRegression.load_class(
-                trained_model_path_cvqr
-            )
-        else:
-            reg_cvqr.fit(ds.X_train, ds.Y_train)
-            reg_cvqr.model.save(trained_model_path_cvqr)
-        score_calculators["CVQRegressor"] = reg_cvqr
-
-    if "CVQRegressorY" in required_model_names:
-        # Fit base models
-        if Path.is_file(trained_model_path_cvqr_y):
-            #reg_cvqr.model.load(trained_model_path_cvqr)
-            reg_cvqr_y.model = AmortizedNeuralQuantileRegression.load_class(
-                trained_model_path_cvqr_y
-            )
-        else:
-            reg_cvqr_y.fit(ds.X_train, ds.Y_train)
-            reg_cvqr_y.model.save(trained_model_path_cvqr_y)
-        score_calculators["CVQRegressorY"] = reg_cvqr_y
-
-    if "CVQRegressorRF" in required_model_names:
-        n_rf = ds.n_train // 4
-        _rf = RandomForestWithScore(
-            random_state=args.seed, n_jobs=-1
-        ).fit(ds.X_train[:n_rf], ds.Y_train[:n_rf])
-        _cvqr = CVQRegressor(
-            feature_dimension=ds.n_features,
-            response_dimension=ds.n_outputs,
-            **model_config
+    score_calculators = {
+        base_model_name: getattr(all_score_calculators, base_model_name).create_or_load(
+            path=current_seed_dir, args=args, dataset_split=ds
         )
-        _cvqr.fit(ds.X_train[n_rf:], ds.Y_train[n_rf:] - _rf.predict(ds.X_train[n_rf:]))
-        cvqr_rf = CVQRegressorRF(_cvqr, _rf)
-        score_calculators["CVQRegressorRF"] = cvqr_rf
-
-    if "RandomForest" in required_model_names:
-        rf.fit(ds.X_train, ds.Y_train)
-        score_calculators["RandomForest"] = rf
-
-    if "CPFlowRegressor" in required_model_names:
-        if Path.is_file(trained_model_path_cpflow):
-            reg_cpflow.model.load(trained_model_path_cpflow)
-        else:
-            reg_cpflow.fit(ds.X_train, ds.Y_train)
-            reg_cpflow.model.save(trained_model_path_cpflow)
-        score_calculators["CPFlowRegressor"] = reg_cpflow
+        for base_model_name in required_model_names
+    }
 
     def _calculate_scores(X, Y):
         return {
@@ -276,7 +135,6 @@ def run_experiment(args):
 
     # Compute metrics
     records = []
-    records_volumes = []
 
     rng = np.random.default_rng(args.seed)
     ymin = ds.Y_train.min(axis=0)
@@ -310,7 +168,7 @@ def run_experiment(args):
                         delta=0.1,
                         M=10000,
                         random_state=args.seed + k,
-                        n_cpus=8,
+                        n_cpus=args.n_cpus,
                         verbose=True
                     )
                 )
@@ -384,12 +242,13 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dataset", type=str, default="rf1")
     parser.add_argument("-s", "--seed", type=int, default=0)
     parser.add_argument("-j", "--jobs", type=int, default=-1)
+    parser.add_argument("-c", "--n_cpus", type=int, default=8)
     parser.add_argument("--baselines", action='store_true')
     parser.add_argument("--ours", action='store_true')
     parser.add_argument("--cpflow", action='store_true')
     parser.add_argument("--rf", action='store_true')
     parser.add_argument("--all", action='store_true')
-    parser.add_argument("--skip-area-computation", action='store_true', default=False)
+    parser.add_argument("-f", "--skip-area-computation", action='store_true', default=False)
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)

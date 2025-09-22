@@ -74,7 +74,7 @@ class DatasetSplit:
 
 def get_dataset_split(
     name: str, seed: int, n_train=None, n_cal=2000, n_test=2000, reduce=True
-):
+) -> DatasetSplit:
     load_func = loaders.get(name, None)
     if load_func is not None:
         X, Y = load_func()

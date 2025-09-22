@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 
 from conformal.real_datasets.reproducible_split import get_dataset_split
-from conformal.wrappers.cvq_regressor import CVQRegressor
+from conformal.score_calculators.cvq_regressor import CVQRegressor
 from utils.network import get_total_number_of_parameters
 from utils.quantile import get_quantile_level_analytically
 
