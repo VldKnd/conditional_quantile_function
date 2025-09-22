@@ -185,7 +185,7 @@ baselines = [
     ConformalMethodDescription(
         name="OT-CP-Global",
         name_mathtext=r"$\mathrm{OT}$-$\mathrm{CP}$",
-        base_model_name="RandomForest",
+        base_model_name="RandomForestWithScore",
         score_name="Signed Error",
         class_name="OTCPGlobalPredictor",
         cls=OTCPGlobalPredictor
@@ -193,7 +193,7 @@ baselines = [
     ConformalMethodDescription(
         name="OT-CP-Local",
         name_mathtext=r"$\mathrm{OT}$-$\mathrm{CP}$+",
-        base_model_name="RandomForest",
+        base_model_name="RandomForestWithScore",
         score_name="Signed Error",
         class_name="OTCPLocalPredictor",
         cls=OTCPLocalPredictor
@@ -201,7 +201,7 @@ baselines = [
     ConformalMethodDescription(
         name="Ell-Local",
         name_mathtext=r"$\mathrm{ELL}$-$\mathrm{local}$+",
-        base_model_name="RandomForest",
+        base_model_name="RandomForestWithScore",
         score_name="Signed Error",
         class_name="EllipsoidalLocal",
         cls=EllipsoidalLocal
