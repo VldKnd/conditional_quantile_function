@@ -26,23 +26,12 @@ from conformal.method_zoo import section5, section5_y, baselines, cpflow_based, 
 
 RESULTS_DIR = "./conformal_results_u"
 
-# CVQR configuration for ~ 1000 parameters
-_model_config_small = {
-    "hidden_dimension": 8,
-    "number_of_hidden_layers": 2,
-    "batch_size": 256,
-    "n_epochs": 50,
-    "warmup_iterations": 50,
-    "learning_rate": 0.01,
-    "dtype": torch.float32,
-}
-
+# Batch size for Hessians in score calculation
 _scores_batch_size = 4096
 
 
 def run_experiment(args):
-    # Decide what methods to test\
-    
+    # Decide what methods to test
     methods: list[ConformalMethodDescription] = []
     if args.baselines or args.all:
         methods += baselines.copy()
@@ -61,31 +50,20 @@ def run_experiment(args):
 
     skip_area_computation = args.skip_area_computation
 
-    current_seed_dir = Path(args.path if args.path is not None else RESULTS_DIR) / args.dataset / str(args.seed)
+    current_seed_dir = Path(args.path if args.path is not None else RESULTS_DIR
+                            ) / args.dataset / str(args.seed)
     os.makedirs(current_seed_dir, exist_ok=True)
 
     # Metrics paths
     fn_feather = current_seed_dir / f"metrics_all.feather"
     fn_csv = current_seed_dir / f"metrics_all.csv"
 
-    #alpha = 0.3
-    #alphas = [0.1, 0.2, 0.3, 0.4, 0.5]
     alphas = [0.1, 0.2, 0.3]
+
     # Number of samples for volume estimation
     n_samples = 10_000
 
     ds = get_dataset_split(name=args.dataset, seed=args.seed)
-    model_config = copy.deepcopy(_model_config_small)
-
-    if ds.n_train > 10_000:
-        _model_config_small["batch_size"] = 1024
-    if ds.n_train > 55_000:
-        _model_config_small["batch_size"] = 8192
-
-    #if args.dataset in _tuned_configs:
-    #    model_config = _tuned_configs[args.dataset]
-
-    #_model_config_small["n_epochs"] = 1
 
     # Instantiate conformal methods
     required_model_names = set()
@@ -94,9 +72,9 @@ def run_experiment(args):
         method.instance = method.cls(**method.kwargs, seed=args.seed, d_y=ds.n_outputs)
 
     score_calculators = {
-        base_model_name: getattr(all_score_calculators, base_model_name).create_or_load(
-            path=current_seed_dir, args=args, dataset_split=ds
-        )
+        base_model_name:
+        getattr(all_score_calculators, base_model_name
+                ).create_or_load(path=current_seed_dir, args=args, dataset_split=ds)
         for base_model_name in required_model_names
     }
 
@@ -111,7 +89,11 @@ def run_experiment(args):
 
     # Calculate scores for all base models
     scores_calibration = _calculate_scores(ds.X_cal, ds.Y_cal)
-    scores_test = _calculate_scores(ds.X_test, ds.Y_test)
+    if args.area_only:
+        #
+        scores_test = scores_calibration
+    else:
+        scores_test = _calculate_scores(ds.X_test, ds.Y_test)
 
     # Diagnostic plotting
     for model_name in scores_calibration.keys():
@@ -120,11 +102,15 @@ def run_experiment(args):
             draw_qq_scores_pair(
                 scores_calibration[model_name]["MK Quantile"],
                 scores_test[model_name]["MK Quantile"],
+                title_2="Calibration",
+                sup_title=f"{model_name}, {args.dataset}, {args.seed}",
                 save_path=current_seed_dir / f"{model_name}_QQ.png"
             )
             draw_density_scores_pair(
                 scores_calibration[model_name]["MK Quantile"],
                 scores_test[model_name]["MK Quantile"],
+                title_2="Calibration",
+                sup_title=f"{model_name}, {args.dataset}, {args.seed}",
                 save_path=current_seed_dir / f"{model_name}_U_kde.png"
             )
 
@@ -142,48 +128,50 @@ def run_experiment(args):
         records_alpha = []
         for method in methods:
             print(f"{alpha=:.2f}, {method.name=}")
+            record = dict(
+                dataset_name=args.dataset,
+                seed=args.seed,
+                method_name=method.name,
+                method_name_mathtext=method.name_mathtext,
+                score_name=method.score_name,
+                conformalizer=method.class_name,
+                base_model_name=method.base_model_name,
+                alpha=alpha,
+            )
             method.instance.fit(
                 X_cal=ds.X_cal,
                 scores_cal=scores_calibration[method.base_model_name][method.score_name
                                                                       ],
                 alpha=alpha
             )
-            is_covered = method.instance.is_covered(
-                X_test=ds.X_test,
-                scores_test=scores_test[method.base_model_name][method.score_name],
-                verbose=True
-            )
-            coverage = is_covered.mean()
-            wsc_list = []
-            for k in range(10):
-                wsc_list.append(
-                    wsc_unbiased(
-                        ds.X_test,
-                        is_covered,
-                        delta=0.1,
-                        M=10000,
-                        random_state=args.seed + k,
-                        n_cpus=args.n_cpus,
-                        verbose=True
+            if not args.area_only:
+                is_covered = method.instance.is_covered(
+                    X_test=ds.X_test,
+                    scores_test=scores_test[method.base_model_name][method.score_name],
+                    verbose=True
+                )
+                coverage = is_covered.mean()
+                wsc_list = []
+                for k in range(10):
+                    wsc_list.append(
+                        wsc_unbiased(
+                            ds.X_test,
+                            is_covered,
+                            delta=0.1,
+                            M=10000,
+                            random_state=args.seed + k,
+                            n_cpus=args.n_cpus,
+                            verbose=True
+                        )
                     )
+                wsc = np.mean(wsc_list)
+                record.update(
+                        marginal_coverage=coverage,
+                        worst_slab_coverage=wsc,
+                        worst_slab_coverage_se=scipy.stats.sem(wsc_list)
                 )
-            wsc = np.mean(wsc_list)
-            records_alpha.append(
-                dict(
-                    dataset_name=args.dataset,
-                    seed=args.seed,
-                    method_name=method.name,
-                    method_name_mathtext=method.name_mathtext,
-                    score_name=method.score_name,
-                    conformalizer=method.class_name,
-                    base_model_name=method.base_model_name,
-                    alpha=alpha,
-                    marginal_coverage=coverage,
-                    worst_slab_coverage=wsc,
-                    worst_slab_coverage_se=scipy.stats.sem(wsc_list)
-                )
-            )
-            print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
+                print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
+            records_alpha.append(record)
         # Print the incomplete results (without volume) for this alpha
         print(pd.DataFrame(records_alpha))
         # Save all results obtained so far (without volume)
@@ -243,8 +231,11 @@ if __name__ == "__main__":
     parser.add_argument("--cpflow", action='store_true')
     parser.add_argument("--rf", action='store_true')
     parser.add_argument("--all", action='store_true')
-    parser.add_argument("-f", "--skip-area-computation", action='store_true', default=False)
+    parser.add_argument(
+        "-f", "--skip-area-computation", action='store_true', default=False
+    )
     parser.add_argument("-p", "--path", type=str, default=RESULTS_DIR)
+    parser.add_argument("--area-only", action='store_true', default=False)
     args = parser.parse_args()
     print(f"{args=}")
     results = run_experiment(args)
