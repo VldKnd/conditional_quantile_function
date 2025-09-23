@@ -186,7 +186,7 @@ class CVQRegressor(BaseVQRegressor):
     def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
         return cls._train_or_load(
             pf_cls=AmortizedNeuralQuantileRegression,
-            save_path=path / f"model_{str(cls)}.pth",
+            save_path=path / f"model_{str(cls.__name__)}.pth",
             model_config=selected_params[args.dataset],
             X_train=dataset_split.X_train,
             Y_train=dataset_split.Y_train
@@ -244,7 +244,7 @@ class CPFlowRegressor(BaseVQRegressor):
     def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
         return cls._train_or_load(
             pf_cls=ConvexPotentialFlow,
-            save_path=path / f"model_{str(cls)}.pth",
+            save_path=path / f"model_{str(cls.__name__)}.pth",
             model_config=selected_params[args.dataset],
             X_train=dataset_split.X_train,
             Y_train=dataset_split.Y_train
@@ -275,7 +275,7 @@ class CVQRegressorRF(ScoreCalculator):
 
         cvqr = CVQRegressor._train_or_load(
             pf_cls=AmortizedNeuralQuantileRegression,
-            save_path=path / f"model_CVQRegressor_RF.pth",
+            save_path=path / f"model_{cls.__name__}.pth",
             model_config=selected_params[args.dataset],
             X_train=dataset_split.X_train[n:],
             Y_train=dataset_split.Y_train[n:] - rf.predict(dataset_split.X_train[n:])
@@ -297,7 +297,7 @@ class CVQRegressorYRF(CVQRegressorRF):
 
         cvqr = CVQRegressorY._train_or_load(
             pf_cls=AmortizedNeuralQuantileRegression,
-            save_path=path / f"model_CVQRegressorY_RF.pth",
+            save_path=path / f"model_{cls.__name__}.pth",
             model_config=selected_params[args.dataset],
             X_train=dataset_split.X_train[n:],
             Y_train=dataset_split.Y_train[n:] - rf.predict(dataset_split.X_train[n:])
