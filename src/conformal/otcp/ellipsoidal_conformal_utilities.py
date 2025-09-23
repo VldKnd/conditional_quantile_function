@@ -106,7 +106,7 @@ def ellipse_local_alpha_s(
     :param cov_train: Covariance matrix estimated from proper training instances
     :return: kNN model, Local $\alpha_s$ value
     """
-    knn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=-1)
+    knn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=8)
     knn.fit(x_train)
 
     local_neighbors_cal = knn.kneighbors(x_cal, return_distance=False)
