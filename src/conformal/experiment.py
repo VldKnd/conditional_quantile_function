@@ -51,7 +51,7 @@ def run_experiment(args):
     if args.cpflow or args.all:
         methods += cpflow_based.copy()
     if args.rf or args.all:
-        methods += section5_rf + section5_y_rf
+        methods += section5_rf.copy() + section5_y_rf.copy()
 
     #df_methods_desc = pd.DataFrame([asdict(method) for method in methods])
     print(f"Testing methods: \n {methods}")
@@ -67,11 +67,6 @@ def run_experiment(args):
     # Metrics paths
     fn_feather = current_seed_dir / f"metrics_all.feather"
     fn_csv = current_seed_dir / f"metrics_all.csv"
-
-    # Trianed models path
-    trained_model_path_cvqr = current_seed_dir / f"model_cvqr.pth"
-    trained_model_path_cvqr_y = current_seed_dir / f"model_cvqr_y.pth"
-    trained_model_path_cpflow = current_seed_dir / f"model_cpflow.pth"
 
     #alpha = 0.3
     #alphas = [0.1, 0.2, 0.3, 0.4, 0.5]
