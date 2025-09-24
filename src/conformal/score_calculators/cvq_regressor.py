@@ -45,6 +45,7 @@ class BaseVQRegressor(ScoreCalculator):
     model: PushForwardOperator = field(init=False)
 
     def __post_init__(self):
+        print(f"{self.potential_to_estimate_with_neural_network=}")
         _optimizer_parameters = dict(
             lr=self.learning_rate, betas=self.betas, weight_decay=self.weight_decay
         )
@@ -98,6 +99,7 @@ class BaseVQRegressor(ScoreCalculator):
         X_train: np.ndarray,
         Y_train: np.ndarray,
     ) -> Self:
+        print(f"{save_path=}")
         n_features = X_train.shape[1]
         n_outputs = Y_train.shape[1]
 
@@ -184,9 +186,13 @@ class CVQRegressor(BaseVQRegressor):
 
     @classmethod
     def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
+        ckpt_path = path / f"model_{str(cls.__name__)}.pth"
+        #ckpt_path_old = path / f"model_cvqr.pth"
+        if not ckpt_path.is_file():
+            ckpt_path = path / f"model_cvqr.pth"
         return cls._train_or_load(
             pf_cls=AmortizedNeuralQuantileRegression,
-            save_path=path / f"model_{str(cls.__name__)}.pth",
+            save_path=ckpt_path,
             model_config=selected_params[args.dataset],
             X_train=dataset_split.X_train,
             Y_train=dataset_split.Y_train
