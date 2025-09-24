@@ -84,31 +84,6 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
 
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
-    def get_log_volume_jacobian(self, condition: torch.Tensor, radius: float, n_samples: int = 2000) -> float:
-        """
-        Estimate log(volume) via Monte Carlo of the Jacobian determinant:
-        volume = vol_unit_ball * radius^d * mean_{u ~ Unif(ball(0,1))} |det Df(radius * u)|
-        Requires: ability to compute |det Df(u)| for given u and condition x.
-        """
-        condition_squeezed = condition.squeeze()
-        device = condition_squeezed.device
-        dtype = condition_squeezed.dtype
-        d = self.response_dimension
-
-        u_unit = sample_uniform_ball_interior((n_samples, d)).to(device=device, dtype=dtype)  # implement or provide
-        u_samples = radius * u_unit  # scale to radius
-
-        cond_rep = condition_squeezed.unsqueeze(0).repeat(n_samples, 1).to(device=device, dtype=dtype)
-
-        # compute absolute determinant of Jacobian for each sample: shape (n_samples,)
-        # You need a method; I name it self.abs_det_jacobian_u_to_y(u, x)
-        abs_dets = self.abs_det_jacobian_u_to_y(u=u_samples, x=cond_rep)  # (n_samples,)
-        mean_abs_det = abs_dets.mean().clamp_min(1e-30)
-
-        log_vol_unit_ball = 0.5 * d * math.log(math.pi) - math.lgamma(0.5 * d + 1)
-        log_volume = log_vol_unit_ball + d * math.log(radius) + torch.log(mean_abs_det).item()
-        return float(log_volume)
-        
     def get_log_volume(
             self,
             condition: torch.Tensor,
