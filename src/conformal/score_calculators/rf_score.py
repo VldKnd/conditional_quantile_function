@@ -14,7 +14,7 @@ class RandomForestWithScore(RandomForestRegressor, ScoreCalculator):
                          Y: ndarray,
                          batch_size: int | None = None) -> dict[str, ndarray]:
         return {"Signed Error": Y - self.predict(X)}
-    
+
     @classmethod
     def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
         rf = cls(random_state=args.seed, n_jobs=args.n_cpus)

@@ -1,5 +1,6 @@
 import torch
 
+
 def sample_distribution(shape: tuple, distribution_name: str):
     if distribution_name == "uniform_centered":
         return sample_uniform_centered(shape)
@@ -24,26 +25,32 @@ def sample_distribution(shape: tuple, distribution_name: str):
             ", exponential-centered"
         )
 
+
 def sample_uniform_ball_surface(shape: tuple):
     point = torch.randn(*shape)
     point_normalized = point / point.norm(dim=-1, keepdim=True)
     return point_normalized
+
 
 def sample_uniform_ball_surface_like(tensor: torch.Tensor):
     point = torch.randn_like(tensor)
     point_normalized = point / point.norm(dim=-1, keepdim=True)
     return point_normalized
 
+
 def sample_exponential(shape: tuple):
     return -torch.log(1 - torch.rand(shape))
 
+
 def sample_uniform_centered(shape: tuple):
     return torch.rand(shape) * 2 - 1
+
 
 def sample_uniform_ball(shape: tuple):
     point = torch.randn(*shape[:-1], shape[-1] + 2)
     point_normalized = point / point.norm(dim=-1, keepdim=True)
     return point_normalized
+
 
 def sample_distribution_like(tensor: torch.Tensor, distribution_name: str):
     if distribution_name == "uniform_centered":
@@ -69,11 +76,14 @@ def sample_distribution_like(tensor: torch.Tensor, distribution_name: str):
             ", exponential-centered"
         )
 
+
 def exponential_like(tensor: torch.Tensor):
     return -torch.log(1 - torch.rand_like(tensor))
 
+
 def uniform_centered_like(tensor: torch.Tensor):
     return torch.rand_like(tensor) * 2 - 1
+
 
 def uniform_ball_like(tensor: torch.Tensor):
     point = torch.randn(*tensor.shape[:-1], tensor.shape[-1] + 2)

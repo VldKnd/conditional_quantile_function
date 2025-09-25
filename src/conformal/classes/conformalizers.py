@@ -251,7 +251,9 @@ class QuantileEstimatePredictor(BaseRegionPredictor):
 
     def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
         self.threshold = get_quantile_level_analytically(
-            alpha=torch.tensor([1 - alpha]), distribution="gaussian", dimension=self.d_y
+            alpha=torch.tensor([1 - alpha]),
+            distribution="gaussian",
+            dimension=self.d_y
         ).numpy(force=True)[0]
 
     def is_covered(

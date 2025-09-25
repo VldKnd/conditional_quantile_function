@@ -85,36 +85,55 @@ class AmortizedNeuralQuantileRegression(PushForwardOperator, nn.Module):
         self.Y_scaler = nn.BatchNorm1d(response_dimension, affine=False)
 
     def get_log_volume(
-            self,
-            condition: torch.Tensor,
-            radius: float,
-            number_of_points_to_estimate_bounding_box: int = 1000,
-            number_of_points_to_estimate_volume: int = 1000,
-        ) -> float:
+        self,
+        condition: torch.Tensor,
+        radius: float,
+        number_of_points_to_estimate_bounding_box: int = 1000,
+        number_of_points_to_estimate_volume: int = 1000,
+    ) -> float:
         """
         Computes volume of a region created by pushing sphere of radius `radius` from U space to Y by applying push_u_given_x.
         """
         condition_squeezed = condition.squeeze()
         if len(condition_squeezed.shape) > 1:
-            raise RuntimeError("Condition should have only one value in form [..., dimension_of_x]")
-        
-        condition_expanded_for_ball_in_u = condition_squeezed.unsqueeze(0).repeat(number_of_points_to_estimate_bounding_box, 1)
+            raise RuntimeError(
+                "Condition should have only one value in form [..., dimension_of_x]"
+            )
+
+        condition_expanded_for_ball_in_u = condition_squeezed.unsqueeze(0).repeat(
+            number_of_points_to_estimate_bounding_box, 1
+        )
         u_dimension = self.response_dimension
         ball_in_u_shape = (number_of_points_to_estimate_bounding_box, u_dimension)
         ball_in_u = radius * sample_uniform_ball_surface(ball_in_u_shape)
         ball_in_u = ball_in_u.to(condition)
 
-        transformed_ball_surface_in_y = self.push_u_given_x(u=ball_in_u, x=condition_expanded_for_ball_in_u)
+        transformed_ball_surface_in_y = self.push_u_given_x(
+            u=ball_in_u, x=condition_expanded_for_ball_in_u
+        )
         bounding_box_in_y_max, _ = transformed_ball_surface_in_y.max(dim=0)
         bounding_box_in_y_min, _ = transformed_ball_surface_in_y.min(dim=0)
 
-        samples_from_bounding_box_interiour_in_y = torch.rand(number_of_points_to_estimate_volume, u_dimension)
-        samples_from_bounding_box_interiour_in_y = samples_from_bounding_box_interiour_in_y.to(condition) * (bounding_box_in_y_max - bounding_box_in_y_min) + bounding_box_in_y_min
-        condition_expanded_for_bounding_box_in_y = condition_squeezed.unsqueeze(0).repeat(number_of_points_to_estimate_volume, 1)
-        bounding_box_inferiour_in_u = self.push_y_given_x(y=samples_from_bounding_box_interiour_in_y, x=condition_expanded_for_bounding_box_in_y)
-        
-        log_percentage_of_points_in_the_ball_in_u = bounding_box_inferiour_in_u.norm(dim=-1).less_equal(radius).float().mean().add(1e-15).log()
-        log_volume_of_bounding_box_in_y = (bounding_box_in_y_max - bounding_box_in_y_min).log().sum()
+        samples_from_bounding_box_interiour_in_y = torch.rand(
+            number_of_points_to_estimate_volume, u_dimension
+        )
+        samples_from_bounding_box_interiour_in_y = samples_from_bounding_box_interiour_in_y.to(
+            condition
+        ) * (bounding_box_in_y_max - bounding_box_in_y_min) + bounding_box_in_y_min
+        condition_expanded_for_bounding_box_in_y = condition_squeezed.unsqueeze(
+            0
+        ).repeat(number_of_points_to_estimate_volume, 1)
+        bounding_box_inferiour_in_u = self.push_y_given_x(
+            y=samples_from_bounding_box_interiour_in_y,
+            x=condition_expanded_for_bounding_box_in_y
+        )
+
+        log_percentage_of_points_in_the_ball_in_u = bounding_box_inferiour_in_u.norm(
+            dim=-1
+        ).less_equal(radius).float().mean().add(1e-15).log()
+        log_volume_of_bounding_box_in_y = (
+            bounding_box_in_y_max - bounding_box_in_y_min
+        ).log().sum()
 
         return log_volume_of_bounding_box_in_y + log_percentage_of_points_in_the_ball_in_u
 

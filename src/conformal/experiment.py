@@ -166,9 +166,9 @@ def run_experiment(args):
                     )
                 wsc = np.mean(wsc_list)
                 record.update(
-                        marginal_coverage=coverage,
-                        worst_slab_coverage=wsc,
-                        worst_slab_coverage_se=scipy.stats.sem(wsc_list)
+                    marginal_coverage=coverage,
+                    worst_slab_coverage=wsc,
+                    worst_slab_coverage_se=scipy.stats.sem(wsc_list)
                 )
                 print(f"{method.name}, {coverage=:.4f}, {wsc=:.4f}")
             records_alpha.append(record)
