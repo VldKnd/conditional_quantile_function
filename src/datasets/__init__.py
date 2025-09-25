@@ -13,9 +13,6 @@ from datasets.synthetic.convex.picnn import (
     PICNN_FNLVQR_Glasses,
     PICNN_FNLVQR_Star,
 )
-from datasets.synthetic.convex.quadratic_potential import (
-    QuadraticPotentialConvexBananaDataset,
-)
 from datasets.protocol import Dataset
 
 __all__ = [
