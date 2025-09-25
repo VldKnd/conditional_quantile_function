@@ -1,5 +1,9 @@
+# Metrics, serialized Data Frames
+*.feather
+
 # Large graphs
 *.pdf
+*.png
 
 # PyCharm files
 .idea/
@@ -13,6 +17,8 @@
 
 # Datasets
 data/
+conformal_results/
+conformal_results*/
 
 # Experiments
 notebooks/sandbox.ipynb

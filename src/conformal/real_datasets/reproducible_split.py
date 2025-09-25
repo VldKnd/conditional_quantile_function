@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 from conformal.real_datasets.process_raw import loaders
 
@@ -22,6 +23,9 @@ class DatasetSplit:
     Y_cal: np.ndarray = field(init=False)
     X_test: np.ndarray = field(init=False)
     Y_test: np.ndarray = field(init=False)
+    X_train_pre_pca: np.ndarray = field(init=False)
+    X_cal_pre_pca: np.ndarray = field(init=False)
+    X_test_pre_pca: np.ndarray = field(init=False)
     X_train_raw: np.ndarray
     Y_train_raw: np.ndarray
     X_cal_raw: np.ndarray
@@ -35,6 +39,8 @@ class DatasetSplit:
     n_test: int = field(init=False)
     X_scaler: StandardScaler = field(init=False)
     Y_scaler: StandardScaler = field(init=False)
+    reduce: bool = False
+    pca: PCA = field(init=False)
 
     def __post_init__(self):
         self.n_train, self.n_features = self.X_train_raw.shape
@@ -53,14 +59,32 @@ class DatasetSplit:
                                           self.Y_cal_raw,
                                           self.Y_test_raw))
 
+        if self.reduce and self.n_features > 50:
+            n_components = 50 if self.n_features < 150 else 100
+            self.pca = PCA(n_components=n_components)
+            self.pca.fit(self.X_train)
+            self.X_train_pre_pca, self.X_cal_pre_pca, self.X_test_pre_pca = \
+                self.X_train, self.X_cal, self.X_test
+            self.X_train, self.X_cal, self.X_test = \
+            map(self.pca.transform, (self.X_train,
+                                     self.X_cal,
+                                     self.X_test))
+            self.n_features = n_components
 
-def get_dataset_split(name: str, seed: int, n_train=2000, n_cal=2000, n_test=2000):
+
+def get_dataset_split(
+    name: str, seed: int, n_train=None, n_cal=2000, n_test=2000, reduce=True
+) -> DatasetSplit:
     load_func = loaders.get(name, None)
     if load_func is not None:
         X, Y = load_func()
         n_total = X.shape[0]
 
         # TODO: add logic to set only some of the sizes?
+        if n_train is None:
+            assert n_cal is not None and n_test is not None
+            n_train = n_total - n_cal - n_test
+
         train_start, train_end = 0, n_train
         cal_start, cal_end = n_train, n_train + n_cal
         test_start, test_end = n_train + n_cal, n_train + n_cal + n_test
@@ -80,7 +104,8 @@ def get_dataset_split(name: str, seed: int, n_train=2000, n_cal=2000, n_test=200
             X_cal_raw=X[idx_cal],
             Y_cal_raw=Y[idx_cal],
             X_test_raw=X[idx_test],
-            Y_test_raw=Y[idx_test]
+            Y_test_raw=Y[idx_test],
+            reduce=reduce,
         )
     else:
         raise Exception(f"Unknown dataset: {name}.")
