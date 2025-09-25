@@ -118,6 +118,7 @@ class BaseVQRegressor(ScoreCalculator):
 
 @dataclass
 class CVQRegressor(BaseVQRegressor):
+    ckpt_name_old = "model_cvqr.pth"
 
     def __post_init__(self):
         super().__post_init__()
@@ -187,9 +188,8 @@ class CVQRegressor(BaseVQRegressor):
     @classmethod
     def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
         ckpt_path = path / f"model_{str(cls.__name__)}.pth"
-        #ckpt_path_old = path / f"model_cvqr.pth"
         if not ckpt_path.is_file():
-            ckpt_path = path / f"model_cvqr.pth"
+            ckpt_path = path / cls.ckpt_name_old
         return cls._train_or_load(
             pf_cls=AmortizedNeuralQuantileRegression,
             save_path=ckpt_path,
@@ -202,6 +202,7 @@ class CVQRegressor(BaseVQRegressor):
 @dataclass
 class CVQRegressorY(CVQRegressor):
     potential_to_estimate_with_neural_network = "y"
+    ckpt_name_old = "model_cvqr_y.pth"
 
 
 @dataclass
