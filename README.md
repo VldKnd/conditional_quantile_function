@@ -1,5 +1,23 @@
-### Conditional Quantile Estimation
-Codebase containing implimentation, benchmarking and experiments related to vector quantile regression.
+### Vector Quantile Estimation
+We propose a framework for conditional vector quantile regression (CVQR) that
+combines neural optimal transport with amortized optimization, and apply it to
+multivariate conformal prediction. Classical quantile regression does not extend
+naturally to multivariate responses, while existing approaches often ignore the
+geometry of joint distributions. Our method parameterizes the conditional vector
+quantile function as the gradient of a convex potential implemented by an input-
+convex neural network, ensuring monotonicity and uniform ranks. To reduce the
+cost of solving high-dimensional variational problems, we introduce amortized
+optimization of the dual potentials, yielding efficient training and faster inference.
+We then exploit the induced multivariate ranks for conformal prediction, con-
+structing distribution-free predictive regions with finite-sample validity. Unlike
+coordinatewise methods, our approach adapts to the geometry of the conditional
+distribution, producing tighter and more informative regions. Experiments on
+benchmark datasets show improved coverage–efficiency trade-offs compared to
+baselines, highlighting the benefits of integrating neural optimal transport with
+conformal prediction.
+
+### Codebase
+This codebase contains implimentation, benchmarking and experiments related to vector quantile regression paper.
 
 ### Installation
 You can manage the Python dependencies for this project using uv or pip.
@@ -28,9 +46,10 @@ pip install -r requirements.txt
 ```
 
 ### Project structure
-* notebooks/ - Contain different implementations of approaches to quantile regression.
-* src/ - Folder with main code snippets used in notebooks and experiments.
-* poc/ - Notebooks with different experiments with Optimal Transport approach to quantile regression.
+* notebooks/ - Contain different implementations of approaches to quantile regression and their conformalization.
+* src/ - Folder with main code snippets used in notebooks and experiments. Contains both conformal and optimal transport implementations.
+* scripts/ - Folder with utility scripts to run processes in different infrastructure environments.
+* poc/ - Notebooks with different experiments with Optimal Transport approach to quantile regression. Code in that folder is written to quickly check the idea and should not be treated as production ready.
 
 ### Commit messages:
 ```
