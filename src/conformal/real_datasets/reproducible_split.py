@@ -85,7 +85,6 @@ def get_dataset_split(
         X, Y = load_func()
         n_total = X.shape[0]
 
-        # TODO: add logic to set only some of the sizes?
         if n_train is None:
             assert n_cal is not None and n_test is not None
             n_train = n_total - n_cal - n_test

@@ -9,11 +9,6 @@ import pooch
 
 from conformal.real_datasets.preprocessing import preprocess
 
-#MULTIDIM_DATASETS = pooch.create(
-#    path="./data/raw/", # pooch.os_cache("conditional_quantile_function"),
-#    base_url="",
-#)
-
 _RAW_DATASETS = "./data/raw/"
 _PROCESSED_DATASETS = "./data/processed/"
 
@@ -43,7 +38,6 @@ def download_with_pooch(name: str, url: str, known_hash: str | None):
             file_name = pooch.retrieve(
                 url=url, known_hash=known_hash, path=_RAW_DATASETS, processor=processor
             )
-            #print(f"{file_name=}")
             with np.load(file_name) as npzf:
                 X, Y = npzf["X"], npzf["Y"]
             return X, Y

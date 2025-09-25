@@ -2,12 +2,8 @@
 Code adapted from https://github.com/LeoGrin/tabular-benchmark/blob/main/data/data_utils.py
 """
 
-#import logging
-
 import numpy as np
 import pandas as pd
-
-#log = logging.getLogger(__name__)
 
 
 class InvalidDataset(Exception):
@@ -26,8 +22,6 @@ def remove_high_cardinality(x, y, categorical_mask, threshold=20):
 
 def remove_pseudo_categorical(x, y, categorical_mask, min_unique=10):
     """Remove numerical columns where most values are the same"""
-    # num_cols = set(x.select_dtypes(include='number').columns)
-    # num_mask = x.columns.isin(num_cols)
     num_mask = ~categorical_mask
     pseudo_categorical_cols_mask = x.nunique() < min_unique
     to_remove = num_mask & pseudo_categorical_cols_mask
