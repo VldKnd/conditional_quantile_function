@@ -7,7 +7,7 @@ from typing import Literal
 from pushforward_operators.picnn import PISCNN
 
 from tqdm import trange
-from utils.distribution import sample_distribution_like, sample_uniform_ball_surface, sample_uniform_ball_surface_like
+from utils.distribution import sample_distribution_like, sample_uniform_ball_surface
 
 
 class AmortizationNetwork(nn.Module):

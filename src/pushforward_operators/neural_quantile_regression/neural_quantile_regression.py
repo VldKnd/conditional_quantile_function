@@ -72,7 +72,7 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
         bounding_box_in_y_min, _ = transformed_ball_surface_in_y.min(dim=0)
 
         samples_from_bounding_box_interiour_in_y = torch.rand(number_of_points_to_estimate_volume, u_dimension)
-        samples_from_bounding_box_interiour_in_y = samples_from_bounding_box_interiour_in_y.to(condition)
+        samples_from_bounding_box_interiour_in_y = samples_from_bounding_box_interiour_in_y.to(condition) * (bounding_box_in_y_max - bounding_box_in_y_min) + bounding_box_in_y_min
         condition_expanded_for_bounding_box_in_y = condition_squeezed.unsqueeze(0).repeat(number_of_points_to_estimate_volume, 1)
         bounding_box_inferiour_in_u = self.push_y_given_x(y=samples_from_bounding_box_interiour_in_y, x=condition_expanded_for_bounding_box_in_y)
         
