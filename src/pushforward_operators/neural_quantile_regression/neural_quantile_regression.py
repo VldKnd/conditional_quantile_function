@@ -302,12 +302,14 @@ class NeuralQuantileRegression(PushForwardOperator, nn.Module):
 
                     progress_bar.set_description(progress_bar_message)
 
-        training_information_per_epoch.append(
-            {
-                "potential_loss": torch.mean(torch.tensor(potential_losses_per_epoch)),
-                "epoch_training_time": time.perf_counter() - start_of_epoch
-            }
-        )
+            training_information_per_epoch.append(
+                {
+                    "potential_loss":
+                    torch.mean(torch.tensor(potential_losses_per_epoch)),
+                    "epoch_training_time": time.perf_counter() - start_of_epoch
+                }
+            )
+
         progress_bar.close()
 
         self.model_information_dict["number_of_epochs_to_train"

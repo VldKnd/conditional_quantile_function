@@ -26,7 +26,7 @@ from metrics import (
 from pushforward_operators import PushForwardOperator
 
 NUMBER_OF_JOINT_TEST_REPETITIONS = 50
-NUMBER_OF_JOINT_TEST_SAMPLES = 1000
+NUMBER_OF_JOINT_TEST_SAMPLES = 500
 
 NUMBER_OF_CONDITIONAL_TEST_REPETITIONS = 100
 NUMBER_OF_CONDITIONAL_TEST_CONDITIONS = 100
@@ -155,13 +155,20 @@ def test(
         "Q(U,X)_uv_l2": [],
     }
 
-
-    if any([
+    print(
         not exclude_wasserstein2,
         not exclude_sliced_wasserstein2,
         not exclude_kde_kl_divergence,
         not exclude_kde_l1_divergence,
-    ]):
+    )
+    if any(
+        [
+            not exclude_wasserstein2,
+            not exclude_sliced_wasserstein2,
+            not exclude_kde_kl_divergence,
+            not exclude_kde_l1_divergence,
+        ]
+    ):
         conditional_tests_progress_bar = trange(
             NUMBER_OF_CONDITIONAL_TEST_REPETITIONS,
             desc="Running Conditional Tests",
@@ -318,7 +325,7 @@ def test(
         )
 
         if not exclude_unexplained_variance_percentage:
-            X_joint_dataset, Y_joint_dataset, U_joint_dataset  = dataset.sample_x_y_u(
+            X_joint_dataset, Y_joint_dataset, U_joint_dataset = dataset.sample_x_y_u(
                 n_points=NUMBER_OF_JOINT_TEST_SAMPLES
             )
 
