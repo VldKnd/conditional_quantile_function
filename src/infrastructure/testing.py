@@ -70,6 +70,7 @@ def test_from_json_file(
     exclude_sliced_wasserstein2: bool = False,
     exclude_kde_kl_divergence: bool = False,
     exclude_kde_l1_divergence: bool = False,
+    exclude_conditional_tests: bool = False,
 ) -> dict:
     experiment = Experiment.load_from_path_to_experiment_file(
         path_to_experiment_file=path_to_experiment_file
@@ -81,7 +82,8 @@ def test_from_json_file(
         exclude_unexplained_variance_percentage=exclude_unexplained_variance_percentage,
         exclude_sliced_wasserstein2=exclude_sliced_wasserstein2,
         exclude_kde_kl_divergence=exclude_kde_kl_divergence,
-        exclude_kde_l1_divergence=exclude_kde_l1_divergence
+        exclude_kde_l1_divergence=exclude_kde_l1_divergence,
+        exclude_conditional_tests=exclude_conditional_tests,
     )
 
     if experiment.path_to_metrics is not None:
@@ -97,6 +99,7 @@ def test(
     exclude_sliced_wasserstein2: bool = False,
     exclude_kde_kl_divergence: bool = False,
     exclude_kde_l1_divergence: bool = False,
+    exclude_conditional_tests: bool = False,
     verbose: bool = False,
 ) -> dict:
     dataset: Dataset = name_to_dataset_map[experiment.dataset_name](
@@ -153,12 +156,6 @@ def test(
         "Q(U,X)_uv_l2": [],
     }
 
-    print(
-        not exclude_wasserstein2,
-        not exclude_sliced_wasserstein2,
-        not exclude_kde_kl_divergence,
-        not exclude_kde_l1_divergence,
-    )
     if any(
         [
             not exclude_wasserstein2,
@@ -166,7 +163,7 @@ def test(
             not exclude_kde_kl_divergence,
             not exclude_kde_l1_divergence,
         ]
-    ):
+    ) and not exclude_conditional_tests:
         conditional_tests_progress_bar = trange(
             NUMBER_OF_CONDITIONAL_TEST_REPETITIONS,
             desc="Running Conditional Tests",
@@ -458,11 +455,22 @@ if __name__ == "__main__":
         required=False,
         default=False
     )
+    parser.add_argument(
+        "--exclude-conditional-tests",
+        action="store_true",
+        required=False,
+        default=False
+    )
 
     args = parser.parse_args()
 
     test_from_json_file(
-        args.path_to_experiment_file, args.verbose, args.exclude_wasserstein2,
-        args.exclude_unexplained_variance, args.exclude_sliced_wasserstein2,
-        args.exclude_kde_kl_divergence, args.exclude_kde_l1_divergence
+        path_to_experiment_file=args.path_to_experiment_file,
+        verbose=args.verbose,
+        exclude_wasserstein2=args.exclude_wasserstein2,
+        exclude_unexplained_variance_percentage=args.exclude_unexplained_variance,
+        exclude_sliced_wasserstein2=args.exclude_sliced_wasserstein2,
+        exclude_kde_kl_divergence=args.exclude_kde_kl_divergence,
+        exclude_kde_l1_divergence=args.exclude_kde_l1_divergence,
+        exclude_conditional_tests=args.exclude_conditional_tests
     )

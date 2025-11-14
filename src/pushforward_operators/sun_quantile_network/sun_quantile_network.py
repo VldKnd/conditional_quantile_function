@@ -2,7 +2,7 @@
 
 import time
 import torch
-from tqdm.notebook import trange
+from tqdm import trange
 from pushforward_operators import PushForwardOperator
 from utils.distribution import sample_distribution_like
 from infrastructure.classes import TrainParameters
@@ -226,7 +226,7 @@ class SunQuantileNetwork(PushForwardOperator, torch.nn.Module):
 
     @torch.enable_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplemented("This method is not implemented.")
+        return y.clone()
 
     @torch.enable_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
