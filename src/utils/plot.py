@@ -68,12 +68,11 @@ def plot_quantile_levels_from_dataset(
     color_map = matplotlib.colormaps['viridis']
     fig, (ax1,
           ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': '3d'})
-    fig.suptitle('Separated 3D Plots', fontsize=16)
+    # fig.suptitle('Separated 3D Plots', fontsize=16)
 
-    ax1.set_title(f'Data space (Y|X={list(conditional_value.detach())})')
-    ax1.set_xlabel('Axis 0')
-    ax1.set_ylabel('Axis 1')
-    ax1.set_zlabel('x_ value')
+    # ax1.set_xlabel('Axis 0')
+    # ax1.set_ylabel('Axis 1')
+    # ax1.set_zlabel('x value')
 
     z_line = torch.zeros(X_batch.shape[0]).flatten().detach()
 
@@ -129,10 +128,11 @@ def plot_quantile_levels_from_dataset(
         )
 
     ax1.view_init(elev=-55, azim=154, roll=-83)
-    ax1.legend()
+    # ax1.legend()
 
     ax2.view_init(elev=-55, azim=154, roll=-83)
-    ax2.legend()
+    # ax2.legend()
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig("quantiles.pdf")
     plt.show()

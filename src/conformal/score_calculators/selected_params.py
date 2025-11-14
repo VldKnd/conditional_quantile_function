@@ -1,6 +1,23 @@
 import torch
 
 selected_params = {
+    "act": {
+        "hidden_dimension": 15,
+        "number_of_hidden_layers": 2,
+        "batch_size": 512,
+        "n_epochs": 100,
+        "warmup_iterations": 50,
+        "learning_rate": 0.01,
+    },
+    "ujiindoor": {
+        "hidden_dimension": 12,
+        "number_of_hidden_layers": 4,
+        "batch_size": 512,
+        "n_epochs": 100,
+        "warmup_iterations": 10,
+        "learning_rate": 0.01,
+        "dtype": torch.float32,
+    },
     "bio": {
         "hidden_dimension": 12,
         "number_of_hidden_layers": 4,
@@ -48,15 +65,15 @@ selected_params = {
     },
     'scm1d': {
         'learning_rate': 0.01,
-        'batch_size': 2048,
+        'batch_size': 512,
         'n_epochs': 500,
-        'warmup_iterations': 50,
-        'hidden_dimension': 6,
-        'number_of_hidden_layers': 3,
+        'warmup_iterations': 100,
+        'hidden_dimension': 8,
+        'number_of_hidden_layers': 1,
         "dtype": torch.float32,
     },
     'scm20d': {
-        'learning_rate': 0.0001,
+        'learning_rate': 0.001,
         'batch_size': 256,
         'n_epochs': 500,
         'warmup_iterations': 50,

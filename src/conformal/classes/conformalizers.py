@@ -130,7 +130,7 @@ class OTCPLocalPredictor(BaseRegionPredictor):
     # Rule for choosing number of neighbors:
     # "large": sqrt(len(X_cal))
     # other: 0.1 * len(X_cal)
-    knn_mode: str = "large"
+    knn_mode: str = "small"
 
     def fit(self, X_cal: np.ndarray, scores_cal: np.ndarray, alpha: float):
         self.alpha = alpha
@@ -138,6 +138,7 @@ class OTCPLocalPredictor(BaseRegionPredictor):
             n_neighbors = int(len(X_cal)**0.5)
         else:
             n_neighbors = int(len(X_cal) * 0.1)
+
         self.Quantile_Treshold, self.knn, self.scores_cal_1, self.mu = MultivQuantileTreshold_Adaptive(
             scores_cal, X_cal, n_neighbors=n_neighbors, alpha=1 - alpha
         )

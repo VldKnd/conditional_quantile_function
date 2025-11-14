@@ -77,9 +77,10 @@ class BaseVQRegressor(ScoreCalculator):
         return Y.numpy(force=True)
 
     def predict_quantile(self, X: np.ndarray, Y: np.ndarray):
-        u = self.model.push_y_given_x(
-            y=torch.tensor(Y, dtype=self.dtype), x=torch.tensor(X, dtype=self.dtype)
-        ).numpy(force=True)
+        device = next(iter(self.model.parameters())).device
+        X = torch.tensor(X, dtype=self.dtype, device=device)
+        Y = torch.tensor(Y, dtype=self.dtype, device=device)
+        u = self.model.push_y_given_x(y=Y, x=X).numpy(force=True)
         self.model.eval()
         return u
 

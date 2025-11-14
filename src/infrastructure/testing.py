@@ -5,7 +5,6 @@ from datasets import (
     Dataset,
     # Synthetic datasets with pushforward operator
     BananaDataset,
-    QuadraticPotentialConvexBananaDataset,
     NotConditionalBananaDataset,
     FNLVQR_MVN,
     PICNN_FNLVQR_Glasses,
@@ -105,8 +104,7 @@ def test(
     )
 
     if type(dataset) in {
-        BananaDataset, QuadraticPotentialConvexBananaDataset,
-        NotConditionalBananaDataset, FNLVQR_MVN, PICNN_FNLVQR_Glasses,
+        BananaDataset, NotConditionalBananaDataset, FNLVQR_MVN, PICNN_FNLVQR_Glasses,
         PICNN_FNLVQR_Star, PICNN_FNLVQR_Banana
     }:
         pushforward_operator_not_defined = False
