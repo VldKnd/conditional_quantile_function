@@ -114,3 +114,15 @@ class FNLVQR_Star(Dataset):
         Push forward the conditional distribution of the covariates given the response.
         """
         return self.rotate_points(self.transform_to_star(u), x)
+
+
+class Not_Conditional_FNLVQR_Star(Dataset):
+
+    def sample_covariates(self, n_points: int) -> torch.Tensor:
+        """
+            Returns:
+            torch.Tensor[n, k]
+        """
+        return torch.ones(n_points, 1).to(
+            **self.tensor_parameters
+        ) * 2 * torch.pi / self.number_of_star_angles

@@ -9,15 +9,12 @@ from pushforward_operators.linear_quantile_regression import LinearQuantileRegre
 from pushforward_operators.protocol import PushForwardOperator
 from pushforward_operators.sun_quantile_network import SunQuantileNetwork
 from pushforward_operators.vedula_quantile_network import VedulaQuantileNetwork
+from pushforward_operators.variational_encoder import VariationalEncoder
+from pushforward_operators.denoising_diffusion import DenoisingDiffusion
 
 __all__ = [
-    "EntropicNeuralQuantileRegression",
-    "AmortizedNeuralQuantileRegression",
-    "NeuralQuantileRegression",
-    "LinearQuantileRegression",
-    "PushForwardOperator",
-    "ConvexPotentialFlow",
-    "FastNonLinearQuantileRegression",
-    "SunQuantileNetwork",
-    "VedulaQuantileNetwork",
+    "EntropicNeuralQuantileRegression", "AmortizedNeuralQuantileRegression",
+    "NeuralQuantileRegression", "LinearQuantileRegression", "PushForwardOperator",
+    "ConvexPotentialFlow", "FastNonLinearQuantileRegression", "SunQuantileNetwork",
+    "VedulaQuantileNetwork", "VariationalEncoder", "DenoisingDiffusion"
 ]

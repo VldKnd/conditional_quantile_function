@@ -1,0 +1,366 @@
+# Denoising Diffusion Probabilistic Model (DDPM) for vector data
+# Ho et al., NeurIPS 2020
+
+import math
+import time
+import torch
+from torch import nn
+from tqdm import trange
+from pushforward_operators import PushForwardOperator
+from infrastructure.classes import TrainParameters
+
+
+def _make_mlp(
+    in_dim: int,
+    hidden_dim: int,
+    out_dim: int,
+    num_hidden: int,
+    activation: nn.Module,
+):
+    layers = [nn.Linear(in_dim, hidden_dim), activation]
+    for _ in range(num_hidden):
+        layers += [nn.Linear(hidden_dim, hidden_dim), activation]
+    layers += [nn.Linear(hidden_dim, out_dim)]
+    return nn.Sequential(*layers)
+
+
+class SinusoidalTimeEmbedding(nn.Module):
+    """Classic transformer-style sinusoidal embedding for scalar timesteps."""
+
+    def __init__(self, emb_dim: int):
+        super().__init__()
+        if emb_dim % 2 != 0:
+            raise ValueError("time_embedding_dimension must be even.")
+        self.emb_dim = emb_dim
+        half = emb_dim // 2
+        # Register as buffer so it moves with .to(device) and isn't a parameter
+        self.register_buffer(
+            "inv_freq",
+            torch.exp(
+                -math.log(10000) * torch.arange(0, half).float() / max(1, half - 1)
+            ),
+            persistent=False,
+        )
+
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            t: Long or float tensor of shape [batch] with values in [1, T].
+        Returns:
+            [batch, emb_dim] tensor.
+        """
+        t = t.float().unsqueeze(1)  # [B, 1]
+        freqs = t * self.inv_freq.unsqueeze(0)  # [B, half]
+        emb = torch.cat([freqs.sin(), freqs.cos()], dim=1)  # [B, emb_dim]
+        return emb
+
+
+class DenoisingDiffusion(PushForwardOperator, nn.Module):
+    """DDPM with an MLP noise predictor for vector-shaped data.
+    
+    - push_y_given_x(y, x): forward diffusion to a latent 'u' (x_T).
+    - push_u_given_x(u, x): reverse diffusion from 'u' back to data space (x_0).
+    - fit(...): standard DDPM noise-prediction training objective (MSE on eps).
+
+    The model is intentionally similar in structure to your VariationalEncoder.
+    """
+
+    def __init__(
+        self,
+        feature_dimension: int,
+        response_dimension: int,
+        hidden_dimension: int,
+        number_of_hidden_layers: int,
+        num_diffusion_steps: int = 1000,
+        beta_schedule: str = "linear",  # {"linear"}
+        time_embedding_dimension: int = 64,
+    ):
+        super().__init__()
+
+        if time_embedding_dimension % 2 != 0:
+            raise ValueError("time_embedding_dimension must be even.")
+
+        self.init_dict = {
+            "feature_dimension": feature_dimension,
+            "response_dimension": response_dimension,
+            "hidden_dimension": hidden_dimension,
+            "number_of_hidden_layers": number_of_hidden_layers,
+            "num_diffusion_steps": num_diffusion_steps,
+            "beta_schedule": beta_schedule,
+            "time_embedding_dimension": time_embedding_dimension,
+        }
+        self.model_information_dict = {
+            "class_name": "DenoisingDiffusion",
+        }
+
+        self.activation_function = nn.ReLU()
+        self.T = int(num_diffusion_steps)
+
+        # --- Diffusion schedule (register constant buffers) ---
+        betas = self._make_beta_schedule(self.T, beta_schedule)  # [T]
+        alphas = 1.0 - betas
+        alphas_cumprod = torch.cumprod(alphas, dim=0)  # ᾱ_t
+        alphas_cumprod_prev = torch.cat(
+            [torch.tensor([1.0]), alphas_cumprod[:-1]], dim=0
+        )
+
+        # Useful precomputations for training/sampling
+        self.register_buffer("betas", betas)
+        self.register_buffer("alphas", alphas)
+        self.register_buffer("alphas_cumprod", alphas_cumprod)  # ᾱ_t
+        self.register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)  # ᾱ_{t-1}
+
+        self.register_buffer("sqrt_alphas_cumprod", torch.sqrt(alphas_cumprod))
+        self.register_buffer(
+            "sqrt_one_minus_alphas_cumprod", torch.sqrt(1.0 - alphas_cumprod)
+        )
+        self.register_buffer("sqrt_recip_alphas", torch.sqrt(1.0 / alphas))
+        # Posterior variance per Ho et al.
+        self.register_buffer(
+            "posterior_variance",
+            betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
+        )
+        self.register_buffer(
+            "posterior_log_variance_clipped",
+            torch.log(
+                torch.clamp(
+                    betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod),
+                    min=1e-20,
+                )
+            )
+        )
+
+        # --- Networks ---
+        # Time embedding → projection to same scale as hidden
+        self.time_embedding = SinusoidalTimeEmbedding(time_embedding_dimension)
+        self.time_mlp = nn.Sequential(
+            nn.Linear(time_embedding_dimension, hidden_dimension),
+            self.activation_function
+        )
+
+        # Noise predictor ε_θ(x_t, t) : simple MLP for vector data
+        # Input: [y_t, t_emb]  (optionally could include x features)
+        eps_in_dim = response_dimension + hidden_dimension
+        eps_out_dim = response_dimension
+        self.epsilon_network = _make_mlp(
+            in_dim=eps_in_dim,
+            hidden_dim=hidden_dimension,
+            out_dim=eps_out_dim,
+            num_hidden=number_of_hidden_layers,
+            activation=self.activation_function,
+        )
+
+    # ---------- schedules & utilities ----------
+
+    @staticmethod
+    def _make_beta_schedule(T: int, schedule: str = "linear") -> torch.Tensor:
+        if schedule != "linear":
+            raise ValueError(f"Unsupported beta_schedule: {schedule}")
+        # Common linear schedule
+        return torch.linspace(1e-4, 2e-2, T)
+
+    @staticmethod
+    def _extract(
+        coeff: torch.Tensor, t: torch.Tensor, ref_shape: torch.Size
+    ) -> torch.Tensor:
+        """Extract per-t batch coefficients and reshape to broadcast over ref tensor."""
+        b = t.shape[0]
+        out = coeff[(t - 1).clamp(min=0)].reshape(b, *((1, ) * (len(ref_shape) - 1)))
+        return out
+
+    def _predict_eps(
+        self, x_t: torch.Tensor, t: torch.Tensor, x_feat: torch.Tensor | None
+    ) -> torch.Tensor:
+        t_emb = self.time_mlp(self.time_embedding(t))  # [B, hidden]
+        # if x_feat is not None: x_in = torch.cat([x_t, x_feat, t_emb], dim=1)
+        x_in = torch.cat([x_t, t_emb], dim=1)  # [B, D + hidden]
+        return self.epsilon_network(x_in)  # [B, D]
+
+    # ---------- progress bar message ----------
+
+    def make_progress_bar_message(
+        self, training_information: list[dict], epoch_idx: int
+    ):
+        running_mean_objective = sum(
+            info["diffusion_loss"] for info in training_information[-10:]
+        ) / max(1, len(training_information[-10:]))
+        return (f"Epoch: {epoch_idx}, "
+                f"Objective: {running_mean_objective:.4f}")
+
+    # ---------- training ----------
+
+    def fit(
+        self, dataloader: torch.utils.data.DataLoader,
+        train_parameters: TrainParameters, *args, **kwargs
+    ):
+        """Fits DDPM via noise-prediction objective: E[ ||ε - ε_θ(x_t, t)||^2 ]."""
+        number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
+        verbose = train_parameters.verbose
+
+        optimizer = torch.optim.AdamW(
+            [
+                {
+                    "params": self.epsilon_network.parameters()
+                }, {
+                    "params": self.time_mlp.parameters()
+                }
+            ], **train_parameters.optimizer_parameters
+        )
+
+        training_information = []
+        training_information_per_epoch = []
+
+        progress_bar = trange(
+            1, number_of_epochs_to_train + 1, desc="Training", disable=not verbose
+        )
+
+        for epoch_idx in progress_bar:
+            start_of_epoch = time.perf_counter()
+            losses_per_epoch = []
+
+            for batch_index, (X_batch, Y_batch) in enumerate(dataloader):
+                # Device inference from batch
+                device = Y_batch.device
+
+                # Sample random timesteps in [1, T]
+                t = torch.randint(
+                    low=1, high=self.T + 1, size=(Y_batch.shape[0], ), device=device
+                )
+
+                # Sample Gaussian noise ε
+                eps = torch.randn_like(Y_batch)
+
+                # Sample x_t = sqrt(ᾱ_t) x_0 + sqrt(1-ᾱ_t) ε
+                sqrt_alpha_bar_t = self._extract(
+                    self.sqrt_alphas_cumprod, t, Y_batch.shape
+                )
+                sqrt_one_minus_alpha_bar_t = self._extract(
+                    self.sqrt_one_minus_alphas_cumprod, t, Y_batch.shape
+                )
+                x_t = sqrt_alpha_bar_t * Y_batch + sqrt_one_minus_alpha_bar_t * eps
+
+                # Predict noise
+                optimizer.zero_grad(set_to_none=True)
+                # Optionally pass X_batch as additional conditioning (commented to mirror your VAE)
+                # x_feat = X_batch
+                x_feat = None
+                eps_pred = self._predict_eps(x_t, t, x_feat)
+
+                # MSE loss on noise
+                loss = torch.mean((eps - eps_pred)**2)
+                loss.backward()
+                optimizer.step()
+
+                loss_item = float(loss.detach().cpu())
+                losses_per_epoch.append(loss_item)
+                training_information.append(
+                    {
+                        "diffusion_loss":
+                        loss_item,
+                        "batch_index":
+                        batch_index,
+                        "epoch_index":
+                        epoch_idx,
+                        "time_elapsed_since_last_epoch":
+                        time.perf_counter() - start_of_epoch,
+                    }
+                )
+
+                if verbose:
+                    progress_bar.set_description(
+                        self.make_progress_bar_message(
+                            training_information=training_information,
+                            epoch_idx=epoch_idx
+                        )
+                    )
+
+            training_information_per_epoch.append(
+                {
+                    "diffusion_loss": torch.mean(torch.tensor(losses_per_epoch)),
+                    "epoch_training_time": time.perf_counter() - start_of_epoch
+                }
+            )
+
+        progress_bar.close()
+
+        self.model_information_dict["number_of_epochs_to_train"
+                                    ] = number_of_epochs_to_train
+        self.model_information_dict["training_batch_size"] = dataloader.batch_size
+        self.model_information_dict["training_information"
+                                    ] = training_information_per_epoch
+        return self
+
+    @torch.no_grad()
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Forward diffusion: map data y to a latent u ≈ x_T ~ N(0, I).
+        Stochastic by design (samples ε)."""
+        device = y.device
+        B = y.shape[0]
+        t_T = torch.full((B, ), self.T, device=device, dtype=torch.long)
+        eps = torch.randn_like(y)
+        sqrt_alpha_bar_T = self._extract(self.sqrt_alphas_cumprod, t_T, y.shape)
+        sqrt_one_minus_alpha_bar_T = self._extract(
+            self.sqrt_one_minus_alphas_cumprod, t_T, y.shape
+        )
+        u = sqrt_alpha_bar_T * y + sqrt_one_minus_alpha_bar_T * eps
+        return u
+
+    @torch.no_grad()
+    def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Reverse diffusion: map latent u (treated as x_T) back to data space."""
+        x_t = u
+        device = u.device
+        B = u.shape[0]
+
+        for t_int in range(self.T, 0, -1):
+            t = torch.full((B, ), t_int, device=device, dtype=torch.long)
+
+            # Predict ε_θ(x_t, t)
+            # x_feat = x
+            x_feat = None
+            eps_theta = self._predict_eps(x_t, t, x_feat)
+
+            # Compute the mean of p(x_{t-1} | x_t)
+            beta_t = self._extract(self.betas, t, x_t.shape)
+            alpha_t = self._extract(self.alphas, t, x_t.shape)
+            sqrt_one_minus_alpha_bar_t = self._extract(
+                self.sqrt_one_minus_alphas_cumprod, t, x_t.shape
+            )
+            mean = (
+                self._extract(self.sqrt_recip_alphas, t, x_t.shape) *
+                (x_t - (beta_t / sqrt_one_minus_alpha_bar_t) * eps_theta)
+            )
+
+            if t_int > 1:
+                var = self._extract(self.posterior_variance, t, x_t.shape)
+                noise = torch.randn_like(x_t)
+                x_t = mean + torch.sqrt(var) * noise
+            else:
+                x_t = mean  # final step, t=1 → x_0
+
+        return x_t  # ≈ reconstructed y
+
+    def save(self, path: str):
+        torch.save(
+            {
+                "init_dict": self.init_dict,
+                "state_dict": self.state_dict(),
+                "model_information_dict": self.model_information_dict,
+            },
+            path,
+        )
+
+    def load(self, path: str, map_location: torch.device = torch.device('cpu')):
+        data = torch.load(path, map_location=map_location)
+        self.load_state_dict(data["state_dict"])
+        return self
+
+    @classmethod
+    def load_class(
+        cls, path: str, map_location: torch.device = torch.device('cpu')
+    ) -> "DenoisingDiffusion":
+        data = torch.load(path, map_location=map_location)
+        instance = cls(**data["init_dict"])
+        instance.load_state_dict(data["state_dict"])
+        instance.model_information_dict = data.get("model_information_dict", {})
+        return instance

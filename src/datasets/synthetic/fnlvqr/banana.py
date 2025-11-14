@@ -88,3 +88,14 @@ class FNLVQR_Banana(Dataset):
         Push forward the conditional distribution of the covariates given the response.
         """
         raise NotImplementedError("Not implemented")
+
+
+class Not_Conditional_FNLVQR_Banana(FNLVQR_Banana):
+
+    def sample_covariates(self, n_points: int) -> torch.Tensor:
+        """
+            Returns:
+            torch.Tensor[n, k]
+        """
+        x = torch.rand(n_points, 1) * 0 + 1.
+        return x.to(**self.tensor_parameters)

@@ -1,13 +1,14 @@
 from datasets import (
     BananaDataset, Dataset, FNLVQR_MVN, FNLVQR_Glasses, FNLVQR_Star, FNLVQR_Banana,
     NotConditionalBananaDataset, PICNN_FNLVQR_Banana, PICNN_FNLVQR_Glasses,
-    PICNN_FNLVQR_Star, FunnelDistribution
+    PICNN_FNLVQR_Star, FunnelDistribution, Not_Conditional_FNLVQR_Banana,
+    Not_Conditional_FNLVQR_Star
 )
 from pushforward_operators import (
     PushForwardOperator, ConvexPotentialFlow, EntropicNeuralQuantileRegression,
     AmortizedNeuralQuantileRegression, NeuralQuantileRegression,
     LinearQuantileRegression, FastNonLinearQuantileRegression, SunQuantileNetwork,
-    VedulaQuantileNetwork
+    VedulaQuantileNetwork, VariationalEncoder, DenoisingDiffusion
 )
 
 # yapf: disable
@@ -22,6 +23,8 @@ name_to_dataset_map: dict[str, Dataset] = {
     "picnn_fnlvqr_banana": PICNN_FNLVQR_Banana,
     "picnn_fnlvqr_glasses": PICNN_FNLVQR_Glasses,
     "picnn_fnlvqr_star": PICNN_FNLVQR_Star,
+    "not_conditional_fnlvqr_star":Not_Conditional_FNLVQR_Star,
+    "not_conditional_fnlvqr_banana":Not_Conditional_FNLVQR_Banana,
 }
 
 name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
@@ -32,6 +35,8 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "neural_quantile_regression": NeuralQuantileRegression,
     "amortized_neural_quantile_regression": AmortizedNeuralQuantileRegression,
     "sun_quantile_network": SunQuantileNetwork,
-    "vedula_quantile_network": VedulaQuantileNetwork
+    "vedula_quantile_network": VedulaQuantileNetwork,
+    "variational_encoder":VariationalEncoder,
+    "denoising_diffusion":DenoisingDiffusion,
 }
 # yapf: enable

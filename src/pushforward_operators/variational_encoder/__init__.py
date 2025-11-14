@@ -1,9 +1,3 @@
-from pushforward_operators.neural_quantile_regression.entropic_neural_quantile_regression import EntropicNeuralQuantileRegression
-from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
-from pushforward_operators.neural_quantile_regression.neural_quantile_regression import NeuralQuantileRegression
+from pushforward_operators.variational_encoder.variational_encoder import VariationalEncoder
 
-__all__ = [
-    "EntropicNeuralQuantileRegression",
-    "AmortizedNeuralQuantileRegression",
-    "NeuralQuantileRegression",
-]
+__all__ = ["VariationalEncoder"]
