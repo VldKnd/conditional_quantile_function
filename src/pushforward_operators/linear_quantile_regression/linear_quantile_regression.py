@@ -1,3 +1,5 @@
+# Vector Quantile Regression, Guillaume Carlier et al https://arxiv.org/abs/1406.4643
+
 import torch
 import numpy
 from pushforward_operators.protocol import PushForwardOperator

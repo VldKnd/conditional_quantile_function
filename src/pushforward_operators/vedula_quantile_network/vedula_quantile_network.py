@@ -1,4 +1,4 @@
-# Conditional Generative Quantile Networks via Optimal Transport, Jesse Sun et al. https://openreview.net/pdf?id=BBxeo2Vuvbq
+# Continuous Vector Quantile Regression Sanketh Vedulaon et al https://openreview.net/pdf?id=DUZbGAXcyL
 
 import time
 import torch
@@ -71,7 +71,7 @@ class FFNN(torch.nn.Module):
         return self.forward_network(input_tensor)
 
 
-class SunQuantileNetwork(PushForwardOperator, torch.nn.Module):
+class VedulaQuantileNetwork(PushForwardOperator, torch.nn.Module):
 
     def __init__(
         self,
@@ -89,7 +89,7 @@ class SunQuantileNetwork(PushForwardOperator, torch.nn.Module):
             "number_of_hidden_layers": number_of_hidden_layers,
         }
         self.model_information_dict = {
-            "class_name": "SunQuantileNetwork",
+            "class_name": "VedulaQuantileNetwork",
         }
 
         self.linear_feature_network = torch.nn.Sequential(
@@ -179,7 +179,7 @@ class SunQuantileNetwork(PushForwardOperator, torch.nn.Module):
                     Y_batch @ U_batch.T - phi.T - linear_features @ linear_potential.T
                 )
 
-                psi, _ = torch.max(discrete_c_transform_matrix, dim=1, keepdim=True)
+                psi = torch.logsumexp(discrete_c_transform_matrix, dim=1, keepdim=True)
 
                 potential_network_objective = torch.mean(phi) + torch.mean(psi)
                 potential_network_objective.backward()
@@ -262,7 +262,7 @@ class SunQuantileNetwork(PushForwardOperator, torch.nn.Module):
     @classmethod
     def load_class(
         cls, path: str, map_location: torch.device = torch.device('cpu')
-    ) -> "SunQuantileNetwork":
+    ) -> "VedulaQuantileNetwork":
         data = torch.load(path, map_location=map_location)
         neural_quantile_regression = cls(**data["init_dict"])
         neural_quantile_regression.load_state_dict(data["state_dict"])

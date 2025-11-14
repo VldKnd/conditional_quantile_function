@@ -1,3 +1,5 @@
+# Fast Nonlinear Vector Quantile Regression Aviv A. Rosenberg et al. https://arxiv.org/abs/2205.14977
+
 from sympy import Q
 import torch
 from pushforward_operators.protocol import PushForwardOperator

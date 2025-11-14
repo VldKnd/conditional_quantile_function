@@ -6,7 +6,8 @@ from datasets import (
 from pushforward_operators import (
     PushForwardOperator, ConvexPotentialFlow, EntropicNeuralQuantileRegression,
     AmortizedNeuralQuantileRegression, NeuralQuantileRegression,
-    LinearQuantileRegression, FastNonLinearQuantileRegression, SunQuantileNetwork
+    LinearQuantileRegression, FastNonLinearQuantileRegression, SunQuantileNetwork,
+    VedulaQuantileNetwork
 )
 
 # yapf: disable
@@ -31,5 +32,6 @@ name_to_pushforward_operator_map: dict[str, PushForwardOperator] = {
     "neural_quantile_regression": NeuralQuantileRegression,
     "amortized_neural_quantile_regression": AmortizedNeuralQuantileRegression,
     "sun_quantile_network": SunQuantileNetwork,
+    "vedula_quantile_network": VedulaQuantileNetwork
 }
 # yapf: enable

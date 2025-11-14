@@ -1,3 +1,5 @@
+#Convex Potential Flows: Universal Probability Distributions with Optimal Transport and Convex Optimization, Chin-Wei Huang et al. https://arxiv.org/abs/2012.05942
+
 import torch
 import torch.nn as nn
 from tqdm import trange
