@@ -9,6 +9,14 @@ selected_params = {
         "warmup_iterations": 50,
         "learning_rate": 0.01,
     },
+    "act_100x50": {
+        "hidden_dimension": 64,
+        "number_of_hidden_layers": 4,
+        "batch_size": 1024,
+        "n_epochs": 20,
+        "warmup_iterations": 50,
+        "learning_rate": 0.01,
+    },
     "ujiindoor": {
         "hidden_dimension": 12,
         "number_of_hidden_layers": 4,

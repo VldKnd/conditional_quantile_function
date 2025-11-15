@@ -335,10 +335,10 @@ read_local_dataset(
 )
 
 read_local_dataset(
-    name="act_10x10",
+    name="act_100x50",
     csv_path=os.path.join(os.getcwd(), "act_dataset.csv"),
     processor=act_preprocesser,
-    processed_file_name="act_10x10.npz",
+    processed_file_name="act_100x50.npz",
 )
 
 if __name__ == "__main__":

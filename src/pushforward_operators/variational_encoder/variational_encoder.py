@@ -59,7 +59,10 @@ class VariationalEncoder(PushForwardOperator, torch.nn.Module):
         )
 
     def make_progress_bar_message(
-        self, training_information: list[dict], epoch_idx: int
+        self,
+        training_information: list[dict],
+        epoch_idx: int,
+        last_learning_rate: str = None
     ):
         running_mean_objective = sum(
             [
@@ -69,7 +72,12 @@ class VariationalEncoder(PushForwardOperator, torch.nn.Module):
         ) / len(training_information[-10:])
 
         return (f"Epoch: {epoch_idx}, "
-                f"Objective: {running_mean_objective:.3f}")
+                f"Objective: {running_mean_objective:.3f}") + \
+        (
+            f", LR: {last_learning_rate[0]:.6f}"
+            if last_learning_rate is not None
+            else ""
+        )
 
     def fit(
         self, dataloader: torch.utils.data.DataLoader,
@@ -83,6 +91,7 @@ class VariationalEncoder(PushForwardOperator, torch.nn.Module):
         """
         number_of_epochs_to_train = train_parameters.number_of_epochs_to_train
         verbose = train_parameters.verbose
+        total_number_of_optimizer_steps = number_of_epochs_to_train * len(dataloader)
 
         encoder_network_optimizer = torch.optim.AdamW(
             self.encoder_network.parameters(), **train_parameters.optimizer_parameters
@@ -91,6 +100,19 @@ class VariationalEncoder(PushForwardOperator, torch.nn.Module):
         decoder_network_optimizer = torch.optim.AdamW(
             self.decoder_network.parameters(), **train_parameters.optimizer_parameters
         )
+
+        if train_parameters.scheduler_parameters:
+            encoder_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                encoder_network_optimizer, total_number_of_optimizer_steps // 2,
+                **train_parameters.scheduler_parameters
+            )
+            decoder_network_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                decoder_network_optimizer, total_number_of_optimizer_steps // 2,
+                **train_parameters.scheduler_parameters
+            )
+        else:
+            encoder_network_scheduler = None
+            decoder_network_scheduler = None
 
         training_information = []
         training_information_per_epoch = []
@@ -131,8 +153,12 @@ class VariationalEncoder(PushForwardOperator, torch.nn.Module):
 
                 if batch_index % 2 == 1:
                     encoder_network_optimizer.step()
+                    if encoder_network_scheduler is not None:
+                        encoder_network_scheduler.step()
                 else:
                     decoder_network_optimizer.step()
+                    if decoder_network_scheduler is not None:
+                        decoder_network_scheduler.step()
 
                 potential_losses_per_epoch.append(loss.item())
 
@@ -150,8 +176,15 @@ class VariationalEncoder(PushForwardOperator, torch.nn.Module):
                 )
 
                 if verbose:
+                    last_learning_rate = (
+                        decoder_network_scheduler.get_last_lr()
+                        if decoder_network_scheduler is not None else None
+                    )
+
                     progress_bar_message = self.make_progress_bar_message(
-                        training_information=training_information, epoch_idx=epoch_idx
+                        training_information=training_information,
+                        epoch_idx=epoch_idx,
+                        last_learning_rate=last_learning_rate
                     )
 
                     progress_bar.set_description(progress_bar_message)
