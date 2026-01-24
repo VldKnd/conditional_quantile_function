@@ -104,15 +104,18 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             u_quantile_surfaces_flat = vector_quantile_function.quantile_grid.reshape(
                 y_dimension, -1
             )
-            distances_to_quantile_surfaces = numpy.linalg.norm(
+
+            distances_to_y_quantile_surfaces = numpy.linalg.norm(
                 y_quantile_surfaces_flat - y_numpy.reshape(-1, 1), axis=0
             )
-            index_of_closest_quantile_vector = numpy.argmin(
-                distances_to_quantile_surfaces
+
+            index_of_closest_y_quantile_vector = numpy.argmin(
+                distances_to_y_quantile_surfaces
             )
+
             u_samples.append(
                 torch.tensor(
-                    u_quantile_surfaces_flat[:, index_of_closest_quantile_vector]
+                    u_quantile_surfaces_flat[:, index_of_closest_y_quantile_vector]
                 )
             )
 
@@ -140,15 +143,16 @@ class FastNonLinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             u_quantile_surfaces_flat = vector_quantile_function.quantile_grid.reshape(
                 u_dimension, -1
             )
-            distances_to_quantile_surfaces = numpy.linalg.norm(
+            distances_to_u_quantile_surfaces = numpy.linalg.norm(
                 u_quantile_surfaces_flat - u_numpy.reshape(-1, 1), axis=0
             )
-            index_of_closest_quantile_vector = numpy.argmin(
-                distances_to_quantile_surfaces
+            index_of_closest_u_quantile_vector = numpy.argmin(
+                distances_to_u_quantile_surfaces
             )
+            
             y_samples.append(
                 torch.tensor(
-                    y_quantile_surfaces_flat[:, index_of_closest_quantile_vector]
+                    y_quantile_surfaces_flat[:, index_of_closest_u_quantile_vector]
                 )
             )
 

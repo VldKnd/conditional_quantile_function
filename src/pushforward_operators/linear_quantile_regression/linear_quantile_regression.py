@@ -49,6 +49,7 @@ class LinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             **self.vector_quantile_regression_arguments
         )
         vqr = VectorQuantileRegressor(solver=nonlinear_mlp_solver)
+
         return vqr.fit(X_tensors, Y_tensors)
 
     def make_progress_bar_message(
@@ -80,7 +81,7 @@ class LinearQuantileRegression(PushForwardOperator, torch.nn.Module):
             dataloader=dataloader
         )
 
-    @torch.enable_grad()
+    @torch.no_grad()
     def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         input_shape = x.shape[:-1]
         y_dimension = y.shape[-1]
@@ -115,7 +116,7 @@ class LinearQuantileRegression(PushForwardOperator, torch.nn.Module):
         u_flat = torch.stack(u_samples).to(x)
         return u_flat.reshape(*input_shape, -1)
 
-    @torch.enable_grad()
+    @torch.no_grad()
     def push_u_given_x(self, u: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         input_shape = x.shape[:-1]
         u_dimension = u.shape[-1]
@@ -149,6 +150,45 @@ class LinearQuantileRegression(PushForwardOperator, torch.nn.Module):
 
         y_flat = torch.stack(y_samples).to(x)
         return y_flat.reshape(*input_shape, -1)
+
+    @torch.enable_grad()
+    def push_y_given_x(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        input_shape = x.shape[:-1]
+        y_dimension = y.shape[-1]
+
+        x_flat = x.flatten(start_dim=0, end_dim=-2)
+        y_flat = y.flatten(start_dim=0, end_dim=-2)
+        u_samples = []
+
+        for x_single, y_single in zip(x_flat, y_flat):
+            x_numpy = x_single.numpy(force=True)
+            y_numpy = y_single.numpy(force=True)
+            vector_quantile_function = self.vector_quantile_regression.vector_quantiles(
+                X=x_numpy
+            )[0]
+
+            y_quantile_surfaces = numpy.stack(tuple(vector_quantile_function))
+            y_quantile_surfaces_flat = y_quantile_surfaces.reshape(y_dimension, -1)
+            u_quantile_surfaces_flat = vector_quantile_function.quantile_grid.reshape(
+                y_dimension, -1
+            )
+
+            distances_to_y_quantile_surfaces = numpy.linalg.norm(
+                y_quantile_surfaces_flat - y_numpy.reshape(-1, 1), axis=0
+            )
+
+            index_of_closest_y_quantile_vector = numpy.argmin(
+                distances_to_y_quantile_surfaces
+            )
+
+            u_samples.append(
+                torch.tensor(
+                    u_quantile_surfaces_flat[:, index_of_closest_y_quantile_vector]
+                )
+            )
+
+        u_flat = torch.stack(u_samples).to(x)
+        return u_flat.reshape(*input_shape, -1)
 
     def save(self, path: str):
         import pickle

@@ -22,7 +22,7 @@ import conformal.score_calculators as all_score_calculators
 from metrics.wsc import wsc_unbiased
 from pushforward_operators.neural_quantile_regression.amortized_neural_quantile_regression import AmortizedNeuralQuantileRegression
 from utils.network import get_total_number_of_parameters
-from conformal.method_zoo import section5, section5_y, baselines, cpflow_based, section5_rf, section5_y_rf
+from conformal.method_zoo import section5, section5_y, baselines, cpflow_based, section5_rf, section5_y_rf, vqr
 
 RESULTS_DIR = "./conformal_results_u"
 
@@ -36,9 +36,15 @@ def run_experiment(args):
     if args.baselines or args.all:
         methods += baselines.copy()
     if args.ours or args.all:
-        methods += section5.copy() + section5_y.copy()
+        methods += (
+            section5.copy()
+        )
+        #         section5_y.copy()
+        # )
     if args.cpflow or args.all:
         methods += cpflow_based.copy()
+    if args.vqr or args.all:
+        methods += vqr
     if args.rf or args.all:
         methods += section5_rf.copy() + section5_y_rf.copy()
 
@@ -71,12 +77,16 @@ def run_experiment(args):
         required_model_names.add(method.base_model_name)
         method.instance = method.cls(**method.kwargs, seed=args.seed, d_y=ds.n_outputs)
 
+    print(f"{methods=}")
+    
     score_calculators = {
         base_model_name:
         getattr(all_score_calculators, base_model_name
                 ).create_or_load(path=current_seed_dir, args=args, dataset_split=ds)
         for base_model_name in required_model_names
     }
+
+    print(f"{score_calculators=}")
 
     def _calculate_scores(X, Y):
         return {
@@ -90,7 +100,6 @@ def run_experiment(args):
     # Calculate scores for all base models
     scores_calibration = _calculate_scores(ds.X_cal, ds.Y_cal)
     if args.area_only:
-        #
         scores_test = scores_calibration
     else:
         scores_test = _calculate_scores(ds.X_test, ds.Y_test)
@@ -144,6 +153,7 @@ def run_experiment(args):
                                                                       ],
                 alpha=alpha
             )
+            
             if not args.area_only:
                 is_covered = method.instance.is_covered(
                     X_test=ds.X_test,
@@ -179,10 +189,12 @@ def run_experiment(args):
 
         # For each test point Xi, sample Y values randomly in the range of all observed Ys,
         # then calculate the ratio of covered points and multiply by the bounding box's volume
-        volumes = np.zeros((len(methods), ds.n_test))
+        numer_of_points_to_test = min(ds.n_test, 200)
+        volumes = np.zeros((len(methods), numer_of_points_to_test))
         if not skip_area_computation:
             print(f"{alpha=:.2f}, estimating areas:")
-            for i in tqdm(range(ds.n_test)):
+            progress_bar = tqdm(range(numer_of_points_to_test))
+            for i in progress_bar:
                 X_samples = np.repeat(ds.X_test[i:i + 1], repeats=n_samples, axis=0)
                 Y_smaples = ymin + rng.random((n_samples, ds.n_outputs)) * (ymax - ymin)
 
@@ -201,6 +213,23 @@ def run_experiment(args):
                             scores_samples[method.base_model_name][method.score_name]
                         ).mean() * scale
                     volumes[j, i] = volume
+
+                mean_volumes_after_i_samples = volumes[:, :i].mean(axis=-1)
+                std_volumes_after_i_samples = volumes[:, :i].std(axis=-1)
+                
+
+                progress_bar.set_postfix(
+                    {
+                        "[" + "][".join(
+                            [method.class_name[:5], method.base_model_name[:5]]
+                        ) + "]":(
+                            f"{mean_volumes_after_i_samples[j]:.2}, "
+                            f"{std_volumes_after_i_samples[j]:.2}"
+                        )
+                        for j, method in enumerate(methods)
+                    }
+                )
+
             mean_volumes = volumes.mean(axis=-1)
             for j, _ in enumerate(methods):
                 records_alpha[j]["volume"] = mean_volumes[j]
@@ -228,6 +257,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--n_cpus", type=int, default=8)
     parser.add_argument("--baselines", action='store_true')
     parser.add_argument("--ours", action='store_true')
+    parser.add_argument("--vqr", action='store_true')
     parser.add_argument("--cpflow", action='store_true')
     parser.add_argument("--rf", action='store_true')
     parser.add_argument("--all", action='store_true')

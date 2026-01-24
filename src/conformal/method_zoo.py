@@ -1,6 +1,26 @@
 from conformal.classes.conformalizers import OTCPGlobalPredictor, OTCPLocalPredictor, QuantileEstimatePredictor, SplitConformalPredictor, EllipsoidalLocal
 from conformal.classes.method_desc import ConformalMethodDescription
 
+vqr = [
+    ConformalMethodDescription(
+        name="VQR",
+        name_mathtext="VQR, Carlier",
+        base_model_name="CarlierRegressor",
+        score_name="Cube Rank",
+        class_name="SplitConformalPredictor",
+        cls=SplitConformalPredictor,
+    ),
+    # ConformalMethodDescription(
+    #     name="FN-VQR",
+    #     name_mathtext="FN-VQR",
+    #     base_model_name="ABC",
+    #     score_name="Cube rank",
+    #     class_name="SplitConformalPredictor",
+    #     cls=SplitConformalPredictor,
+    # ),
+]
+
+
 section5 = [
     ConformalMethodDescription(
         name="PB",
@@ -18,15 +38,15 @@ section5 = [
         class_name="OTCPGlobalPredictor",
         cls=OTCPGlobalPredictor
     ),
-    ConformalMethodDescription(
-        name="HPD",
-        name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}}$",
-        base_model_name="CVQRegressor",
-        score_name="Log Density",
-        class_name="SplitConformalPredictor",
-        cls=SplitConformalPredictor,
-        kwargs=dict(lower_is_better=False)
-    ),
+    # ConformalMethodDescription(
+    #     name="HPD",
+    #     name_mathtext=r"$\mathcal{C}^{\mathrm{HPD}}$",
+    #     base_model_name="CVQRegressor",
+    #     score_name="Log Density",
+    #     class_name="SplitConformalPredictor",
+    #     cls=SplitConformalPredictor,
+    #     kwargs=dict(lower_is_better=False)
+    # ),
     ConformalMethodDescription(
         name="Quantile",
         name_mathtext=r"$Q_{Y|X}$",
@@ -198,12 +218,12 @@ baselines = [
         class_name="OTCPLocalPredictor",
         cls=OTCPLocalPredictor
     ),
-    ConformalMethodDescription(
-        name="Ell-Local",
-        name_mathtext=r"$\mathrm{ELL}$-$\mathrm{local}$+",
-        base_model_name="RandomForestWithScore",
-        score_name="Signed Error",
-        class_name="EllipsoidalLocal",
-        cls=EllipsoidalLocal
-    ),
+    # ConformalMethodDescription(
+    #     name="Ell-Local",
+    #     name_mathtext=r"$\mathrm{ELL}$-$\mathrm{local}$+",
+    #     base_model_name="RandomForestWithScore",
+    #     score_name="Signed Error",
+    #     class_name="EllipsoidalLocal",
+    #     cls=EllipsoidalLocal
+    # ),
 ]

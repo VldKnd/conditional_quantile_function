@@ -9,8 +9,9 @@ import pooch
 
 from conformal.real_datasets.preprocessing import preprocess
 
-_RAW_DATASETS = "./data/raw/"
-_PROCESSED_DATASETS = "./data/processed/"
+_BASE_PATH = f"{os.path.dirname(__file__)}"
+_RAW_DATASETS = f"{_BASE_PATH}/data/raw"
+_PROCESSED_DATASETS = f"{_BASE_PATH}/data/processed"
 
 __all__ = ["loaders", "datasets"]
 
@@ -246,7 +247,6 @@ def ujiindoor_processor(fname):
 
     return X, Y
 
-
 def read_local_dataset(
     name: str,
     csv_path: str,
@@ -265,6 +265,7 @@ def read_local_dataset(
     processed_path = os.path.join(_PROCESSED_DATASETS, processed_file_name)
 
     def _build_if_needed() -> None:
+        
         if force or (not os.path.isfile(processed_path)) or (
             os.path.isfile(csv_path)
             and os.path.getmtime(processed_path) < os.path.getmtime(csv_path)
@@ -291,54 +292,44 @@ def read_local_dataset(
 def act_preprocesser(fname: str) -> tuple[np.ndarray, np.ndarray]:
     """
     Read a locally generated ATC/ACT sequences CSV and return (X, Y).
-
-    Expected columns (produced by your sequencing step):
-      - History features: anything that's NOT in {'x_t','y_t','z_t','person_id','time_t'}
-      - Targets: 'x_t', 'y_t', 'z_t'
-      - Optional meta: 'person_id', 'time_t' (dropped)
-
-    Notes:
-      * Imputes missing feature values with the median (like other processors).
-      * Returns float32 arrays.
     """
-    df = pd.read_csv(fname)
+    dataset_as_dataframe = pd.read_csv(fname)
 
-    target_cols = ["x_t", "y_t", "z_t"]
-    missing = [c for c in target_cols if c not in df.columns]
-    if missing:
-        raise KeyError(
-            f"Expected target columns {target_cols} not found. Missing: {missing}. "
-            "Make sure you ran the sequencing step that creates '*_t-<k>' and 'x_t,y_t,z_t'."
-        )
+    all_column_names_as_set = set(dataset_as_dataframe.columns)
 
-    # Exclude targets and common meta from features
-    meta_cols = {"person_id", "time_t"}
-    feature_cols = [c for c in df.columns if c not in set(target_cols) | meta_cols]
+    def feature_column_name_filter(column_name: str):
+        try:
+            return int(column_name.split("_")[-1]) < 32
+        except ValueError:
+            return False
+        
+    def target_column_name_filter(column_name: str):
+        try:
+            return int(column_name.split("_")[-1]) >= 32 and "position" in column_name
+        except ValueError:
+            return False
+        
+    sorting_key_function = lambda x: (ord(x[0]) - 96) * 100000 + (ord(x.split("_")[-2][-1]) - 96) * 100 + int(x.split("_")[-1])
 
-    # Build arrays
-    X = df.loc[:, feature_cols].to_numpy(dtype=np.float32, copy=False)
-    Y = df.loc[:, target_cols].to_numpy(dtype=np.float32, copy=False)
+    feature_columns_as_iterable = filter(feature_column_name_filter, all_column_names_as_set)
+    target_columns_as_iterable = filter(target_column_name_filter, all_column_names_as_set)
 
-    # Median impute like the other processors (rf*, scm*, etc.)
-    from sklearn.impute import SimpleImputer
-    imputer = SimpleImputer(missing_values=np.nan, strategy="median")
-    X = imputer.fit_transform(X).astype(np.float32, copy=False)
+    feature_columns_as_list = sorted(feature_columns_as_iterable, key=sorting_key_function)
+    target_columns_as_list = sorted(target_columns_as_iterable, key=sorting_key_function)
+
+    features_as_dataframe = dataset_as_dataframe[feature_columns_as_list]
+    targets_as_dataframe = dataset_as_dataframe[target_columns_as_list]
+
+    X = features_as_dataframe.to_numpy()
+    Y = targets_as_dataframe.to_numpy()
 
     return X, Y
 
-
 read_local_dataset(
-    name="act",
-    csv_path=os.path.join(os.getcwd(), "act_dataset.csv"),
+    name="atc_20121024_20121205",
+    csv_path=f"{_RAW_DATASETS}/atc_20121024_20121205.csv",
     processor=act_preprocesser,
-    processed_file_name="act.npz",
-)
-
-read_local_dataset(
-    name="act_100x50",
-    csv_path=os.path.join(os.getcwd(), "act_dataset.csv"),
-    processor=act_preprocesser,
-    processed_file_name="act_100x50.npz",
+    processed_file_name="atc_20121024_20121205.npz",
 )
 
 if __name__ == "__main__":

@@ -179,6 +179,9 @@ class RegularizedDualVQRSolver(VQRDiscreteSolver):
 
         # All quantile levels
         Td: int = T**d
+
+        print(f"{T=}, {d=}, {Td=}")
+        # assert False
         U: Array = vector_quantile_levels(T, d)
         assert U.shape == (Td, d)
 

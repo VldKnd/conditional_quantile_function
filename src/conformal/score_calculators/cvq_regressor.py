@@ -16,11 +16,11 @@ from conformal.score_calculators.selected_params import selected_params
 from infrastructure.classes import TrainParameters
 from pushforward_operators.convex_potential_flow.core_flow import ConvexPotentialFlow
 from pushforward_operators.protocol import PushForwardOperator
-from pushforward_operators import NeuralQuantileRegression, AmortizedNeuralQuantileRegression
+from pushforward_operators import AmortizedNeuralQuantileRegression
 
 
 def _make_xy_dataloader(
-    X: np.ndarray, Y: np.ndarray, batch_size: int, dtype=torch.float64
+    X: np.ndarray, Y: np.ndarray, batch_size: int, dtype=torch.float32
 ) -> DataLoader:
     dataset = TensorDataset(torch.tensor(X, dtype=dtype), torch.tensor(Y, dtype=dtype))
     dataloader = DataLoader(dataset, batch_size=batch_size)
@@ -29,7 +29,6 @@ def _make_xy_dataloader(
 
 @dataclass
 class BaseVQRegressor(ScoreCalculator):
-
     feature_dimension: int
     response_dimension: int
     hidden_dimension: int
@@ -38,7 +37,7 @@ class BaseVQRegressor(ScoreCalculator):
     n_epochs: int
     learning_rate: float = 0.01
     potential_to_estimate_with_neural_network = "u"
-    dtype: torch.dtype = torch.float64
+    dtype: torch.dtype = torch.float32
     betas: tuple[float, float] = (0.5, 0.5)
     weight_decay: float = 1e-4
     warmup_iterations: int = 5
@@ -187,6 +186,27 @@ class CVQRegressor(BaseVQRegressor):
         return {"MK Quantile": quantiles, "MK Rank": ranks, "Log Density": log_density}
 
     @classmethod
+    def load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
+        ckpt_path = path / f"model_{str(cls.__name__)}.pth"
+        if not ckpt_path.is_file():
+            ckpt_path = path / cls.ckpt_name_old
+
+        X_train=dataset_split.X_train,
+        Y_train=dataset_split.Y_train
+
+        n_features = X_train.shape[1]
+        n_outputs = Y_train.shape[1]
+
+        reg_cvqr = cls(
+            feature_dimension=n_features,
+            response_dimension=n_outputs,
+            **selected_params[args.dataset]
+        )
+
+        reg_cvqr.model = AmortizedNeuralQuantileRegression.load_class(ckpt_path)
+        return reg_cvqr
+
+    @classmethod
     def create_or_load(cls, path: Path, args, dataset_split: DatasetSplit) -> Self:
         ckpt_path = path / f"model_{str(cls.__name__)}.pth"
         if not ckpt_path.is_file():
@@ -324,6 +344,7 @@ if __name__ == "__main__":
         n_epochs=1
     )
     print(cvqr.potential_to_estimate_with_neural_network)
+
     cvqr_y = CVQRegressorY(
         feature_dimension=1,
         response_dimension=1,

@@ -1,20 +1,12 @@
 import torch
 
 selected_params = {
-    "act": {
-        "hidden_dimension": 15,
-        "number_of_hidden_layers": 2,
+    "atc_20121024_20121205": {
+        "hidden_dimension": 16,
+        "number_of_hidden_layers": 4,
         "batch_size": 512,
         "n_epochs": 100,
-        "warmup_iterations": 50,
-        "learning_rate": 0.01,
-    },
-    "act_100x50": {
-        "hidden_dimension": 64,
-        "number_of_hidden_layers": 4,
-        "batch_size": 1024,
-        "n_epochs": 20,
-        "warmup_iterations": 50,
+        "warmup_iterations": 5,
         "learning_rate": 0.01,
     },
     "ujiindoor": {
